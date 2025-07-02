@@ -149,14 +149,14 @@ pub struct STmpVert {
     pub vert: [libc::c_float; 3],
     pub index: libc::c_int,
 }
-pub const M_PI: libc::c_double = 3.14159265358979323846f64;
+pub const M_PI: libc::c_double = 3.141_592_653_589_793_f64;
 pub const FLT_MIN: libc::c_float = __FLT_MIN__;
 pub const NULL: libc::c_int = 0 as libc::c_int;
 pub const TFALSE: libc::c_int = 0 as libc::c_int;
 pub const TTRUE: libc::c_int = 1 as libc::c_int;
 pub const INTERNAL_RND_SORT_SEED: libc::c_int = 39871946 as libc::c_int;
 unsafe extern "C" fn veq(v1: SVec3, v2: SVec3) -> tbool {
-    return (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as libc::c_int;
+    (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as libc::c_int
 }
 unsafe extern "C" fn vadd(v1: SVec3, v2: SVec3) -> SVec3 {
     let mut vRes: SVec3 = SVec3 {
@@ -167,7 +167,7 @@ unsafe extern "C" fn vadd(v1: SVec3, v2: SVec3) -> SVec3 {
     vRes.x = v1.x + v2.x;
     vRes.y = v1.y + v2.y;
     vRes.z = v1.z + v2.z;
-    return vRes;
+    vRes
 }
 unsafe extern "C" fn vsub(v1: SVec3, v2: SVec3) -> SVec3 {
     let mut vRes: SVec3 = SVec3 {
@@ -178,7 +178,7 @@ unsafe extern "C" fn vsub(v1: SVec3, v2: SVec3) -> SVec3 {
     vRes.x = v1.x - v2.x;
     vRes.y = v1.y - v2.y;
     vRes.z = v1.z - v2.z;
-    return vRes;
+    vRes
 }
 unsafe extern "C" fn vscale(fS: libc::c_float, v: SVec3) -> SVec3 {
     let mut vRes: SVec3 = SVec3 {
@@ -189,25 +189,25 @@ unsafe extern "C" fn vscale(fS: libc::c_float, v: SVec3) -> SVec3 {
     vRes.x = fS * v.x;
     vRes.y = fS * v.y;
     vRes.z = fS * v.z;
-    return vRes;
+    vRes
 }
 unsafe extern "C" fn LengthSquared(v: SVec3) -> libc::c_float {
-    return v.x * v.x + v.y * v.y + v.z * v.z;
+    v.x * v.x + v.y * v.y + v.z * v.z
 }
 unsafe extern "C" fn Length(v: SVec3) -> libc::c_float {
-    return sqrtf(LengthSquared(v));
+    sqrtf(LengthSquared(v))
 }
 unsafe extern "C" fn Normalize(v: SVec3) -> SVec3 {
-    return vscale(1 as libc::c_int as libc::c_float / Length(v), v);
+    vscale(1 as libc::c_int as libc::c_float / Length(v), v)
 }
 unsafe extern "C" fn vdot(v1: SVec3, v2: SVec3) -> libc::c_float {
-    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+    v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 }
 unsafe extern "C" fn NotZero(fX: libc::c_float) -> tbool {
-    return (fabsf(fX) > FLT_MIN) as libc::c_int;
+    (fabsf(fX) > FLT_MIN) as libc::c_int
 }
 unsafe extern "C" fn VNotZero(v: SVec3) -> tbool {
-    return (NotZero(v.x) != 0 || NotZero(v.y) != 0 || NotZero(v.z) != 0) as libc::c_int;
+    (NotZero(v.x) != 0 || NotZero(v.y) != 0 || NotZero(v.z) != 0) as libc::c_int
 }
 pub const MARK_DEGENERATE: libc::c_int = 1 as libc::c_int;
 pub const QUAD_ONE_DEGEN_TRI: libc::c_int = 2 as libc::c_int;
@@ -240,7 +240,7 @@ unsafe extern "C" fn MakeIndex(iFace: libc::c_int, iVert: libc::c_int) -> libc::
             );
         }
     };
-    return iFace << 2 as libc::c_int | iVert & 0x3 as libc::c_int;
+    iFace << 2 as libc::c_int | iVert & 0x3 as libc::c_int
 }
 unsafe extern "C" fn IndexToData(
     mut piFace: *mut libc::c_int,
@@ -288,11 +288,11 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
             ts_res.vOt = Normalize(ts_res.vOt);
         }
     }
-    return ts_res;
+    ts_res
 }
 #[no_mangle]
 pub unsafe extern "C" fn genTangSpaceDefault(mut pContext: *const SMikkTSpaceContext) -> tbool {
-    return genTangSpace(pContext, 180.0f32);
+    genTangSpace(pContext, 180.0f32)
 }
 #[no_mangle]
 pub unsafe extern "C" fn genTangSpace(
@@ -334,12 +334,10 @@ pub unsafe extern "C" fn genTangSpace(
             .expect("non-null function pointer")(pContext, f);
         if verts == 3 as libc::c_int {
             iNrTrianglesIn += 1;
-            iNrTrianglesIn;
         } else if verts == 4 as libc::c_int {
             iNrTrianglesIn += 2 as libc::c_int;
         }
         f += 1;
-        f;
     }
     if iNrTrianglesIn <= 0 as libc::c_int {
         return TFALSE;
@@ -380,10 +378,8 @@ pub unsafe extern "C" fn genTangSpace(
         if veq(p0, p1) != 0 || veq(p0, p2) != 0 || veq(p1, p2) != 0 {
             (*pTriInfos.offset(t as isize)).iFlag |= MARK_DEGENERATE;
             iDegenTriangles += 1;
-            iDegenTriangles;
         }
         t += 1;
-        t;
     }
     iNrTrianglesIn = iTotTris - iDegenTriangles;
     DegenPrologue(pTriInfos, piTriListIn, iNrTrianglesIn, iTotTris);
@@ -449,7 +445,6 @@ pub unsafe extern "C" fn genTangSpace(
         (*psTspace.offset(t as isize)).vOt.z = 0.0f32;
         (*psTspace.offset(t as isize)).fMagT = 1.0f32;
         t += 1;
-        t;
     }
     bRes = GenerateTSpaces(
         psTspace,
@@ -519,16 +514,13 @@ pub unsafe extern "C" fn genTangSpace(
                     );
                 }
                 index += 1;
-                index;
                 i += 1;
-                i;
             }
         }
         f += 1;
-        f;
     }
     free(psTspace as *mut libc::c_void);
-    return TTRUE;
+    TTRUE
 }
 static mut g_iCells: libc::c_int = 2048 as libc::c_int;
 #[inline(never)]
@@ -539,7 +531,7 @@ unsafe extern "C" fn FindGridCell(
 ) -> libc::c_int {
     let fIndex: libc::c_float = g_iCells as libc::c_float * ((fVal - fMin) / (fMax - fMin));
     let iIndex: libc::c_int = fIndex as libc::c_int;
-    return if iIndex < g_iCells {
+    if iIndex < g_iCells {
         if iIndex >= 0 as libc::c_int {
             iIndex
         } else {
@@ -547,7 +539,7 @@ unsafe extern "C" fn FindGridCell(
         }
     } else {
         g_iCells - 1 as libc::c_int
-    };
+    }
 }
 unsafe extern "C" fn GenerateSharedVerticesIndexList(
     mut piTriList_in_and_out: *mut libc::c_int,
@@ -593,7 +585,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             vMax.z = vP.z;
         }
         i += 1;
-        i;
     }
     vDim = vsub(vMax, vMin);
     iChannel = 0 as libc::c_int;
@@ -669,11 +660,9 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             vP_0.z
         };
         let iCell: libc::c_int = FindGridCell(fMin, fMax, fVal);
-        let ref mut fresh0 = *piHashCount.offset(iCell as isize);
+        let fresh0 = &mut (*piHashCount.offset(iCell as isize));
         *fresh0 += 1;
-        *fresh0;
         i += 1;
-        i;
     }
     *piHashOffsets.offset(0 as libc::c_int as isize) = 0 as libc::c_int;
     k = 1 as libc::c_int;
@@ -681,7 +670,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         *piHashOffsets.offset(k as isize) = *piHashOffsets.offset((k - 1 as libc::c_int) as isize)
             + *piHashCount.offset((k - 1 as libc::c_int) as isize);
         k += 1;
-        k;
     }
     i = 0 as libc::c_int;
     while i < iNrTrianglesIn * 3 as libc::c_int {
@@ -735,11 +723,9 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
             as *mut libc::c_int;
         *pTable.offset(*piHashCount2.offset(iCell_0 as isize) as isize) = i;
-        let ref mut fresh1 = *piHashCount2.offset(iCell_0 as isize);
+        let fresh1 = &mut (*piHashCount2.offset(iCell_0 as isize));
         *fresh1 += 1;
-        *fresh1;
         i += 1;
-        i;
     }
     k = 0 as libc::c_int;
     while k < g_iCells {
@@ -780,7 +766,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             }
         };
         k += 1;
-        k;
     }
     free(piHashCount2 as *mut libc::c_void);
     iMaxCount = *piHashCount.offset(0 as libc::c_int as isize);
@@ -790,7 +775,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             iMaxCount = *piHashCount.offset(k as isize);
         }
         k += 1;
-        k;
     }
     pTmpVert = malloc(
         (::core::mem::size_of::<STmpVert>() as libc::c_ulong)
@@ -802,7 +786,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             .offset(*piHashOffsets.offset(k as isize) as isize)
             as *mut libc::c_int;
         let iEntries: libc::c_int = *piHashCount.offset(k as isize);
-        if !(iEntries < 2 as libc::c_int) {
+        if iEntries >= 2 as libc::c_int {
             if !pTmpVert.is_null() {
                 e = 0 as libc::c_int;
                 while e < iEntries {
@@ -814,7 +798,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
                     (*pTmpVert.offset(e as isize)).vert[2 as libc::c_int as usize] = vP_2.z;
                     (*pTmpVert.offset(e as isize)).index = i_0;
                     e += 1;
-                    e;
                 }
                 MergeVertsFast(
                     piTriList_in_and_out,
@@ -833,7 +816,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             }
         }
         k += 1;
-        k;
     }
     if !pTmpVert.is_null() {
         free(pTmpVert as *mut libc::c_void);
@@ -863,7 +845,6 @@ unsafe extern "C" fn MergeVertsFast(
         fvMin[c as usize] = (*pTmpVert.offset(iL_in as isize)).vert[c as usize];
         fvMax[c as usize] = fvMin[c as usize];
         c += 1;
-        c;
     }
     l = iL_in + 1 as libc::c_int;
     while l <= iR_in {
@@ -876,10 +857,8 @@ unsafe extern "C" fn MergeVertsFast(
                 fvMax[c as usize] = (*pTmpVert.offset(l as isize)).vert[c as usize];
             }
             c += 1;
-            c;
         }
         l += 1;
-        l;
     }
     dx = fvMax[0 as libc::c_int as usize] - fvMin[0 as libc::c_int as usize];
     dy = fvMax[1 as libc::c_int as usize] - fvMin[1 as libc::c_int as usize];
@@ -925,7 +904,6 @@ unsafe extern "C" fn MergeVertsFast(
                     bNotFound = TFALSE;
                 } else {
                     l2 += 1;
-                    l2;
                 }
             }
             if bNotFound == 0 {
@@ -933,7 +911,6 @@ unsafe extern "C" fn MergeVertsFast(
                     *piTriList_in_and_out.offset(i2rec as isize);
             }
             l += 1;
-            l;
         }
     } else {
         let mut iL: libc::c_int = iL_in;
@@ -1015,7 +992,6 @@ unsafe extern "C" fn MergeVertsFast(
                     !((*pTmpVert.offset(iL as isize)).vert[channel as usize] < fSep) as libc::c_int;
                 if bReadyLeftSwap == 0 {
                     iL += 1;
-                    iL;
                 }
             }
             while bReadyRightSwap == 0 && iL < iR {
@@ -1058,7 +1034,6 @@ unsafe extern "C" fn MergeVertsFast(
                     ((*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep) as libc::c_int;
                 if bReadyRightSwap == 0 {
                     iR -= 1;
-                    iR;
                 }
             }
             if iL < iR || !(bReadyLeftSwap != 0 && bReadyRightSwap != 0) {
@@ -1136,9 +1111,7 @@ unsafe extern "C" fn MergeVertsFast(
                 *pTmpVert.offset(iL as isize) = *pTmpVert.offset(iR as isize);
                 *pTmpVert.offset(iR as isize) = sTmp;
                 iL += 1;
-                iL;
                 iR -= 1;
-                iR;
             }
         }
         if iL == iR + 1 as libc::c_int || iL == iR {
@@ -1180,10 +1153,8 @@ unsafe extern "C" fn MergeVertsFast(
                 ((*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep) as libc::c_int;
             if bReadyRightSwap_0 != 0 {
                 iL += 1;
-                iL;
             } else {
                 iR -= 1;
-                iR;
             }
         }
         if iL_in < iR {
@@ -1222,14 +1193,12 @@ unsafe extern "C" fn MergeVertsSlow(
                 bNotFound = TFALSE;
             } else {
                 e2 += 1;
-                e2;
             }
         }
         if bNotFound == 0 {
             *piTriList_in_and_out.offset(i as isize) = *piTriList_in_and_out.offset(i2rec as isize);
         }
         e += 1;
-        e;
     }
 }
 unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
@@ -1237,7 +1206,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: libc::c_int,
 ) {
-    let mut iNumUniqueVerts: libc::c_int = 0 as libc::c_int;
     let mut t: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     t = 0 as libc::c_int;
@@ -1264,12 +1232,10 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
                         bFound = TTRUE;
                     } else {
                         j += 1;
-                        j;
                     }
                 }
                 if bFound == 0 {
                     t2 += 1;
-                    t2;
                 }
             }
             if bFound != 0 {
@@ -1306,16 +1272,10 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
                     );
                 }
             };
-            if index2rec == index {
-                iNumUniqueVerts += 1;
-                iNumUniqueVerts;
-            }
             *piTriList_in_and_out.offset(offs as isize) = index2rec;
             i += 1;
-            i;
         }
         t += 1;
-        t;
     }
 }
 unsafe extern "C" fn GenerateInitialVerticesIndexList(
@@ -1353,7 +1313,6 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     .offset((iDstTriIndex * 3 as libc::c_int + 2 as libc::c_int) as isize) =
                     MakeIndex(f, 2 as libc::c_int);
                 iDstTriIndex += 1;
-                iDstTriIndex;
             } else {
                 (*pTriInfos.offset((iDstTriIndex + 1 as libc::c_int) as isize)).iOrgFaceNumber = f;
                 (*pTriInfos.offset((iDstTriIndex + 1 as libc::c_int) as isize)).iTSpacesOffs =
@@ -1399,7 +1358,6 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     *piTriList_out
                         .offset((iDstTriIndex * 3 as libc::c_int + 2 as libc::c_int) as isize) = i2;
                     iDstTriIndex += 1;
-                    iDstTriIndex;
                     let mut pVerts_B: *mut libc::c_uchar =
                         ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
                     *pVerts_B.offset(0 as libc::c_int as isize) = 0 as libc::c_int as libc::c_uchar;
@@ -1412,7 +1370,6 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     *piTriList_out
                         .offset((iDstTriIndex * 3 as libc::c_int + 2 as libc::c_int) as isize) = i3;
                     iDstTriIndex += 1;
-                    iDstTriIndex;
                 } else {
                     let mut pVerts_A_0: *mut libc::c_uchar =
                         ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
@@ -1429,7 +1386,6 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     *piTriList_out
                         .offset((iDstTriIndex * 3 as libc::c_int + 2 as libc::c_int) as isize) = i3;
                     iDstTriIndex += 1;
-                    iDstTriIndex;
                     let mut pVerts_B_0: *mut libc::c_uchar =
                         ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
                     *pVerts_B_0.offset(0 as libc::c_int as isize) =
@@ -1445,7 +1401,6 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     *piTriList_out
                         .offset((iDstTriIndex * 3 as libc::c_int + 2 as libc::c_int) as isize) = i3;
                     iDstTriIndex += 1;
-                    iDstTriIndex;
                 }
             }
             iTSpacesOffs += verts;
@@ -1487,15 +1442,13 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
             };
         }
         f += 1;
-        f;
     }
     t = 0 as libc::c_int;
     while t < iNrTrianglesIn {
         (*pTriInfos.offset(t as isize)).iFlag = 0 as libc::c_int;
         t += 1;
-        t;
     }
-    return iTSpacesOffs;
+    iTSpacesOffs
 }
 unsafe extern "C" fn GetPosition(
     mut pContext: *const SMikkTSpaceContext,
@@ -1519,7 +1472,7 @@ unsafe extern "C" fn GetPosition(
     res.x = pos[0 as libc::c_int as usize];
     res.y = pos[1 as libc::c_int as usize];
     res.z = pos[2 as libc::c_int as usize];
-    return res;
+    res
 }
 unsafe extern "C" fn GetNormal(
     mut pContext: *const SMikkTSpaceContext,
@@ -1543,7 +1496,7 @@ unsafe extern "C" fn GetNormal(
     res.x = norm[0 as libc::c_int as usize];
     res.y = norm[1 as libc::c_int as usize];
     res.z = norm[2 as libc::c_int as usize];
-    return res;
+    res
 }
 unsafe extern "C" fn GetTexCoord(
     mut pContext: *const SMikkTSpaceContext,
@@ -1567,7 +1520,7 @@ unsafe extern "C" fn GetTexCoord(
     res.x = texc[0 as libc::c_int as usize];
     res.y = texc[1 as libc::c_int as usize];
     res.z = 1.0f32;
-    return res;
+    res
 }
 unsafe extern "C" fn CalcTexArea(
     mut pContext: *const SMikkTSpaceContext,
@@ -1581,11 +1534,11 @@ unsafe extern "C" fn CalcTexArea(
     let t31x: libc::c_float = t3.x - t1.x;
     let t31y: libc::c_float = t3.y - t1.y;
     let fSignedAreaSTx2: libc::c_float = t21x * t31y - t21y * t31x;
-    return if fSignedAreaSTx2 < 0 as libc::c_int as libc::c_float {
+    if fSignedAreaSTx2 < 0 as libc::c_int as libc::c_float {
         -fSignedAreaSTx2
     } else {
         fSignedAreaSTx2
-    };
+    }
 }
 unsafe extern "C" fn InitTriInfo(
     mut pTriInfos: *mut STriInfo,
@@ -1601,7 +1554,7 @@ unsafe extern "C" fn InitTriInfo(
         i = 0 as libc::c_int;
         while i < 3 as libc::c_int {
             (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] = -(1 as libc::c_int);
-            let ref mut fresh2 = (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
+            let fresh2 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
             *fresh2 = NULL as *mut SGroup;
             (*pTriInfos.offset(f as isize)).vOs.x = 0.0f32;
             (*pTriInfos.offset(f as isize)).vOs.y = 0.0f32;
@@ -1613,10 +1566,8 @@ unsafe extern "C" fn InitTriInfo(
             (*pTriInfos.offset(f as isize)).fMagT = 0 as libc::c_int as libc::c_float;
             (*pTriInfos.offset(f as isize)).iFlag |= GROUP_WITH_ANY;
             i += 1;
-            i;
         }
         f += 1;
-        f;
     }
     f = 0 as libc::c_int;
     while f < iNrTrianglesIn {
@@ -1684,7 +1635,6 @@ unsafe extern "C" fn InitTriInfo(
             }
         }
         f += 1;
-        f;
     }
     while t < iNrTrianglesIn - 1 as libc::c_int {
         let iFO_a: libc::c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
@@ -1756,7 +1706,6 @@ unsafe extern "C" fn InitTriInfo(
             t += 2 as libc::c_int;
         } else {
             t += 1;
-            t;
         }
     }
     let mut pEdges: *mut SEdge = malloc(
@@ -1831,7 +1780,7 @@ unsafe extern "C" fn Build4RuleGroups(
                         );
                     }
                 };
-                let ref mut fresh3 = (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
+                let fresh3 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
                 *fresh3 = &mut *pGroups.offset(iNrActiveGroups as isize) as *mut SGroup;
                 (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize])
                     .iVertexRepresentitive = vert_index;
@@ -1840,11 +1789,9 @@ unsafe extern "C" fn Build4RuleGroups(
                         as libc::c_int;
                 (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces =
                     0 as libc::c_int;
-                let ref mut fresh4 =
-                    (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).pFaceIndices;
+                let fresh4 = &mut (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).pFaceIndices;
                 *fresh4 = &mut *piGroupTrianglesBuffer.offset(iOffset as isize) as *mut libc::c_int;
                 iNrActiveGroups += 1;
-                iNrActiveGroups;
                 AddTriToGroup((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize], f);
                 bOrPre = if (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING
                     != 0 as libc::c_int
@@ -2000,12 +1947,10 @@ unsafe extern "C" fn Build4RuleGroups(
                 };
             }
             i += 1;
-            i;
         }
         f += 1;
-        f;
     }
-    return iNrActiveGroups;
+    iNrActiveGroups
 }
 unsafe extern "C" fn AddTriToGroup(mut pGroup: *mut SGroup, iTriIndex: libc::c_int) {
     *((*pGroup).pFaceIndices).offset((*pGroup).iNrFaces as isize) = iTriIndex;
@@ -2063,18 +2008,14 @@ unsafe extern "C" fn AssignRecur(
     } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_null() {
         return TFALSE;
     }
-    if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as libc::c_int {
-        if ((*pMyTriInfo).AssignedGroup[0 as libc::c_int as usize]).is_null()
-            && ((*pMyTriInfo).AssignedGroup[1 as libc::c_int as usize]).is_null()
-            && ((*pMyTriInfo).AssignedGroup[2 as libc::c_int as usize]).is_null()
-        {
-            (*pMyTriInfo).iFlag &= !ORIENT_PRESERVING;
-            (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering != 0 {
-                ORIENT_PRESERVING
-            } else {
-                0 as libc::c_int
-            };
-        }
+    if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as libc::c_int && ((*pMyTriInfo).AssignedGroup[0 as libc::c_int as usize]).is_null()
+            && ((*pMyTriInfo).AssignedGroup[1 as libc::c_int as usize]).is_null() && ((*pMyTriInfo).AssignedGroup[2 as libc::c_int as usize]).is_null() {
+        (*pMyTriInfo).iFlag &= !ORIENT_PRESERVING;
+        (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering != 0 {
+            ORIENT_PRESERVING
+        } else {
+            0 as libc::c_int
+        };
     }
     let bOrient: tbool = if (*pMyTriInfo).iFlag & ORIENT_PRESERVING != 0 as libc::c_int {
         TTRUE
@@ -2098,7 +2039,7 @@ unsafe extern "C" fn AssignRecur(
     if neigh_indexR >= 0 as libc::c_int {
         AssignRecur(piTriListIn, psTriInfos, neigh_indexR, pGroup);
     }
-    return TTRUE;
+    TTRUE
 }
 unsafe extern "C" fn GenerateTSpaces(
     mut psTspace: *mut STSpace,
@@ -2113,7 +2054,6 @@ unsafe extern "C" fn GenerateTSpaces(
     let mut pUniSubGroups: *mut SSubGroup = NULL as *mut SSubGroup;
     let mut pTmpMembers: *mut libc::c_int = NULL as *mut libc::c_int;
     let mut iMaxNrFaces: libc::c_int = 0 as libc::c_int;
-    let mut iUniqueTspaces: libc::c_int = 0 as libc::c_int;
     let mut g: libc::c_int = 0 as libc::c_int;
     let mut i: libc::c_int = 0 as libc::c_int;
     g = 0 as libc::c_int;
@@ -2122,7 +2062,6 @@ unsafe extern "C" fn GenerateTSpaces(
             iMaxNrFaces = (*pGroups.offset(g as isize)).iNrFaces;
         }
         g += 1;
-        g;
     }
     if iMaxNrFaces == 0 as libc::c_int {
         return TTRUE;
@@ -2151,7 +2090,6 @@ unsafe extern "C" fn GenerateTSpaces(
         }
         return TFALSE;
     }
-    iUniqueTspaces = 0 as libc::c_int;
     g = 0 as libc::c_int;
     while g < iNrActiveGroups {
         let mut pGroup: *const SGroup = &*pGroups.offset(g as isize) as *const SGroup;
@@ -2168,7 +2106,7 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut l: libc::c_int = 0 as libc::c_int;
             let mut tmp_group: SSubGroup = SSubGroup {
                 iNrFaces: 0,
-                pTriMembers: 0 as *mut libc::c_int,
+                pTriMembers: core::ptr::null_mut::<libc::c_int>(),
             };
             let mut bFound: tbool = 0;
             let mut n: SVec3 = SVec3 {
@@ -2354,11 +2292,10 @@ unsafe extern "C" fn GenerateTSpaces(
                 };
                 if bAny != 0 || bSameOrgFace != 0 || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
-                    iMembers = iMembers + 1;
+                    iMembers += 1;
                     *pTmpMembers.offset(fresh5 as isize) = t;
                 }
                 j += 1;
-                j;
             }
             tmp_group.iNrFaces = iMembers;
             tmp_group.pTriMembers = pTmpMembers;
@@ -2377,7 +2314,6 @@ unsafe extern "C" fn GenerateTSpaces(
                 bFound = CompareSubGroups(&mut tmp_group, &mut *pUniSubGroups.offset(l as isize));
                 if bFound == 0 {
                     l += 1;
-                    l;
                 }
             }
             if bFound != 0 || l == iUniqueSubGroups {
@@ -2429,7 +2365,6 @@ unsafe extern "C" fn GenerateTSpaces(
                             (*pUniSubGroups.offset(s_0 as isize)).pTriMembers as *mut libc::c_void,
                         );
                         s_0 += 1;
-                        s_0;
                     }
                     free(pUniSubGroups as *mut libc::c_void);
                     free(pTmpMembers as *mut libc::c_void);
@@ -2437,7 +2372,7 @@ unsafe extern "C" fn GenerateTSpaces(
                     return TFALSE;
                 }
                 (*pUniSubGroups.offset(iUniqueSubGroups as isize)).iNrFaces = iMembers;
-                let ref mut fresh6 = (*pUniSubGroups.offset(iUniqueSubGroups as isize)).pTriMembers;
+                let fresh6 = &mut (*pUniSubGroups.offset(iUniqueSubGroups as isize)).pTriMembers;
                 *fresh6 = pIndices;
                 memcpy(
                     pIndices as *mut libc::c_void,
@@ -2454,7 +2389,6 @@ unsafe extern "C" fn GenerateTSpaces(
                     (*pGroup).iVertexRepresentitive,
                 );
                 iUniqueSubGroups += 1;
-                iUniqueSubGroups;
             }
             let iOffs: libc::c_int = (*pTriInfos.offset(f as isize)).iTSpacesOffs;
             let iVert: libc::c_int =
@@ -2582,22 +2516,18 @@ unsafe extern "C" fn GenerateTSpaces(
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             }
             i += 1;
-            i;
         }
         s = 0 as libc::c_int;
         while s < iUniqueSubGroups {
             free((*pUniSubGroups.offset(s as isize)).pTriMembers as *mut libc::c_void);
             s += 1;
-            s;
         }
-        iUniqueTspaces += iUniqueSubGroups;
         g += 1;
-        g;
     }
     free(pUniSubGroups as *mut libc::c_void);
     free(pTmpMembers as *mut libc::c_void);
     free(pSubGroupTspace as *mut libc::c_void);
-    return TTRUE;
+    TTRUE
 }
 unsafe extern "C" fn EvalTspace(
     mut face_indices: *mut libc::c_int,
@@ -2797,7 +2727,6 @@ unsafe extern "C" fn EvalTspace(
             fAngleSum += fAngle;
         }
         face += 1;
-        face;
     }
     if VNotZero(res.vOs) != 0 {
         res.vOs = Normalize(res.vOs);
@@ -2809,7 +2738,7 @@ unsafe extern "C" fn EvalTspace(
         res.fMagS /= fAngleSum;
         res.fMagT /= fAngleSum;
     }
-    return res;
+    res
 }
 unsafe extern "C" fn CompareSubGroups(
     mut pg1: *const SSubGroup,
@@ -2830,10 +2759,9 @@ unsafe extern "C" fn CompareSubGroups(
         };
         if bStillSame != 0 {
             i += 1;
-            i;
         }
     }
-    return bStillSame;
+    bStillSame
 }
 unsafe extern "C" fn QuickSort(
     mut pSortBuffer: *mut libc::c_int,
@@ -2886,22 +2814,18 @@ unsafe extern "C" fn QuickSort(
     loop {
         while *pSortBuffer.offset(iL as isize) < iMid {
             iL += 1;
-            iL;
         }
         while *pSortBuffer.offset(iR as isize) > iMid {
             iR -= 1;
-            iR;
         }
         if iL <= iR {
             iTmp = *pSortBuffer.offset(iL as isize);
             *pSortBuffer.offset(iL as isize) = *pSortBuffer.offset(iR as isize);
             *pSortBuffer.offset(iR as isize) = iTmp;
             iL += 1;
-            iL;
             iR -= 1;
-            iR;
         }
-        if !(iL <= iR) {
+        if iL > iR {
             break;
         }
     }
@@ -2941,15 +2865,13 @@ unsafe extern "C" fn BuildNeighborsFast(
                 .i0 = if i0 < i1 { i0 } else { i1 };
             (*pEdges.offset((f * 3 as libc::c_int + i) as isize))
                 .c2rust_unnamed
-                .i1 = if !(i0 < i1) { i0 } else { i1 };
+                .i1 = if i0 >= i1 { i0 } else { i1 };
             (*pEdges.offset((f * 3 as libc::c_int + i) as isize))
                 .c2rust_unnamed
                 .f = f;
             i += 1;
-            i;
         }
         f += 1;
-        f;
     }
     QuickSortEdges(
         pEdges,
@@ -2971,7 +2893,6 @@ unsafe extern "C" fn BuildNeighborsFast(
             QuickSortEdges(pEdges, iL, iR, 1 as libc::c_int, uSeed);
         }
         i += 1;
-        i;
     }
     iCurStartIndex = 0 as libc::c_int;
     i = 1 as libc::c_int;
@@ -2987,7 +2908,6 @@ unsafe extern "C" fn BuildNeighborsFast(
             QuickSortEdges(pEdges, iL_0, iR_0, 2 as libc::c_int, uSeed);
         }
         i += 1;
-        i;
     }
     i = 0 as libc::c_int;
     while i < iEntries {
@@ -3046,7 +2966,6 @@ unsafe extern "C" fn BuildNeighborsFast(
                     bNotFound = TFALSE;
                 } else {
                     j += 1;
-                    j;
                 }
             }
             if bNotFound == 0 {
@@ -3056,7 +2975,6 @@ unsafe extern "C" fn BuildNeighborsFast(
             }
         }
         i += 1;
-        i;
     }
 }
 unsafe extern "C" fn BuildNeighborsSlow(
@@ -3101,13 +3019,11 @@ unsafe extern "C" fn BuildNeighborsSlow(
                                 bFound = TTRUE;
                             } else {
                                 j += 1;
-                                j;
                             }
                         }
                     }
                     if bFound == 0 {
                         t += 1;
-                        t;
                     }
                 }
                 if bFound != 0 {
@@ -3116,10 +3032,8 @@ unsafe extern "C" fn BuildNeighborsSlow(
                 }
             }
             i += 1;
-            i;
         }
         f += 1;
-        f;
     }
 }
 unsafe extern "C" fn QuickSortEdges(
@@ -3190,22 +3104,18 @@ unsafe extern "C" fn QuickSortEdges(
     loop {
         while (*pSortBuffer.offset(iL as isize)).array[channel as usize] < iMid {
             iL += 1;
-            iL;
         }
         while (*pSortBuffer.offset(iR as isize)).array[channel as usize] > iMid {
             iR -= 1;
-            iR;
         }
         if iL <= iR {
             sTmp = *pSortBuffer.offset(iL as isize);
             *pSortBuffer.offset(iL as isize) = *pSortBuffer.offset(iR as isize);
             *pSortBuffer.offset(iR as isize) = sTmp;
             iL += 1;
-            iL;
             iR -= 1;
-            iR;
         }
-        if !(iL <= iR) {
+        if iL > iR {
             break;
         }
     }
@@ -3280,7 +3190,6 @@ unsafe extern "C" fn DegenPrologue(
             t += 2 as libc::c_int;
         } else {
             t += 1;
-            t;
         }
     }
     iNextGoodTriangleSearchIndex = 1 as libc::c_int;
@@ -3315,13 +3224,11 @@ unsafe extern "C" fn DegenPrologue(
                     bJustADegenerate = TFALSE;
                 } else {
                     iNextGoodTriangleSearchIndex += 1;
-                    iNextGoodTriangleSearchIndex;
                 }
             }
             t0 = t;
             t1 = iNextGoodTriangleSearchIndex;
             iNextGoodTriangleSearchIndex += 1;
-            iNextGoodTriangleSearchIndex;
             if iNextGoodTriangleSearchIndex > t + 1 as libc::c_int {
             } else {
                 __assert_fail(
@@ -3361,7 +3268,6 @@ unsafe extern "C" fn DegenPrologue(
                         *piTriList_out.offset((t1 * 3 as libc::c_int + i) as isize);
                     *piTriList_out.offset((t1 * 3 as libc::c_int + i) as isize) = index;
                     i += 1;
-                    i;
                 }
                 let tri_info: STriInfo = *pTriInfos.offset(t0 as isize);
                 *pTriInfos.offset(t0 as isize) = *pTriInfos.offset(t1 as isize);
@@ -3372,7 +3278,6 @@ unsafe extern "C" fn DegenPrologue(
         }
         if bStillFindingGoodOnes != 0 {
             t += 1;
-            t;
         }
     }
     if bStillFindingGoodOnes != 0 {
@@ -3458,7 +3363,6 @@ unsafe extern "C" fn DegenEpilogue(
                         bNotFound = TFALSE;
                     } else {
                         j += 1;
-                        j;
                     }
                 }
                 if bNotFound == 0 {
@@ -3474,11 +3378,9 @@ unsafe extern "C" fn DegenEpilogue(
                         *psTspace.offset((iSrcOffs + iSrcVert) as isize);
                 }
                 i += 1;
-                i;
             }
         }
         t += 1;
-        t;
     }
     t = 0 as libc::c_int;
     while t < iNrTrianglesIn {
@@ -3519,7 +3421,6 @@ unsafe extern "C" fn DegenEpilogue(
                     bNotFound_0 = TFALSE;
                 } else {
                     i_0 += 1;
-                    i_0;
                 }
             }
             if bNotFound_0 == 0 {
@@ -3558,7 +3459,6 @@ unsafe extern "C" fn DegenEpilogue(
             };
         }
         t += 1;
-        t;
     }
 }
-pub const __FLT_MIN__: libc::c_float = 1.17549435e-38f32;
+pub const __FLT_MIN__: libc::c_float = 1.175_494_4e-38_f32;
