@@ -11,12 +11,6 @@
 use super::libc;
 
 extern "C" {
-    fn __assert_fail(
-        __assertion: *const libc::c_char,
-        __file: *const libc::c_char,
-        __line: libc::c_uint,
-        __function: *const libc::c_char,
-    ) -> !;
     fn acos(_: libc::c_double) -> libc::c_double;
     fn cos(_: libc::c_double) -> libc::c_double;
     fn sqrtf(_: libc::c_float) -> libc::c_float;
@@ -214,18 +208,6 @@ pub const QUAD_ONE_DEGEN_TRI: libc::c_int = 2 as libc::c_int;
 pub const GROUP_WITH_ANY: libc::c_int = 4 as libc::c_int;
 pub const ORIENT_PRESERVING: libc::c_int = 8 as libc::c_int;
 unsafe extern "C" fn MakeIndex(iFace: libc::c_int, iVert: libc::c_int) -> libc::c_int {
-    if iVert >= 0 as libc::c_int && iVert < 4 as libc::c_int && iFace >= 0 as libc::c_int {
-    } else {
-        __assert_fail(
-            b"iVert>=0 && iVert<4 && iFace>=0\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            174 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 36], &[libc::c_char; 36]>(
-                b"int MakeIndex(const int, const int)\0",
-            ))
-            .as_ptr(),
-        );
-    }
     assert!(iVert >= 0 as libc::c_int && iVert < 4 as libc::c_int && iFace >= 0 as libc::c_int);
     iFace << 2 as libc::c_int | iVert & 0x3 as libc::c_int
 }
@@ -671,23 +653,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         };
         let iCell_0: libc::c_int = FindGridCell(fMin, fMax, fVal_0);
         let mut pTable: *mut libc::c_int = NULL as *mut libc::c_int;
-        if *piHashCount2.offset(iCell_0 as isize) < *piHashCount.offset(iCell_0 as isize) {
-        } else {
-            __assert_fail(
-                b"piHashCount2[iCell]<piHashCount[iCell]\0" as *const u8
-                    as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                    as *const libc::c_char,
-                532 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<
-                    &[u8; 83],
-                    &[libc::c_char; 83],
-                >(
-                    b"void GenerateSharedVerticesIndexList(int *, const SMikkTSpaceContext *, const int)\0",
-                ))
-                    .as_ptr(),
-            );
-        }
         assert!(*piHashCount2.offset(iCell_0 as isize) < *piHashCount.offset(iCell_0 as isize));
         pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
             as *mut libc::c_int;
