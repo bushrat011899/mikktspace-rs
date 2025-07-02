@@ -1162,8 +1162,8 @@ unsafe extern "C" fn InitTriInfo(
         let d1: SVec3 = v2 - v1;
         let d2: SVec3 = v3 - v1;
         let fSignedAreaSTx2: libc::c_float = t21x * t31y - t21y * t31x;
-        let mut vOs: SVec3 = vsub(vscale(t31y, d1), vscale(t21y, d2));
-        let mut vOt: SVec3 = vscale(-t31x, d1) + vscale(t21x, d2);
+        let mut vOs: SVec3 = (t31y * d1) - (t21y * d2);
+        let mut vOt: SVec3 = (-t31x * d1) + (t21x * d2);
         (*pTriInfos.offset(f as isize)).iFlag |=
             if fSignedAreaSTx2 > 0 as libc::c_int as libc::c_float {
                 ORIENT_PRESERVING
@@ -1181,10 +1181,10 @@ unsafe extern "C" fn InitTriInfo(
                     1.0f32
                 };
             if not_zero(fLenOs) != 0 {
-                (*pTriInfos.offset(f as isize)).vOs = vscale(fS / fLenOs, vOs);
+                (*pTriInfos.offset(f as isize)).vOs = (fS / fLenOs) * vOs;
             }
             if not_zero(fLenOt) != 0 {
-                (*pTriInfos.offset(f as isize)).vOt = vscale(fS / fLenOt, vOt);
+                (*pTriInfos.offset(f as isize)).vOt = (fS / fLenOt) * vOt;
             }
             (*pTriInfos.offset(f as isize)).fMagS = fLenOs / fAbsArea;
             (*pTriInfos.offset(f as isize)).fMagT = fLenOt / fAbsArea;
@@ -1546,9 +1546,9 @@ unsafe extern "C" fn GenerateTSpaces(
             assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
             n = GetNormal(pContext, iVertIndex);
             vOs = (*pTriInfos.offset(f as isize)).vOs
-                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n);
+                - (vdot(n, (*pTriInfos.offset(f as isize)).vOs) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
-                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n);
+                - (vdot(n, (*pTriInfos.offset(f as isize)).vOt) * n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1562,9 +1562,9 @@ unsafe extern "C" fn GenerateTSpaces(
                 let t: libc::c_int = *((*pGroup).pFaceIndices).offset(j as isize);
                 let iOF_2: libc::c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
                 let mut vOs2: SVec3 = (*pTriInfos.offset(t as isize)).vOs
-                    - vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOs), n);
+                    - (vdot(n, (*pTriInfos.offset(t as isize)).vOs) * n);
                 let mut vOt2: SVec3 = (*pTriInfos.offset(t as isize)).vOt
-                    - vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOt), n);
+                    - (vdot(n, (*pTriInfos.offset(t as isize)).vOt) * n);
                 if v_not_zero(vOs2) != 0 {
                     vOs2 = normalize(vOs2);
                 }
@@ -1788,9 +1788,9 @@ unsafe extern "C" fn EvalTspace(
             index = *piTriListIn.offset((3 as libc::c_int * f + i) as isize);
             n = GetNormal(pContext, index);
             vOs = (*pTriInfos.offset(f as isize)).vOs
-                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n);
+                - (vdot(n, (*pTriInfos.offset(f as isize)).vOs) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
-                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n);
+                - (vdot(n, (*pTriInfos.offset(f as isize)).vOt) * n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1819,11 +1819,11 @@ unsafe extern "C" fn EvalTspace(
             p2 = GetPosition(pContext, i2);
             v1 = p0 - p1;
             v2 = p2 - p1;
-            v1 = v1 - vscale(vdot(n, v1), n);
+            v1 = v1 - (vdot(n, v1) * n);
             if v_not_zero(v1) != 0 {
                 v1 = normalize(v1);
             }
-            v2 = v2 - vscale(vdot(n, v2), n);
+            v2 = v2 - (vdot(n, v2) * n);
             if v_not_zero(v2) != 0 {
                 v2 = normalize(v2);
             }
@@ -1838,8 +1838,8 @@ unsafe extern "C" fn EvalTspace(
             fAngle = acos(fCos as libc::c_double) as libc::c_float;
             fMagS = (*pTriInfos.offset(f as isize)).fMagS;
             fMagT = (*pTriInfos.offset(f as isize)).fMagT;
-            res.vOs = res.vOs + vscale(fAngle, vOs);
-            res.vOt = res.vOt + vscale(fAngle, vOt);
+            res.vOs = res.vOs + (fAngle * vOs);
+            res.vOt = res.vOt + (fAngle * vOt);
             res.fMagS += fAngle * fMagS;
             res.fMagT += fAngle * fMagT;
             fAngleSum += fAngle;

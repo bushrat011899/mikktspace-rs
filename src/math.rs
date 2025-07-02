@@ -1,4 +1,4 @@
-use core::ops::{Add, Sub};
+use core::ops::{Add, Mul, Sub};
 
 use crate::libc::{c_double, c_float, c_int};
 
@@ -34,6 +34,30 @@ impl Sub for SVec3 {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Mul<f32> for SVec3 {
+    type Output = SVec3;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        SVec3 {
+            x: rhs * self.x,
+            y: rhs * self.y,
+            z: rhs * self.z,
+        }
+    }
+}
+
+impl Mul<SVec3> for f32 {
+    type Output = SVec3;
+
+    fn mul(self, rhs: SVec3) -> Self::Output {
+        SVec3 {
+            x: self * rhs.x,
+            y: self * rhs.y,
+            z: self * rhs.z,
         }
     }
 }
@@ -78,14 +102,6 @@ pub fn veq(v1: SVec3, v2: SVec3) -> c_int {
     (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as c_int
 }
 
-pub fn vscale(scale: c_float, v: SVec3) -> SVec3 {
-    SVec3 {
-        x: scale * v.x,
-        y: scale * v.y,
-        z: scale * v.z,
-    }
-}
-
 pub fn length_squared(v: SVec3) -> c_float {
     v.x * v.x + v.y * v.y + v.z * v.z
 }
@@ -95,7 +111,7 @@ pub fn length(v: SVec3) -> c_float {
 }
 
 pub fn normalize(v: SVec3) -> SVec3 {
-    vscale(1 as c_int as c_float / length(v), v)
+    (1 as c_int as c_float / length(v)) * v
 }
 
 pub fn vdot(v1: SVec3, v2: SVec3) -> c_float {
