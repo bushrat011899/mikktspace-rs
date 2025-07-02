@@ -8,7 +8,7 @@ mod math;
 mod mikktspace;
 
 use libc::{c_float, c_int};
-use mikktspace::{genTangSpace, genTangSpaceDefault, SMikkTSpaceInterface, SMikkTSpaceContext};
+use mikktspace::{genTangSpace, genTangSpaceDefault, SMikkTSpaceContext, SMikkTSpaceInterface};
 
 #[allow(unused_variables, clippy::too_many_arguments)]
 pub trait MikkTSpaceInterface {

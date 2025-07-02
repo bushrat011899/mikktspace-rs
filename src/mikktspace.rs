@@ -486,7 +486,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         }
         i += 1;
     }
-    vDim = vsub(vMax, vMin);
+    vDim = vMax - vMin;
     iChannel = 0 as libc::c_int;
     fMin = vMin.x;
     fMax = vMax.x;
@@ -920,8 +920,8 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                 let T1: SVec3 = GetTexCoord(pContext, i1);
                 let T2: SVec3 = GetTexCoord(pContext, i2);
                 let T3: SVec3 = GetTexCoord(pContext, i3);
-                let distSQ_02: libc::c_float = length_squared(vsub(T2, T0));
-                let distSQ_13: libc::c_float = length_squared(vsub(T3, T1));
+                let distSQ_02: libc::c_float = length_squared(T2 - T0);
+                let distSQ_13: libc::c_float = length_squared(T3 - T1);
                 let mut bQuadDiagIs_02: tbool = 0;
                 if distSQ_02 < distSQ_13 {
                     bQuadDiagIs_02 = TTRUE;
@@ -932,8 +932,8 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     let P1: SVec3 = GetPosition(pContext, i1);
                     let P2: SVec3 = GetPosition(pContext, i2);
                     let P3: SVec3 = GetPosition(pContext, i3);
-                    let distSQ_02_0: libc::c_float = length_squared(vsub(P2, P0));
-                    let distSQ_13_0: libc::c_float = length_squared(vsub(P3, P1));
+                    let distSQ_02_0: libc::c_float = length_squared(P2 - P0);
+                    let distSQ_13_0: libc::c_float = length_squared(P3 - P1);
                     bQuadDiagIs_02 = if distSQ_13_0 < distSQ_02_0 {
                         TFALSE
                     } else {
@@ -1159,8 +1159,8 @@ unsafe extern "C" fn InitTriInfo(
         let t21y: libc::c_float = t2.y - t1.y;
         let t31x: libc::c_float = t3.x - t1.x;
         let t31y: libc::c_float = t3.y - t1.y;
-        let d1: SVec3 = vsub(v2, v1);
-        let d2: SVec3 = vsub(v3, v1);
+        let d1: SVec3 = v2 - v1;
+        let d2: SVec3 = v3 - v1;
         let fSignedAreaSTx2: libc::c_float = t21x * t31y - t21y * t31x;
         let mut vOs: SVec3 = vsub(vscale(t31y, d1), vscale(t21y, d2));
         let mut vOt: SVec3 = vscale(-t31x, d1) + vscale(t21x, d2);
@@ -1314,7 +1314,8 @@ unsafe extern "C" fn Build4RuleGroups(
                         as libc::c_int;
                 (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces =
                     0 as libc::c_int;
-                let fresh4 = &mut (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).pFaceIndices;
+                let fresh4 =
+                    &mut (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).pFaceIndices;
                 *fresh4 = &mut *piGroupTrianglesBuffer.offset(iOffset as isize) as *mut libc::c_int;
                 iNrActiveGroups += 1;
                 AddTriToGroup((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize], f);
@@ -1408,8 +1409,11 @@ unsafe extern "C" fn AssignRecur(
     } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_null() {
         return TFALSE;
     }
-    if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as libc::c_int && ((*pMyTriInfo).AssignedGroup[0 as libc::c_int as usize]).is_null()
-            && ((*pMyTriInfo).AssignedGroup[1 as libc::c_int as usize]).is_null() && ((*pMyTriInfo).AssignedGroup[2 as libc::c_int as usize]).is_null() {
+    if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as libc::c_int
+        && ((*pMyTriInfo).AssignedGroup[0 as libc::c_int as usize]).is_null()
+        && ((*pMyTriInfo).AssignedGroup[1 as libc::c_int as usize]).is_null()
+        && ((*pMyTriInfo).AssignedGroup[2 as libc::c_int as usize]).is_null()
+    {
         (*pMyTriInfo).iFlag &= !ORIENT_PRESERVING;
         (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering != 0 {
             ORIENT_PRESERVING
@@ -1541,14 +1545,10 @@ unsafe extern "C" fn GenerateTSpaces(
             iVertIndex = *piTriListIn.offset((f * 3 as libc::c_int + index) as isize);
             assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
             n = GetNormal(pContext, iVertIndex);
-            vOs = vsub(
-                (*pTriInfos.offset(f as isize)).vOs,
-                vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n),
-            );
-            vOt = vsub(
-                (*pTriInfos.offset(f as isize)).vOt,
-                vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n),
-            );
+            vOs = (*pTriInfos.offset(f as isize)).vOs
+                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n);
+            vOt = (*pTriInfos.offset(f as isize)).vOt
+                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1561,14 +1561,10 @@ unsafe extern "C" fn GenerateTSpaces(
             while j < (*pGroup).iNrFaces {
                 let t: libc::c_int = *((*pGroup).pFaceIndices).offset(j as isize);
                 let iOF_2: libc::c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
-                let mut vOs2: SVec3 = vsub(
-                    (*pTriInfos.offset(t as isize)).vOs,
-                    vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOs), n),
-                );
-                let mut vOt2: SVec3 = vsub(
-                    (*pTriInfos.offset(t as isize)).vOt,
-                    vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOt), n),
-                );
+                let mut vOs2: SVec3 = (*pTriInfos.offset(t as isize)).vOs
+                    - vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOs), n);
+                let mut vOt2: SVec3 = (*pTriInfos.offset(t as isize)).vOt
+                    - vscale(vdot(n, (*pTriInfos.offset(t as isize)).vOt), n);
                 if v_not_zero(vOs2) != 0 {
                     vOs2 = normalize(vOs2);
                 }
@@ -1587,7 +1583,7 @@ unsafe extern "C" fn GenerateTSpaces(
                 let bSameOrgFace: tbool = if iOF_1 == iOF_2 { TTRUE } else { TFALSE };
                 let fCosS: libc::c_float = vdot(vOs, vOs2);
                 let fCosT: libc::c_float = vdot(vOt, vOt2);
-                assert!(f != t || bSameOrgFace != 0 );
+                assert!(f != t || bSameOrgFace != 0);
                 if bAny != 0 || bSameOrgFace != 0 || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
                     iMembers += 1;
@@ -1659,9 +1655,11 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut pTS_out: *mut STSpace =
                 &mut *psTspace.offset((iOffs + iVert) as isize) as *mut STSpace;
             assert!((*pTS_out).iCounter < 2 as libc::c_int);
-            assert!(((*pTriInfos.offset(f as isize)).iFlag & 8 as libc::c_int != 0 as libc::c_int)
-                as libc::c_int
-                == (*pGroup).bOrientPreservering);
+            assert!(
+                ((*pTriInfos.offset(f as isize)).iFlag & 8 as libc::c_int != 0 as libc::c_int)
+                    as libc::c_int
+                    == (*pGroup).bOrientPreservering
+            );
             if (*pTS_out).iCounter == 1 as libc::c_int {
                 *pTS_out = AvgTSpace(pTS_out, &mut *pSubGroupTspace.offset(l as isize));
                 (*pTS_out).iCounter = 2 as libc::c_int;
@@ -1789,14 +1787,10 @@ unsafe extern "C" fn EvalTspace(
             assert!(i >= 0 as libc::c_int && i < 3 as libc::c_int);
             index = *piTriListIn.offset((3 as libc::c_int * f + i) as isize);
             n = GetNormal(pContext, index);
-            vOs = vsub(
-                (*pTriInfos.offset(f as isize)).vOs,
-                vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n),
-            );
-            vOt = vsub(
-                (*pTriInfos.offset(f as isize)).vOt,
-                vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n),
-            );
+            vOs = (*pTriInfos.offset(f as isize)).vOs
+                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOs), n);
+            vOt = (*pTriInfos.offset(f as isize)).vOt
+                - vscale(vdot(n, (*pTriInfos.offset(f as isize)).vOt), n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1823,13 +1817,13 @@ unsafe extern "C" fn EvalTspace(
             p0 = GetPosition(pContext, i0);
             p1 = GetPosition(pContext, i1);
             p2 = GetPosition(pContext, i2);
-            v1 = vsub(p0, p1);
-            v2 = vsub(p2, p1);
-            v1 = vsub(v1, vscale(vdot(n, v1), n));
+            v1 = p0 - p1;
+            v2 = p2 - p1;
+            v1 = v1 - vscale(vdot(n, v1), n);
             if v_not_zero(v1) != 0 {
                 v1 = normalize(v1);
             }
-            v2 = vsub(v2, vscale(vdot(n, v2), n));
+            v2 = v2 - vscale(vdot(n, v2), n);
             if v_not_zero(v2) != 0 {
                 v2 = normalize(v2);
             }

@@ -1,6 +1,6 @@
-use core::ops::Add;
+use core::ops::{Add, Sub};
 
-use crate::libc::{c_double, c_int, c_float};
+use crate::libc::{c_double, c_float, c_int};
 
 pub const M_PI: c_double = 3.141_592_653_589_793;
 pub const __FLT_MIN__: c_float = 1.175_494_4e-38;
@@ -22,6 +22,18 @@ impl Add for SVec3 {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
+        }
+    }
+}
+
+impl Sub for SVec3 {
+    type Output = SVec3;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        SVec3 {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
         }
     }
 }
@@ -64,14 +76,6 @@ pub fn fabsf(x: c_float) -> c_float {
 
 pub fn veq(v1: SVec3, v2: SVec3) -> c_int {
     (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as c_int
-}
-
-pub fn vsub(v1: SVec3, v2: SVec3) -> SVec3 {
-    SVec3 {
-        x: v1.x - v2.x,
-        y: v1.y - v2.y,
-        z: v1.z - v2.z,
-    }
 }
 
 pub fn vscale(scale: c_float, v: SVec3) -> SVec3 {
