@@ -226,20 +226,7 @@ unsafe extern "C" fn MakeIndex(iFace: libc::c_int, iVert: libc::c_int) -> libc::
             .as_ptr(),
         );
     }
-    'c_3731: {
-        if iVert >= 0 as libc::c_int && iVert < 4 as libc::c_int && iFace >= 0 as libc::c_int {
-        } else {
-            __assert_fail(
-                b"iVert>=0 && iVert<4 && iFace>=0\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                174 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 36], &[libc::c_char; 36]>(
-                    b"int MakeIndex(const int, const int)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
+    assert!(iVert >= 0 as libc::c_int && iVert < 4 as libc::c_int && iFace >= 0 as libc::c_int);
     iFace << 2 as libc::c_int | iVert & 0x3 as libc::c_int
 }
 unsafe extern "C" fn IndexToData(
@@ -701,25 +688,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
                     .as_ptr(),
             );
         }
-        'c_13191: {
-            if *piHashCount2.offset(iCell_0 as isize) < *piHashCount.offset(iCell_0 as isize) {
-            } else {
-                __assert_fail(
-                    b"piHashCount2[iCell]<piHashCount[iCell]\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    532 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 83],
-                        &[libc::c_char; 83],
-                    >(
-                        b"void GenerateSharedVerticesIndexList(int *, const SMikkTSpaceContext *, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-        };
+        assert!(*piHashCount2.offset(iCell_0 as isize) < *piHashCount.offset(iCell_0 as isize));
         pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
             as *mut libc::c_int;
         *pTable.offset(*piHashCount2.offset(iCell_0 as isize) as isize) = i;
@@ -729,42 +698,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     }
     k = 0 as libc::c_int;
     while k < g_iCells {
-        if *piHashCount2.offset(k as isize) == *piHashCount.offset(k as isize) {
-        } else {
-            __assert_fail(
-                b"piHashCount2[k] == piHashCount[k]\0" as *const u8
-                    as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                    as *const libc::c_char,
-                538 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<
-                    &[u8; 83],
-                    &[libc::c_char; 83],
-                >(
-                    b"void GenerateSharedVerticesIndexList(int *, const SMikkTSpaceContext *, const int)\0",
-                ))
-                    .as_ptr(),
-            );
-        }
-        'c_12974: {
-            if *piHashCount2.offset(k as isize) == *piHashCount.offset(k as isize) {
-            } else {
-                __assert_fail(
-                    b"piHashCount2[k] == piHashCount[k]\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    538 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 83],
-                        &[libc::c_char; 83],
-                    >(
-                        b"void GenerateSharedVerticesIndexList(int *, const SMikkTSpaceContext *, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-        };
+        assert!(*piHashCount2.offset(k as isize) == *piHashCount.offset(k as isize));
         k += 1;
     }
     free(piHashCount2 as *mut libc::c_void);
@@ -915,79 +849,12 @@ unsafe extern "C" fn MergeVertsFast(
     } else {
         let mut iL: libc::c_int = iL_in;
         let mut iR: libc::c_int = iR_in;
-        if iR_in - iL_in > 0 as libc::c_int {
-        } else {
-            __assert_fail(
-                b"(iR_in-iL_in)>0\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                    as *const libc::c_char,
-                648 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<
-                    &[u8; 89],
-                    &[libc::c_char; 89],
-                >(
-                    b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                ))
-                    .as_ptr(),
-            );
-        }
-        'c_12259: {
-            if iR_in - iL_in > 0 as libc::c_int {
-            } else {
-                __assert_fail(
-                    b"(iR_in-iL_in)>0\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    648 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 89],
-                        &[libc::c_char; 89],
-                    >(
-                        b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-        };
+        assert!(iR_in - iL_in > 0 as libc::c_int);
         while iL < iR {
             let mut bReadyLeftSwap: tbool = TFALSE;
             let mut bReadyRightSwap: tbool = TFALSE;
             while bReadyLeftSwap == 0 && iL < iR {
-                if iL >= iL_in && iL <= iR_in {
-                } else {
-                    __assert_fail(
-                        b"iL>=iL_in && iL<=iR_in\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        656 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 89],
-                            &[libc::c_char; 89],
-                        >(
-                            b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_12196: {
-                    if iL >= iL_in && iL <= iR_in {
-                    } else {
-                        __assert_fail(
-                            b"iL>=iL_in && iL<=iR_in\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            656 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 89],
-                                &[libc::c_char; 89],
-                            >(
-                                b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(iL >= iL_in && iL <= iR_in);
                 bReadyLeftSwap =
                     !((*pTmpVert.offset(iL as isize)).vert[channel as usize] < fSep) as libc::c_int;
                 if bReadyLeftSwap == 0 {
@@ -995,159 +862,24 @@ unsafe extern "C" fn MergeVertsFast(
                 }
             }
             while bReadyRightSwap == 0 && iL < iR {
-                if iR >= iL_in && iR <= iR_in {
-                } else {
-                    __assert_fail(
-                        b"iR>=iL_in && iR<=iR_in\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        662 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 89],
-                            &[libc::c_char; 89],
-                        >(
-                            b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_12108: {
-                    if iR >= iL_in && iR <= iR_in {
-                    } else {
-                        __assert_fail(
-                            b"iR>=iL_in && iR<=iR_in\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            662 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 89],
-                                &[libc::c_char; 89],
-                            >(
-                                b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(iR >= iL_in && iR <= iR_in);
                 bReadyRightSwap =
                     ((*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep) as libc::c_int;
                 if bReadyRightSwap == 0 {
                     iR -= 1;
                 }
             }
-            if iL < iR || !(bReadyLeftSwap != 0 && bReadyRightSwap != 0) {
-            } else {
-                __assert_fail(
-                    b"(iL<iR) || !(bReadyLeftSwap && bReadyRightSwap)\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    666 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 89],
-                        &[libc::c_char; 89],
-                    >(
-                        b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_12024: {
-                if iL < iR || !(bReadyLeftSwap != 0 && bReadyRightSwap != 0) {
-                } else {
-                    __assert_fail(
-                        b"(iL<iR) || !(bReadyLeftSwap && bReadyRightSwap)\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        666 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 89],
-                            &[libc::c_char; 89],
-                        >(
-                            b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(iL < iR || !(bReadyLeftSwap != 0 && bReadyRightSwap != 0));
             if bReadyLeftSwap != 0 && bReadyRightSwap != 0 {
                 let sTmp: STmpVert = *pTmpVert.offset(iL as isize);
-                if iL < iR {
-                } else {
-                    __assert_fail(
-                        b"iL<iR\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        671 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 89],
-                            &[libc::c_char; 89],
-                        >(
-                            b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_11977: {
-                    if iL < iR {
-                    } else {
-                        __assert_fail(
-                            b"iL<iR\0" as *const u8 as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            671 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 89],
-                                &[libc::c_char; 89],
-                            >(
-                                b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(iL < iR);
                 *pTmpVert.offset(iL as isize) = *pTmpVert.offset(iR as isize);
                 *pTmpVert.offset(iR as isize) = sTmp;
                 iL += 1;
                 iR -= 1;
             }
         }
-        if iL == iR + 1 as libc::c_int || iL == iR {
-        } else {
-            __assert_fail(
-                b"iL==(iR+1) || (iL==iR)\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                    as *const libc::c_char,
-                678 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<
-                    &[u8; 89],
-                    &[libc::c_char; 89],
-                >(
-                    b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                ))
-                    .as_ptr(),
-            );
-        }
-        'c_11871: {
-            if iL == iR + 1 as libc::c_int || iL == iR {
-            } else {
-                __assert_fail(
-                    b"iL==(iR+1) || (iL==iR)\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    678 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 89],
-                        &[libc::c_char; 89],
-                    >(
-                        b"void MergeVertsFast(int *, STmpVert *, const SMikkTSpaceContext *, const int, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-        };
+        assert!(iL == iR + 1 as libc::c_int || iL == iR);
         if iL == iR {
             let bReadyRightSwap_0: tbool =
                 ((*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep) as libc::c_int;
@@ -1238,40 +970,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
                     t2 += 1;
                 }
             }
-            if bFound != 0 {
-            } else {
-                __assert_fail(
-                    b"bFound\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    763 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 87],
-                        &[libc::c_char; 87],
-                    >(
-                        b"void GenerateSharedVerticesIndexListSlow(int *, const SMikkTSpaceContext *, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_13479: {
-                if bFound != 0 {
-                } else {
-                    __assert_fail(
-                        b"bFound\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        763 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 87],
-                            &[libc::c_char; 87],
-                        >(
-                            b"void GenerateSharedVerticesIndexListSlow(int *, const SMikkTSpaceContext *, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(bFound != 0);
             *piTriList_in_and_out.offset(offs as isize) = index2rec;
             i += 1;
         }
@@ -1404,42 +1103,7 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                 }
             }
             iTSpacesOffs += verts;
-            if iDstTriIndex <= iNrTrianglesIn {
-            } else {
-                __assert_fail(
-                    b"iDstTriIndex<=iNrTrianglesIn\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    873 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 95],
-                        &[libc::c_char; 95],
-                    >(
-                        b"int GenerateInitialVerticesIndexList(STriInfo *, int *, const SMikkTSpaceContext *, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_14065: {
-                if iDstTriIndex <= iNrTrianglesIn {
-                } else {
-                    __assert_fail(
-                        b"iDstTriIndex<=iNrTrianglesIn\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        873 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 95],
-                            &[libc::c_char; 95],
-                        >(
-                            b"int GenerateInitialVerticesIndexList(STriInfo *, int *, const SMikkTSpaceContext *, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(iDstTriIndex <= iNrTrianglesIn);
         }
         f += 1;
     }
@@ -1744,42 +1408,7 @@ unsafe extern "C" fn Build4RuleGroups(
                 let mut neigh_indexR: libc::c_int = 0;
                 let vert_index: libc::c_int =
                     *piTriListIn.offset((f * 3 as libc::c_int + i) as isize);
-                if iNrActiveGroups < iNrMaxGroups {
-                } else {
-                    __assert_fail(
-                        b"iNrActiveGroups<iNrMaxGroups\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1085 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 74],
-                            &[libc::c_char; 74],
-                        >(
-                            b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_8257: {
-                    if iNrActiveGroups < iNrMaxGroups {
-                    } else {
-                        __assert_fail(
-                            b"iNrActiveGroups<iNrMaxGroups\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1085 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 74],
-                                &[libc::c_char; 74],
-                            >(
-                                b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(iNrActiveGroups < iNrMaxGroups);
                 let fresh3 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
                 *fresh3 = &mut *pGroups.offset(iNrActiveGroups as isize) as *mut SGroup;
                 (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize])
@@ -1823,40 +1452,7 @@ unsafe extern "C" fn Build4RuleGroups(
                         TFALSE
                     };
                     let bDiff: tbool = if bOrPre != bOrPre2 { TTRUE } else { TFALSE };
-                    if bAnswer != 0 || bDiff != 0 {
-                    } else {
-                        __assert_fail(
-                            b"bAnswer || bDiff\0" as *const u8 as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1105 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 74],
-                                &[libc::c_char; 74],
-                            >(
-                                b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                    'c_8044: {
-                        if bAnswer != 0 || bDiff != 0 {
-                        } else {
-                            __assert_fail(
-                                b"bAnswer || bDiff\0" as *const u8 as *const libc::c_char,
-                                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                    as *const libc::c_char,
-                                1105 as libc::c_int as libc::c_uint,
-                                (*::core::mem::transmute::<
-                                    &[u8; 74],
-                                    &[libc::c_char; 74],
-                                >(
-                                    b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                                ))
-                                    .as_ptr(),
-                            );
-                        }
-                    };
+                    assert!(bAnswer != 0 || bDiff != 0);
                 }
                 if neigh_indexR >= 0 as libc::c_int {
                     let bAnswer_0: tbool = AssignRecur(
@@ -1874,77 +1470,10 @@ unsafe extern "C" fn Build4RuleGroups(
                         TFALSE
                     };
                     let bDiff_0: tbool = if bOrPre != bOrPre2_0 { TTRUE } else { TFALSE };
-                    if bAnswer_0 != 0 || bDiff_0 != 0 {
-                    } else {
-                        __assert_fail(
-                            b"bAnswer || bDiff\0" as *const u8 as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1116 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 74],
-                                &[libc::c_char; 74],
-                            >(
-                                b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                    'c_7941: {
-                        if bAnswer_0 != 0 || bDiff_0 != 0 {
-                        } else {
-                            __assert_fail(
-                                b"bAnswer || bDiff\0" as *const u8 as *const libc::c_char,
-                                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                    as *const libc::c_char,
-                                1116 as libc::c_int as libc::c_uint,
-                                (*::core::mem::transmute::<
-                                    &[u8; 74],
-                                    &[libc::c_char; 74],
-                                >(
-                                    b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                                ))
-                                    .as_ptr(),
-                            );
-                        }
-                    };
+                    assert!(bAnswer_0 != 0 || bDiff_0 != 0);
                 }
                 iOffset += (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces;
-                if iOffset <= iNrMaxGroups {
-                } else {
-                    __assert_fail(
-                        b"iOffset <= iNrMaxGroups\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1125 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 74],
-                            &[libc::c_char; 74],
-                        >(
-                            b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_7450: {
-                    if iOffset <= iNrMaxGroups {
-                    } else {
-                        __assert_fail(
-                            b"iOffset <= iNrMaxGroups\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1125 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 74],
-                                &[libc::c_char; 74],
-                            >(
-                                b"int Build4RuleGroups(STriInfo *, SGroup *, int *, const int *, const int)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(iOffset <= iNrMaxGroups);
             }
             i += 1;
         }
@@ -1977,32 +1506,7 @@ unsafe extern "C" fn AssignRecur(
     } else if *pVerts.offset(2 as libc::c_int as isize) == iVertRep {
         i = 2 as libc::c_int;
     }
-    if i >= 0 as libc::c_int && i < 3 as libc::c_int {
-    } else {
-        __assert_fail(
-            b"i>=0 && i<3\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            1151 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 64], &[libc::c_char; 64]>(
-                b"tbool AssignRecur(const int *, STriInfo *, const int, SGroup *)\0",
-            ))
-            .as_ptr(),
-        );
-    }
-    'c_7840: {
-        if i >= 0 as libc::c_int && i < 3 as libc::c_int {
-        } else {
-            __assert_fail(
-                b"i>=0 && i<3\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                1151 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 64], &[libc::c_char; 64]>(
-                    b"tbool AssignRecur(const int *, STriInfo *, const int, SGroup *)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
+    assert!(i >= 0 as libc::c_int && i < 3 as libc::c_int);
     if (*pMyTriInfo).AssignedGroup[i as usize] == pGroup {
         return TTRUE;
     } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_null() {
@@ -2137,77 +1641,9 @@ unsafe extern "C" fn GenerateTSpaces(
             {
                 index = 2 as libc::c_int;
             }
-            if index >= 0 as libc::c_int && index < 3 as libc::c_int {
-            } else {
-                __assert_fail(
-                    b"index>=0 && index<3\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1241 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 132],
-                        &[libc::c_char; 132],
-                    >(
-                        b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_6960: {
-                if index >= 0 as libc::c_int && index < 3 as libc::c_int {
-                } else {
-                    __assert_fail(
-                        b"index>=0 && index<3\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1241 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(index >= 0 as libc::c_int && index < 3 as libc::c_int);
             iVertIndex = *piTriListIn.offset((f * 3 as libc::c_int + index) as isize);
-            if iVertIndex == (*pGroup).iVertexRepresentitive {
-            } else {
-                __assert_fail(
-                    b"iVertIndex==pGroup->iVertexRepresentitive\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1244 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 132],
-                        &[libc::c_char; 132],
-                    >(
-                        b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_6904: {
-                if iVertIndex == (*pGroup).iVertexRepresentitive {
-                } else {
-                    __assert_fail(
-                        b"iVertIndex==pGroup->iVertexRepresentitive\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1244 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
             n = GetNormal(pContext, iVertIndex);
             vOs = vsub(
                 (*pTriInfos.offset(f as isize)).vOs,
@@ -2255,41 +1691,7 @@ unsafe extern "C" fn GenerateTSpaces(
                 let bSameOrgFace: tbool = if iOF_1 == iOF_2 { TTRUE } else { TFALSE };
                 let fCosS: libc::c_float = vdot(vOs, vOs2);
                 let fCosT: libc::c_float = vdot(vOt, vOt2);
-                if f != t || bSameOrgFace != 0 {
-                } else {
-                    __assert_fail(
-                        b"f!=t || bSameOrgFace\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1278 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_6716: {
-                    if f != t || bSameOrgFace != 0 {
-                    } else {
-                        __assert_fail(
-                            b"f!=t || bSameOrgFace\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1278 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 132],
-                                &[libc::c_char; 132],
-                            >(
-                                b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!(f != t || bSameOrgFace != 0 );
                 if bAny != 0 || bSameOrgFace != 0 || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
                     iMembers += 1;
@@ -2316,42 +1718,7 @@ unsafe extern "C" fn GenerateTSpaces(
                     l += 1;
                 }
             }
-            if bFound != 0 || l == iUniqueSubGroups {
-            } else {
-                __assert_fail(
-                    b"bFound || l==iUniqueSubGroups\0" as *const u8
-                        as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1303 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 132],
-                        &[libc::c_char; 132],
-                    >(
-                        b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_6106: {
-                if bFound != 0 || l == iUniqueSubGroups {
-                } else {
-                    __assert_fail(
-                        b"bFound || l==iUniqueSubGroups\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1303 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(bFound != 0 || l == iUniqueSubGroups);
             if bFound == 0 {
                 let mut pIndices: *mut libc::c_int = malloc(
                     (::core::mem::size_of::<libc::c_int>() as libc::c_ulong)
@@ -2395,122 +1762,16 @@ unsafe extern "C" fn GenerateTSpaces(
                 (*pTriInfos.offset(f as isize)).vert_num[index as usize] as libc::c_int;
             let mut pTS_out: *mut STSpace =
                 &mut *psTspace.offset((iOffs + iVert) as isize) as *mut STSpace;
-            if (*pTS_out).iCounter < 2 as libc::c_int {
-            } else {
-                __assert_fail(
-                    b"pTS_out->iCounter<2\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1335 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 132],
-                        &[libc::c_char; 132],
-                    >(
-                        b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_5073: {
-                if (*pTS_out).iCounter < 2 as libc::c_int {
-                } else {
-                    __assert_fail(
-                        b"pTS_out->iCounter<2\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1335 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
-            if ((*pTriInfos.offset(f as isize)).iFlag & 8 as libc::c_int != 0 as libc::c_int)
+            assert!((*pTS_out).iCounter < 2 as libc::c_int);
+            assert!(((*pTriInfos.offset(f as isize)).iFlag & 8 as libc::c_int != 0 as libc::c_int)
                 as libc::c_int
-                == (*pGroup).bOrientPreservering
-            {
-            } else {
-                __assert_fail(
-                    b"((pTriInfos[f].iFlag&ORIENT_PRESERVING)!=0) == pGroup->bOrientPreservering\0"
-                        as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1336 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 132],
-                        &[libc::c_char; 132],
-                    >(
-                        b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_5008: {
-                if ((*pTriInfos.offset(f as isize)).iFlag & 8 as libc::c_int != 0 as libc::c_int)
-                    as libc::c_int
-                    == (*pGroup).bOrientPreservering
-                {
-                } else {
-                    __assert_fail(
-                        b"((pTriInfos[f].iFlag&ORIENT_PRESERVING)!=0) == pGroup->bOrientPreservering\0"
-                            as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1336 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+                == (*pGroup).bOrientPreservering);
             if (*pTS_out).iCounter == 1 as libc::c_int {
                 *pTS_out = AvgTSpace(pTS_out, &mut *pSubGroupTspace.offset(l as isize));
                 (*pTS_out).iCounter = 2 as libc::c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             } else {
-                if (*pTS_out).iCounter == 0 as libc::c_int {
-                } else {
-                    __assert_fail(
-                        b"pTS_out->iCounter==0\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1345 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 132],
-                            &[libc::c_char; 132],
-                        >(
-                            b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-                'c_4556: {
-                    if (*pTS_out).iCounter == 0 as libc::c_int {
-                    } else {
-                        __assert_fail(
-                            b"pTS_out->iCounter==0\0" as *const u8
-                                as *const libc::c_char,
-                            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                                as *const libc::c_char,
-                            1345 as libc::c_int as libc::c_uint,
-                            (*::core::mem::transmute::<
-                                &[u8; 132],
-                                &[libc::c_char; 132],
-                            >(
-                                b"tbool GenerateTSpaces(STSpace *, const STriInfo *, const SGroup *, const int, const int *, const float, const SMikkTSpaceContext *)\0",
-                            ))
-                                .as_ptr(),
-                        );
-                    }
-                };
+                assert!((*pTS_out).iCounter == 0 as libc::c_int);
                 *pTS_out = *pSubGroupTspace.offset(l as isize);
                 (*pTS_out).iCounter = 1 as libc::c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
@@ -2629,40 +1890,7 @@ unsafe extern "C" fn EvalTspace(
             {
                 i = 2 as libc::c_int;
             }
-            if i >= 0 as libc::c_int && i < 3 as libc::c_int {
-            } else {
-                __assert_fail(
-                    b"i>=0 && i<3\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1390 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 107],
-                        &[libc::c_char; 107],
-                    >(
-                        b"STSpace EvalTspace(int *, const int, const int *, const STriInfo *, const SMikkTSpaceContext *, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_5835: {
-                if i >= 0 as libc::c_int && i < 3 as libc::c_int {
-                } else {
-                    __assert_fail(
-                        b"i>=0 && i<3\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1390 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 107],
-                            &[libc::c_char; 107],
-                        >(
-                            b"STSpace EvalTspace(int *, const int, const int *, const STriInfo *, const SMikkTSpaceContext *, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(i >= 0 as libc::c_int && i < 3 as libc::c_int);
             index = *piTriListIn.offset((3 as libc::c_int * f + i) as isize);
             n = GetNormal(pContext, index);
             vOs = vsub(
@@ -2783,32 +2011,7 @@ unsafe extern "C" fn QuickSort(
     iL = iLeft;
     iR = iRight;
     n = iR - iL + 1 as libc::c_int;
-    if n >= 0 as libc::c_int {
-    } else {
-        __assert_fail(
-            b"n>=0\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            1466 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 46], &[libc::c_char; 46]>(
-                b"void QuickSort(int *, int, int, unsigned int)\0",
-            ))
-            .as_ptr(),
-        );
-    }
-    'c_6437: {
-        if n >= 0 as libc::c_int {
-        } else {
-            __assert_fail(
-                b"n>=0\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                1466 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 46], &[libc::c_char; 46]>(
-                    b"void QuickSort(int *, int, int, unsigned int)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
+    assert!(n >= 0 as libc::c_int);
     index = uSeed.wrapping_rem(n as libc::c_uint) as libc::c_int;
     iMid = *pSortBuffer.offset((index + iL) as isize);
     loop {
@@ -3073,32 +2276,7 @@ unsafe extern "C" fn QuickSortEdges(
     iL = iLeft;
     iR = iRight;
     n = iR - iL + 1 as libc::c_int;
-    if n >= 0 as libc::c_int {
-    } else {
-        __assert_fail(
-            b"n>=0\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            1674 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 64], &[libc::c_char; 64]>(
-                b"void QuickSortEdges(SEdge *, int, int, const int, unsigned int)\0",
-            ))
-            .as_ptr(),
-        );
-    }
-    'c_9174: {
-        if n >= 0 as libc::c_int {
-        } else {
-            __assert_fail(
-                b"n>=0\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                1674 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 64], &[libc::c_char; 64]>(
-                    b"void QuickSortEdges(SEdge *, int, int, const int, unsigned int)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
+    assert!(n >= 0 as libc::c_int);
     index = uSeed.wrapping_rem(n as libc::c_uint) as libc::c_int;
     iMid = (*pSortBuffer.offset((index + iL) as isize)).array[channel as usize];
     loop {
@@ -3229,35 +2407,7 @@ unsafe extern "C" fn DegenPrologue(
             t0 = t;
             t1 = iNextGoodTriangleSearchIndex;
             iNextGoodTriangleSearchIndex += 1;
-            if iNextGoodTriangleSearchIndex > t + 1 as libc::c_int {
-            } else {
-                __assert_fail(
-                    b"iNextGoodTriangleSearchIndex > (t+1)\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1791 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                        b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-                    ))
-                    .as_ptr(),
-                );
-            }
-            'c_11026: {
-                if iNextGoodTriangleSearchIndex > t + 1 as libc::c_int {
-                } else {
-                    __assert_fail(
-                        b"iNextGoodTriangleSearchIndex > (t+1)\0" as *const u8
-                            as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1791 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                            b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-                        ))
-                        .as_ptr(),
-                    );
-                }
-            };
+            assert!(iNextGoodTriangleSearchIndex > t + 1 as libc::c_int);
             if bJustADegenerate == 0 {
                 let mut i: libc::c_int = 0 as libc::c_int;
                 i = 0 as libc::c_int;
@@ -3280,58 +2430,8 @@ unsafe extern "C" fn DegenPrologue(
             t += 1;
         }
     }
-    if bStillFindingGoodOnes != 0 {
-    } else {
-        __assert_fail(
-            b"bStillFindingGoodOnes\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            1816 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-            ))
-            .as_ptr(),
-        );
-    }
-    'c_10863: {
-        if bStillFindingGoodOnes != 0 {
-        } else {
-            __assert_fail(
-                b"bStillFindingGoodOnes\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                1816 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                    b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
-    if iNrTrianglesIn == t {
-    } else {
-        __assert_fail(
-            b"iNrTrianglesIn == t\0" as *const u8 as *const libc::c_char,
-            b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-            1817 as libc::c_int as libc::c_uint,
-            (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-            ))
-            .as_ptr(),
-        );
-    }
-    'c_10822: {
-        if iNrTrianglesIn == t {
-        } else {
-            __assert_fail(
-                b"iNrTrianglesIn == t\0" as *const u8 as *const libc::c_char,
-                b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8 as *const libc::c_char,
-                1817 as libc::c_int as libc::c_uint,
-                (*::core::mem::transmute::<&[u8; 60], &[libc::c_char; 60]>(
-                    b"void DegenPrologue(STriInfo *, int *, const int, const int)\0",
-                ))
-                .as_ptr(),
-            );
-        }
-    };
+    assert!(bStillFindingGoodOnes != 0);
+    assert!(iNrTrianglesIn == t);
 }
 unsafe extern "C" fn DegenEpilogue(
     mut psTspace: *mut STSpace,
@@ -3423,40 +2523,7 @@ unsafe extern "C" fn DegenEpilogue(
                     i_0 += 1;
                 }
             }
-            if bNotFound_0 == 0 {
-            } else {
-                __assert_fail(
-                    b"!bNotFound\0" as *const u8 as *const libc::c_char,
-                    b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                        as *const libc::c_char,
-                    1896 as libc::c_int as libc::c_uint,
-                    (*::core::mem::transmute::<
-                        &[u8; 99],
-                        &[libc::c_char; 99],
-                    >(
-                        b"void DegenEpilogue(STSpace *, STriInfo *, int *, const SMikkTSpaceContext *, const int, const int)\0",
-                    ))
-                        .as_ptr(),
-                );
-            }
-            'c_3584: {
-                if bNotFound_0 == 0 {
-                } else {
-                    __assert_fail(
-                        b"!bNotFound\0" as *const u8 as *const libc::c_char,
-                        b"/mnt/c/g/mikktspace-rs/src/mikktspace.c\0" as *const u8
-                            as *const libc::c_char,
-                        1896 as libc::c_int as libc::c_uint,
-                        (*::core::mem::transmute::<
-                            &[u8; 99],
-                            &[libc::c_char; 99],
-                        >(
-                            b"void DegenEpilogue(STSpace *, STriInfo *, int *, const SMikkTSpaceContext *, const int, const int)\0",
-                        ))
-                            .as_ptr(),
-                    );
-                }
-            };
+            assert!(bNotFound_0 == 0);
         }
         t += 1;
     }
