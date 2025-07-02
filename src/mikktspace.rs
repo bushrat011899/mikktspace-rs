@@ -259,11 +259,9 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
     }
     ts_res
 }
-#[no_mangle]
 pub unsafe extern "C" fn genTangSpaceDefault(mut pContext: *const SMikkTSpaceContext) -> tbool {
     genTangSpace(pContext, 180.0f32)
 }
-#[no_mangle]
 pub unsafe extern "C" fn genTangSpace(
     mut pContext: *const SMikkTSpaceContext,
     fAngularThreshold: libc::c_float,

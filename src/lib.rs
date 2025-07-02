@@ -1,7 +1,7 @@
 #![no_std]
 
 mod libc {
-    pub use core::ffi::{c_char, c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
+    pub use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
 }
 
 mod mikktspace;
