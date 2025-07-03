@@ -109,7 +109,7 @@ pub fn veq(v1: SVec3, v2: SVec3) -> c_int {
 }
 
 pub fn length_squared(v: SVec3) -> c_float {
-    v.x * v.x + v.y * v.y + v.z * v.z
+    v.dot(v)
 }
 
 pub fn length(v: SVec3) -> c_float {
