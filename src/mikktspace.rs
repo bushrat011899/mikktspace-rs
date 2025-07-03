@@ -110,6 +110,16 @@ pub struct SGroup {
     pub iVertexRepresentitive: c_int,
     pub bOrientPreservering: bool,
 }
+
+impl SGroup {
+    pub const ZERO: SGroup = SGroup {
+        iNrFaces: 0,
+        pFaceIndices: core::ptr::null_mut(),
+        iVertexRepresentitive: 0,
+        bOrientPreservering: false,
+    };
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SSubGroup {
@@ -193,7 +203,6 @@ pub unsafe extern "C" fn genTangSpace(
     fAngularThreshold: c_float,
 ) -> bool {
     let mut piGroupTrianglesBuffer: *mut c_int = NULL as *mut c_int;
-    let mut pGroups: *mut SGroup = NULL as *mut SGroup;
     let mut psTspace: *mut STSpace = NULL as *mut STSpace;
     let mut iNrTrianglesIn: c_int = 0 as c_int;
     let mut f: c_int = 0 as c_int;
@@ -270,18 +279,13 @@ pub unsafe extern "C" fn genTangSpace(
         iNrTrianglesIn,
     );
     iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
-    pGroups =
-        malloc((::core::mem::size_of::<SGroup>() as c_ulong).wrapping_mul(iNrMaxGroups as c_ulong))
-            as *mut SGroup;
+    let mut pGroups: Vec<SGroup> = vec![SGroup::ZERO; iNrMaxGroups as usize];
     piGroupTrianglesBuffer = malloc(
         (::core::mem::size_of::<c_int>() as c_ulong)
             .wrapping_mul(iNrTrianglesIn as c_ulong)
             .wrapping_mul(3 as c_int as c_ulong),
     ) as *mut c_int;
-    if pGroups.is_null() || piGroupTrianglesBuffer.is_null() {
-        if !pGroups.is_null() {
-            free(pGroups as *mut c_void);
-        }
+    if piGroupTrianglesBuffer.is_null() {
         if !piGroupTrianglesBuffer.is_null() {
             free(piGroupTrianglesBuffer as *mut c_void);
         }
@@ -289,7 +293,7 @@ pub unsafe extern "C" fn genTangSpace(
     }
     iNrActiveGroups = Build4RuleGroups(
         pTriInfos.as_mut_ptr(),
-        pGroups,
+        pGroups.as_mut_ptr(),
         piGroupTrianglesBuffer,
         piTriListIn.as_ptr(),
         iNrTrianglesIn,
@@ -298,7 +302,6 @@ pub unsafe extern "C" fn genTangSpace(
         malloc((::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iNrTSPaces as c_ulong))
             as *mut STSpace;
     if psTspace.is_null() {
-        free(pGroups as *mut c_void);
         free(piGroupTrianglesBuffer as *mut c_void);
         return false;
     }
@@ -324,13 +327,12 @@ pub unsafe extern "C" fn genTangSpace(
     bRes = GenerateTSpaces(
         psTspace,
         pTriInfos.as_ptr(),
-        pGroups as *const SGroup,
+        pGroups.as_ptr(),
         iNrActiveGroups,
         piTriListIn.as_ptr(),
         fThresCos,
         pContext,
     );
-    free(pGroups as *mut c_void);
     free(piGroupTrianglesBuffer as *mut c_void);
     if !bRes {
         free(psTspace as *mut c_void);
