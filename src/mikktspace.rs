@@ -166,14 +166,13 @@ pub const QUAD_ONE_DEGEN_TRI: c_int = 2 as c_int;
 pub const GROUP_WITH_ANY: c_int = 4 as c_int;
 pub const ORIENT_PRESERVING: c_int = 8 as c_int;
 
-unsafe fn MakeIndex(iFace: c_int, iVert: c_int) -> c_int {
+fn MakeIndex(iFace: c_int, iVert: c_int) -> c_int {
     assert!(iVert >= 0 as c_int && iVert < 4 as c_int && iFace >= 0 as c_int);
     iFace << 2 as c_int | iVert & 0x3 as c_int
 }
 
-unsafe fn IndexToData(mut piFace: *mut c_int, mut piVert: *mut c_int, iIndexIn: c_int) {
-    *piVert.offset(0 as c_int as isize) = iIndexIn & 0x3 as c_int;
-    *piFace.offset(0 as c_int as isize) = iIndexIn >> 2 as c_int;
+fn IndexToData(iIndexIn: c_int) -> (c_int, c_int) {
+    (iIndexIn >> 2 as c_int, iIndexIn & 0x3 as c_int)
 }
 
 unsafe fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpace {
@@ -601,7 +600,7 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     }
 }
 
-unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
+fn MergeVertsFast<I: MikkTSpaceInterface>(
     mut piTriList_in_and_out: &mut [c_int],
     mut pTmpVert: &mut [STmpVert],
     mut pContext: &I,
@@ -882,11 +881,9 @@ unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
     iTSpacesOffs
 }
 
-unsafe fn GetPosition<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
-    let mut iF: c_int = 0;
-    let mut iI: c_int = 0;
+fn GetPosition<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut res: SVec3 = SVec3::ZERO;
-    IndexToData(&mut iF, &mut iI, index);
+    let (iF, iI) = IndexToData(index);
     let pos = pContext.get_position(iF as usize, iI as usize);
     res.x = pos[0 as c_int as usize];
     res.y = pos[1 as c_int as usize];
@@ -894,11 +891,9 @@ unsafe fn GetPosition<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) ->
     res
 }
 
-unsafe fn GetNormal<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
-    let mut iF: c_int = 0;
-    let mut iI: c_int = 0;
+fn GetNormal<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut res: SVec3 = SVec3::ZERO;
-    IndexToData(&mut iF, &mut iI, index);
+    let (iF, iI) = IndexToData(index);
     let norm = pContext.get_normal(iF as usize, iI as usize);
     res.x = norm[0 as c_int as usize];
     res.y = norm[1 as c_int as usize];
@@ -906,11 +901,9 @@ unsafe fn GetNormal<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> S
     res
 }
 
-unsafe fn GetTexCoord<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
-    let mut iF: c_int = 0;
-    let mut iI: c_int = 0;
+fn GetTexCoord<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut res: SVec3 = SVec3::ZERO;
-    IndexToData(&mut iF, &mut iI, index);
+    let (iF, iI) = IndexToData(index);
     let texc = pContext.get_tex_coord(iF as usize, iI as usize);
     res.x = texc[0 as c_int as usize];
     res.y = texc[1 as c_int as usize];
