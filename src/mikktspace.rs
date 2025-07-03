@@ -1577,10 +1577,7 @@ unsafe fn BuildNeighborsFast(
         let mut i1_A: c_int = 0;
         let mut edgenum_A: c_int = 0;
         let mut edgenum_B: c_int = 0 as c_int;
-        GetEdge(
-            &mut i0_A,
-            &mut i1_A,
-            &mut edgenum_A,
+        (edgenum_A, i0_A, i1_A) = get_edge(
             core::slice::from_raw_parts(piTriListIn.offset((f_0 * 3 as c_int) as isize), 3),
             i0_0,
             i1_0,
@@ -1600,10 +1597,7 @@ unsafe fn BuildNeighborsFast(
                 let mut i0_B: c_int = 0;
                 let mut i1_B: c_int = 0;
                 t = (*pEdges.offset(j as isize)).f;
-                GetEdge(
-                    &mut i1_B,
-                    &mut i0_B,
-                    &mut edgenum_B,
+                (edgenum_B, i1_B, i0_B) = get_edge(
                     core::slice::from_raw_parts(piTriListIn.offset((t * 3 as c_int) as isize), 3),
                     (*pEdges.offset(j as isize)).i0,
                     (*pEdges.offset(j as isize)).i1,
@@ -1747,31 +1741,31 @@ fn QuickSortEdges(
         QuickSortEdges(pSortBuffer, iL, iRight, channel, uSeed);
     }
 }
-unsafe fn GetEdge(
-    mut i0_out: *mut c_int,
-    mut i1_out: *mut c_int,
-    mut edgenum_out: *mut c_int,
-    mut indices: &[c_int],
-    i0_in: c_int,
-    i1_in: c_int,
-) {
-    *edgenum_out = -(1 as c_int);
+
+fn get_edge(mut indices: &[c_int], i0_in: c_int, i1_in: c_int) -> (c_int, c_int, c_int) {
+    let mut i0_out: c_int;
+    let mut i1_out: c_int;
+    let mut edgenum_out: c_int;
+
     if indices[0] == i0_in || indices[0] == i1_in {
         if indices[1] == i0_in || indices[1] == i1_in {
-            *edgenum_out = 0 as c_int;
-            *i0_out = indices[0];
-            *i1_out = indices[1];
+            edgenum_out = 0 as c_int;
+            i0_out = indices[0];
+            i1_out = indices[1];
         } else {
-            *edgenum_out = 2 as c_int;
-            *i0_out = indices[2];
-            *i1_out.offset(0 as c_int as isize) = indices[0];
+            edgenum_out = 2 as c_int;
+            i0_out = indices[2];
+            i1_out = indices[0];
         }
     } else {
-        *edgenum_out = 1 as c_int;
-        *i0_out = indices[1];
-        *i1_out = indices[2];
+        edgenum_out = 1 as c_int;
+        i0_out = indices[1];
+        i1_out = indices[2];
     };
+
+    (edgenum_out, i0_out, i1_out)
 }
+
 unsafe fn DegenPrologue(
     mut pTriInfos: *mut STriInfo,
     mut piTriList_out: *mut c_int,
