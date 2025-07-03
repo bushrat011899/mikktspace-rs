@@ -55,7 +55,7 @@ impl STSpace {
 #[repr(C)]
 pub struct STriInfo {
     pub FaceNeighbors: [c_int; 3],
-    pub AssignedGroup: [*mut SGroup; 3],
+    pub AssignedGroup: [Option<usize>; 3],
 
     /// normalized first order face derivative
     pub vOs: SVec3,
@@ -78,7 +78,7 @@ pub struct STriInfo {
 impl STriInfo {
     pub const ZERO: STriInfo = STriInfo {
         FaceNeighbors: [0; 3],
-        AssignedGroup: [core::ptr::null_mut(); 3],
+        AssignedGroup: [None; 3],
         vOs: SVec3::ZERO,
         vOt: SVec3::ZERO,
         fMagS: 0.,
@@ -93,6 +93,7 @@ impl STriInfo {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SGroup {
+    pub id: usize,
     pub iNrFaces: c_int,
     pub pFaceIndices: *mut c_int,
     pub iVertexRepresentitive: c_int,
@@ -101,6 +102,7 @@ pub struct SGroup {
 
 impl SGroup {
     pub const ZERO: SGroup = SGroup {
+        id: 0,
         iNrFaces: 0,
         pFaceIndices: core::ptr::null_mut(),
         iVertexRepresentitive: 0,
@@ -944,7 +946,7 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
         while i < 3 as c_int {
             (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] = -(1 as c_int);
             let fresh2 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
-            *fresh2 = NULL as *mut SGroup;
+            *fresh2 = None;
             (*pTriInfos.offset(f as isize)).vOs.x = 0.0f32;
             (*pTriInfos.offset(f as isize)).vOs.y = 0.0f32;
             (*pTriInfos.offset(f as isize)).vOs.z = 0.0f32;
@@ -1145,26 +1147,26 @@ unsafe fn Build4RuleGroups(
         while i < 3 as c_int {
             // if not assigned to a group
             if (*pTriInfos.offset(f as isize)).iFlag & GROUP_WITH_ANY == 0 as c_int
-                && ((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).is_null()
+                && ((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).is_none()
             {
                 let mut bOrPre: bool = false;
                 let mut neigh_indexL: c_int = 0;
                 let mut neigh_indexR: c_int = 0;
                 let vert_index: c_int = *piTriListIn.offset((f * 3 as c_int + i) as isize);
                 assert!(iNrActiveGroups < iNrMaxGroups);
-                let fresh3 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
-                *fresh3 = &mut *pGroups.offset(iNrActiveGroups as isize) as *mut SGroup;
-                (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize])
-                    .iVertexRepresentitive = vert_index;
-                (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).bOrientPreservering =
+                (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize] =
+                    Some(iNrActiveGroups as usize);
+                let mut this_group = &mut *pGroups.offset(iNrActiveGroups as isize);
+                this_group.id = iNrActiveGroups as usize;
+                this_group.iVertexRepresentitive = vert_index;
+                this_group.bOrientPreservering =
                     (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
-                (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces = 0 as c_int;
-                let fresh4 =
-                    &mut (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).pFaceIndices;
+                this_group.iNrFaces = 0 as c_int;
+                let fresh4 = &mut this_group.pFaceIndices;
                 *fresh4 = &mut *piGroupTrianglesBuffer.offset(iOffset as isize) as *mut c_int;
                 iNrActiveGroups += 1;
 
-                AddTriToGroup((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize], f);
+                AddTriToGroup(this_group, f);
                 bOrPre = (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
                 neigh_indexL = (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize];
                 neigh_indexR = (*pTriInfos.offset(f as isize)).FaceNeighbors[(if i > 0 as c_int {
@@ -1176,12 +1178,8 @@ unsafe fn Build4RuleGroups(
 
                 if neigh_indexL >= 0 as c_int {
                     // neighbor
-                    let bAnswer: bool = AssignRecur(
-                        piTriListIn,
-                        pTriInfos,
-                        neigh_indexL,
-                        (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
-                    );
+                    let bAnswer: bool =
+                        AssignRecur(piTriListIn, pTriInfos, neigh_indexL, this_group);
                     let bOrPre2: bool = (*pTriInfos.offset(neigh_indexL as isize)).iFlag
                         & ORIENT_PRESERVING
                         != 0 as c_int;
@@ -1190,12 +1188,8 @@ unsafe fn Build4RuleGroups(
                 }
                 if neigh_indexR >= 0 as c_int {
                     // neighbor
-                    let bAnswer_0: bool = AssignRecur(
-                        piTriListIn,
-                        pTriInfos,
-                        neigh_indexR,
-                        (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
-                    );
+                    let bAnswer_0: bool =
+                        AssignRecur(piTriListIn, pTriInfos, neigh_indexR, this_group);
                     let bOrPre2_0: bool = (*pTriInfos.offset(neigh_indexR as isize)).iFlag
                         & ORIENT_PRESERVING
                         != 0 as c_int;
@@ -1204,7 +1198,7 @@ unsafe fn Build4RuleGroups(
                 }
 
                 // update offset
-                iOffset += (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces;
+                iOffset += this_group.iNrFaces;
 
                 // since the groups are disjoint a triangle can never
                 // belong to more than 3 groups. Subsequently something
@@ -1248,15 +1242,15 @@ unsafe fn AssignRecur(
     assert!(i >= 0 as c_int && i < 3 as c_int);
 
     // early out
-    if (*pMyTriInfo).AssignedGroup[i as usize] == pGroup {
+    if (*pMyTriInfo).AssignedGroup[i as usize] == Some((*pGroup).id) {
         return true;
-    } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_null() {
+    } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_none() {
         return false;
     }
     if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as c_int
-        && ((*pMyTriInfo).AssignedGroup[0 as c_int as usize]).is_null()
-        && ((*pMyTriInfo).AssignedGroup[1 as c_int as usize]).is_null()
-        && ((*pMyTriInfo).AssignedGroup[2 as c_int as usize]).is_null()
+        && ((*pMyTriInfo).AssignedGroup[0 as c_int as usize]).is_none()
+        && ((*pMyTriInfo).AssignedGroup[1 as c_int as usize]).is_none()
+        && ((*pMyTriInfo).AssignedGroup[2 as c_int as usize]).is_none()
     {
         // first to group with a group-with-anything triangle
         // determines it's orientation.
@@ -1274,7 +1268,7 @@ unsafe fn AssignRecur(
     }
 
     AddTriToGroup(pGroup, iMyTriIndex);
-    (*pMyTriInfo).AssignedGroup[i as usize] = pGroup;
+    (*pMyTriInfo).AssignedGroup[i as usize] = Some((*pGroup).id);
 
     let neigh_indexL: c_int = (*pMyTriInfo).FaceNeighbors[i as usize];
     let neigh_indexR: c_int = (*pMyTriInfo).FaceNeighbors[(if i > 0 as c_int {
@@ -1341,15 +1335,15 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
             let mut vOs: SVec3 = SVec3::ZERO;
             let mut vOt: SVec3 = SVec3::ZERO;
             if (*pTriInfos.offset(f as isize)).AssignedGroup[0 as c_int as usize]
-                == pGroup as *mut SGroup
+                == Some(g as usize)
             {
                 index = 0 as c_int;
             } else if (*pTriInfos.offset(f as isize)).AssignedGroup[1 as c_int as usize]
-                == pGroup as *mut SGroup
+                == Some(g as usize)
             {
                 index = 1 as c_int;
             } else if (*pTriInfos.offset(f as isize)).AssignedGroup[2 as c_int as usize]
-                == pGroup as *mut SGroup
+                == Some(g as usize)
             {
                 index = 2 as c_int;
             }
