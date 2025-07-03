@@ -8,10 +8,6 @@ use core::{
 
 use super::math::*;
 
-extern "C" {
-    fn malloc(_: c_ulong) -> *mut c_void;
-    fn free(_: *mut c_void);
-}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SMikkTSpaceContext {
@@ -120,17 +116,17 @@ impl SGroup {
     };
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct SSubGroup {
     pub iNrFaces: c_int,
-    pub pTriMembers: *mut c_int,
+    pub pTriMembers: Vec<c_int>,
 }
 
 impl SSubGroup {
     pub const ZERO: SSubGroup = SSubGroup {
         iNrFaces: 0,
-        pTriMembers: core::ptr::null_mut(),
+        pTriMembers: Vec::new(),
     };
 }
 
@@ -1276,7 +1272,6 @@ unsafe extern "C" fn GenerateTSpaces(
     }
     let mut pSubGroupTspace: Vec<STSpace> = vec![STSpace::ZERO; iMaxNrFaces as usize];
     let mut pUniSubGroups: Vec<SSubGroup> = vec![SSubGroup::ZERO; iMaxNrFaces as usize];
-    let mut pTmpMembers: Vec<c_int> = vec![0; iMaxNrFaces as usize];
     g = 0 as c_int;
     while g < iNrActiveGroups {
         let mut pGroup: *const SGroup = &*pGroups.offset(g as isize) as *const SGroup;
@@ -1292,7 +1287,7 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut l: c_int = 0 as c_int;
             let mut tmp_group: SSubGroup = SSubGroup {
                 iNrFaces: 0,
-                pTriMembers: core::ptr::null_mut::<c_int>(),
+                pTriMembers: Vec::new(),
             };
             let mut bFound: bool = false;
             let mut n: SVec3 = SVec3::ZERO;
@@ -1342,17 +1337,20 @@ unsafe extern "C" fn GenerateTSpaces(
                 let fCosT: c_float = vOt.dot(vOt2);
                 assert!(f != t || bSameOrgFace);
                 if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos {
-                    let fresh5 = iMembers;
                     iMembers += 1;
-                    pTmpMembers[fresh5 as usize] = t;
+                    tmp_group.pTriMembers.push(t);
                 }
                 j += 1;
             }
             tmp_group.iNrFaces = iMembers;
-            tmp_group.pTriMembers = pTmpMembers.as_mut_ptr();
             if iMembers > 1 as c_int {
                 let mut uSeed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
-                QuickSort(pTmpMembers.as_mut_ptr(), 0 as c_int, iMembers - 1 as c_int, uSeed);
+                QuickSort(
+                    tmp_group.pTriMembers.as_mut_ptr(),
+                    0 as c_int,
+                    iMembers - 1 as c_int,
+                    uSeed,
+                );
             }
             bFound = false;
             l = 0 as c_int;
@@ -1364,23 +1362,15 @@ unsafe extern "C" fn GenerateTSpaces(
             }
             assert!(bFound || l == iUniqueSubGroups);
             if !bFound {
-                let mut pIndices: *mut c_int = malloc(
-                    (::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(iMembers as c_ulong),
-                ) as *mut c_int;
-                if pIndices.is_null() {
-                    return false;
-                }
                 pUniSubGroups[iUniqueSubGroups as usize].iNrFaces = iMembers;
                 let fresh6 = &mut pUniSubGroups[iUniqueSubGroups as usize].pTriMembers;
-                *fresh6 = pIndices;
                 {
                     let len = (iMembers as c_ulong) as usize;
-                    let mut dest = core::slice::from_raw_parts_mut::<c_int>(pIndices, len);
-                    let mut src = core::slice::from_raw_parts::<c_int>(tmp_group.pTriMembers, len);
-                    dest.copy_from_slice(src);
+                    fresh6.clear();
+                    fresh6.extend_from_slice(&tmp_group.pTriMembers[0..len]);
                 }
                 pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
-                    tmp_group.pTriMembers,
+                    tmp_group.pTriMembers.as_mut_ptr(),
                     iMembers,
                     piTriListIn,
                     pTriInfos,
@@ -1409,11 +1399,6 @@ unsafe extern "C" fn GenerateTSpaces(
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             }
             i += 1;
-        }
-        let mut s = 0 as c_int;
-        while s < iUniqueSubGroups {
-            free(pUniSubGroups[s as usize].pTriMembers as *mut c_void);
-            s += 1;
         }
         g += 1;
     }
@@ -1550,8 +1535,7 @@ unsafe extern "C" fn CompareSubGroups(
         return false;
     }
     while i < (*pg1).iNrFaces && bStillSame {
-        bStillSame =
-            *((*pg1).pTriMembers).offset(i as isize) == *((*pg2).pTriMembers).offset(i as isize);
+        bStillSame = (&(*pg1).pTriMembers)[i as usize] == (&(*pg2).pTriMembers)[i as usize];
         if bStillSame {
             i += 1;
         }
