@@ -1339,15 +1339,7 @@ unsafe extern "C" fn GenerateTSpaces(
                 }
                 j += 1;
             }
-            if iMembers > 1 as c_int {
-                let mut uSeed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
-                QuickSort(
-                    tmp_group.pTriMembers.as_mut_ptr(),
-                    0 as c_int,
-                    iMembers - 1 as c_int,
-                    uSeed,
-                );
-            }
+            tmp_group.pTriMembers.sort();
             bFound = false;
             l = 0 as c_int;
             while l < iUniqueSubGroups && !bFound {
@@ -1536,52 +1528,6 @@ unsafe extern "C" fn CompareSubGroups(
         }
     }
     bStillSame
-}
-unsafe extern "C" fn QuickSort(
-    mut pSortBuffer: *mut c_int,
-    mut iLeft: c_int,
-    mut iRight: c_int,
-    mut uSeed: c_uint,
-) {
-    let mut iL: c_int = 0;
-    let mut iR: c_int = 0;
-    let mut n: c_int = 0;
-    let mut index: c_int = 0;
-    let mut iMid: c_int = 0;
-    let mut iTmp: c_int = 0;
-    let mut t: c_uint = uSeed & 31 as c_int as c_uint;
-    t = uSeed.wrapping_shl(t) | uSeed.wrapping_shr((32 as c_int as c_uint).wrapping_sub(t));
-    uSeed = uSeed.wrapping_add(t).wrapping_add(3 as c_int as c_uint);
-    iL = iLeft;
-    iR = iRight;
-    n = iR - iL + 1 as c_int;
-    assert!(n >= 0 as c_int);
-    index = uSeed.wrapping_rem(n as c_uint) as c_int;
-    iMid = *pSortBuffer.offset((index + iL) as isize);
-    loop {
-        while *pSortBuffer.offset(iL as isize) < iMid {
-            iL += 1;
-        }
-        while *pSortBuffer.offset(iR as isize) > iMid {
-            iR -= 1;
-        }
-        if iL <= iR {
-            iTmp = *pSortBuffer.offset(iL as isize);
-            *pSortBuffer.offset(iL as isize) = *pSortBuffer.offset(iR as isize);
-            *pSortBuffer.offset(iR as isize) = iTmp;
-            iL += 1;
-            iR -= 1;
-        }
-        if iL > iR {
-            break;
-        }
-    }
-    if iLeft < iR {
-        QuickSort(pSortBuffer, iLeft, iR, uSeed);
-    }
-    if iL < iRight {
-        QuickSort(pSortBuffer, iL, iRight, uSeed);
-    }
 }
 unsafe extern "C" fn BuildNeighborsFast(
     mut pTriInfos: *mut STriInfo,
