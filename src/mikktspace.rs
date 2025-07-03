@@ -87,6 +87,21 @@ pub struct STriInfo {
     pub iTSpacesOffs: c_int,
     pub vert_num: [c_uchar; 4],
 }
+
+impl STriInfo {
+    pub const ZERO: STriInfo = STriInfo {
+        FaceNeighbors: [0; 3],
+        AssignedGroup: [core::ptr::null_mut(); 3],
+        vOs: SVec3::ZERO,
+        vOt: SVec3::ZERO,
+        fMagS: 0.,
+        fMagT: 0.,
+        iOrgFaceNumber: 0,
+        iFlag: 0,
+        iTSpacesOffs: 0,
+        vert_num: [0; 4],
+    };
+}
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SGroup {
@@ -178,7 +193,6 @@ pub unsafe extern "C" fn genTangSpace(
     fAngularThreshold: c_float,
 ) -> bool {
     let mut piGroupTrianglesBuffer: *mut c_int = NULL as *mut c_int;
-    let mut pTriInfos: *mut STriInfo = NULL as *mut STriInfo;
     let mut pGroups: *mut SGroup = NULL as *mut SGroup;
     let mut psTspace: *mut STSpace = NULL as *mut STSpace;
     let mut iNrTrianglesIn: c_int = 0 as c_int;
@@ -218,16 +232,13 @@ pub unsafe extern "C" fn genTangSpace(
         return false;
     }
     let mut piTriListIn: Vec<c_int> = vec![0; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
-    pTriInfos = malloc(
-        (::core::mem::size_of::<STriInfo>() as c_ulong).wrapping_mul(iNrTrianglesIn as c_ulong),
-    ) as *mut STriInfo;
-    if pTriInfos.is_null() {
-        if !pTriInfos.is_null() {
-            free(pTriInfos as *mut c_void);
-        }
-        return false;
-    }
-    iNrTSPaces = GenerateInitialVerticesIndexList(pTriInfos, piTriListIn.as_mut_ptr(), pContext, iNrTrianglesIn);
+    let mut pTriInfos: Vec<STriInfo> = vec![STriInfo::ZERO; iNrTrianglesIn as usize];
+    iNrTSPaces = GenerateInitialVerticesIndexList(
+        pTriInfos.as_mut_ptr(),
+        piTriListIn.as_mut_ptr(),
+        pContext,
+        iNrTrianglesIn,
+    );
     GenerateSharedVerticesIndexList(piTriListIn.as_mut_ptr(), pContext, iNrTrianglesIn);
     iTotTris = iNrTrianglesIn;
     iDegenTriangles = 0 as c_int;
@@ -240,15 +251,20 @@ pub unsafe extern "C" fn genTangSpace(
         let p1: SVec3 = GetPosition(pContext, i1);
         let p2: SVec3 = GetPosition(pContext, i2);
         if (p0 == p1) || (p0 == p2) || (p1 == p2) {
-            (*pTriInfos.offset(t as isize)).iFlag |= MARK_DEGENERATE;
+            pTriInfos[t as usize].iFlag |= MARK_DEGENERATE;
             iDegenTriangles += 1;
         }
         t += 1;
     }
     iNrTrianglesIn = iTotTris - iDegenTriangles;
-    DegenPrologue(pTriInfos, piTriListIn.as_mut_ptr(), iNrTrianglesIn, iTotTris);
+    DegenPrologue(
+        pTriInfos.as_mut_ptr(),
+        piTriListIn.as_mut_ptr(),
+        iNrTrianglesIn,
+        iTotTris,
+    );
     InitTriInfo(
-        pTriInfos,
+        pTriInfos.as_mut_ptr(),
         piTriListIn.as_ptr(),
         pContext,
         iNrTrianglesIn,
@@ -269,11 +285,10 @@ pub unsafe extern "C" fn genTangSpace(
         if !piGroupTrianglesBuffer.is_null() {
             free(piGroupTrianglesBuffer as *mut c_void);
         }
-        free(pTriInfos as *mut c_void);
         return false;
     }
     iNrActiveGroups = Build4RuleGroups(
-        pTriInfos,
+        pTriInfos.as_mut_ptr(),
         pGroups,
         piGroupTrianglesBuffer,
         piTriListIn.as_ptr(),
@@ -283,7 +298,6 @@ pub unsafe extern "C" fn genTangSpace(
         malloc((::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iNrTSPaces as c_ulong))
             as *mut STSpace;
     if psTspace.is_null() {
-        free(pTriInfos as *mut c_void);
         free(pGroups as *mut c_void);
         free(piGroupTrianglesBuffer as *mut c_void);
         return false;
@@ -309,7 +323,7 @@ pub unsafe extern "C" fn genTangSpace(
     }
     bRes = GenerateTSpaces(
         psTspace,
-        pTriInfos as *const STriInfo,
+        pTriInfos.as_ptr(),
         pGroups as *const SGroup,
         iNrActiveGroups,
         piTriListIn.as_ptr(),
@@ -319,19 +333,17 @@ pub unsafe extern "C" fn genTangSpace(
     free(pGroups as *mut c_void);
     free(piGroupTrianglesBuffer as *mut c_void);
     if !bRes {
-        free(pTriInfos as *mut c_void);
         free(psTspace as *mut c_void);
         return false;
     }
     DegenEpilogue(
         psTspace,
-        pTriInfos,
+        pTriInfos.as_mut_ptr(),
         piTriListIn.as_mut_ptr(),
         pContext,
         iNrTrianglesIn,
         iTotTris,
     );
-    free(pTriInfos as *mut c_void);
     index = 0 as c_int;
     f = 0 as c_int;
     while f < iNrFaces {
