@@ -1169,8 +1169,12 @@ unsafe fn Build4RuleGroups(
 
                 if neigh_indexL >= 0 as c_int {
                     // neighbor
-                    let bAnswer: bool =
-                        AssignRecur(piTriListIn, pTriInfos, neigh_indexL, this_group);
+                    let bAnswer: bool = AssignRecur(
+                        core::slice::from_raw_parts(piTriListIn, iNrMaxGroups as usize),
+                        core::slice::from_raw_parts_mut(pTriInfos, iNrTrianglesIn as usize),
+                        neigh_indexL,
+                        this_group,
+                    );
                     let bOrPre2: bool = (*pTriInfos.offset(neigh_indexL as isize)).iFlag
                         & ORIENT_PRESERVING
                         != 0 as c_int;
@@ -1179,8 +1183,12 @@ unsafe fn Build4RuleGroups(
                 }
                 if neigh_indexR >= 0 as c_int {
                     // neighbor
-                    let bAnswer_0: bool =
-                        AssignRecur(piTriListIn, pTriInfos, neigh_indexR, this_group);
+                    let bAnswer_0: bool = AssignRecur(
+                        core::slice::from_raw_parts(piTriListIn, iNrMaxGroups as usize),
+                        core::slice::from_raw_parts_mut(pTriInfos, iNrTrianglesIn as usize),
+                        neigh_indexR,
+                        this_group,
+                    );
                     let bOrPre2_0: bool = (*pTriInfos.offset(neigh_indexR as isize)).iFlag
                         & ORIENT_PRESERVING
                         != 0 as c_int;
@@ -1200,25 +1208,27 @@ fn AddTriToGroup(mut pGroup: &mut SGroup, iTriIndex: c_int) {
     pGroup.pFaceIndices.push(iTriIndex);
 }
 
-unsafe fn AssignRecur(
-    mut piTriListIn: *const c_int,
-    mut psTriInfos: *mut STriInfo,
+fn AssignRecur(
+    mut piTriListIn: &[c_int],
+    mut psTriInfos: &mut [STriInfo],
     iMyTriIndex: c_int,
-    mut pGroup: *mut SGroup,
+    mut pGroup: &mut SGroup,
 ) -> bool {
-    let mut pMyTriInfo: *mut STriInfo =
-        &mut *psTriInfos.offset(iMyTriIndex as isize) as *mut STriInfo;
+    let mut pMyTriInfo = &mut psTriInfos[iMyTriIndex as usize];
 
     // track down vertex
     let iVertRep: c_int = (*pGroup).iVertexRepresentitive;
-    let mut pVerts: *const c_int =
-        &*piTriListIn.offset((3 as c_int * iMyTriIndex + 0 as c_int) as isize) as *const c_int;
+    let pVerts = &piTriListIn[{
+        let a = (3 as c_int * iMyTriIndex + 0 as c_int) as usize;
+        let b = a + 3;
+        a..b
+    }];
     let mut i: c_int = -(1 as c_int);
-    if *pVerts.offset(0 as c_int as isize) == iVertRep {
+    if pVerts[0] == iVertRep {
         i = 0 as c_int;
-    } else if *pVerts.offset(1 as c_int as isize) == iVertRep {
+    } else if pVerts[1] == iVertRep {
         i = 1 as c_int;
-    } else if *pVerts.offset(2 as c_int as isize) == iVertRep {
+    } else if pVerts[2] == iVertRep {
         i = 2 as c_int;
     }
     assert!(i >= 0 as c_int && i < 3 as c_int);
