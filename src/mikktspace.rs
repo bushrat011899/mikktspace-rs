@@ -1283,9 +1283,7 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut iMembers: c_int = 0 as c_int;
             let mut j: c_int = 0 as c_int;
             let mut l: c_int = 0 as c_int;
-            let mut tmp_group: SSubGroup = SSubGroup {
-                pTriMembers: Vec::new(),
-            };
+            let mut tmp_group: SSubGroup = SSubGroup::ZERO;
             let mut bFound: bool = false;
             let mut n: SVec3 = SVec3::ZERO;
             let mut vOs: SVec3 = SVec3::ZERO;
