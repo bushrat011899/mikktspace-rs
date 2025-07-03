@@ -365,7 +365,7 @@ pub unsafe extern "C" fn genTangSpace(
     free(psTspace as *mut c_void);
     true
 }
-static mut g_iCells: c_int = 2048 as c_int;
+const g_iCells: c_int = 2048 as c_int;
 #[inline(never)]
 unsafe extern "C" fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
     let fIndex: c_float = g_iCells as c_float * ((fVal - fMin) / (fMax - fMin));
