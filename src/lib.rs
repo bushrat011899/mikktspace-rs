@@ -1,13 +1,9 @@
 #![no_std]
 
-mod libc {
-    pub use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
-}
-
 mod math;
 mod mikktspace;
 
-use libc::{c_float, c_int};
+use core::ffi::{c_float, c_int};
 use mikktspace::{genTangSpace, genTangSpaceDefault, SMikkTSpaceContext, SMikkTSpaceInterface};
 
 #[allow(unused_variables, clippy::too_many_arguments)]

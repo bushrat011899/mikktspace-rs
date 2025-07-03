@@ -1,6 +1,8 @@
 #![expect(non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
 
-use super::{libc::*, math::*};
+use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
+
+use super::math::*;
 
 extern "C" {
     fn memcpy(_: *mut c_void, _: *const c_void, _: c_ulong) -> *mut c_void;

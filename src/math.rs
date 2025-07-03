@@ -1,6 +1,5 @@
+use core::ffi::{c_double, c_float, c_int};
 use core::ops::{Add, Mul, Sub};
-
-use crate::libc::{c_double, c_float, c_int};
 
 #[expect(clippy::approx_constant)]
 const M_PI: c_double = 3.141_592_653_589_793;
