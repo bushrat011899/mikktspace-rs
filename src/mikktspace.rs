@@ -90,12 +90,11 @@ impl STriInfo {
     };
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct SGroup {
     pub id: usize,
-    pub iNrFaces: c_int,
-    pub pFaceIndices: *mut c_int,
+    pub pFaceIndices: Vec<c_int>,
     pub iVertexRepresentitive: c_int,
     pub bOrientPreservering: bool,
 }
@@ -103,8 +102,7 @@ pub struct SGroup {
 impl SGroup {
     pub const ZERO: SGroup = SGroup {
         id: 0,
-        iNrFaces: 0,
-        pFaceIndices: core::ptr::null_mut(),
+        pFaceIndices: Vec::new(),
         iVertexRepresentitive: 0,
         bOrientPreservering: false,
     };
@@ -300,12 +298,9 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     // based on the 4 rules, identify groups based on connectivity
     iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
     let mut pGroups: Vec<SGroup> = vec![SGroup::ZERO; iNrMaxGroups as usize];
-    let mut piGroupTrianglesBuffer: Vec<c_int> =
-        vec![0; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
     iNrActiveGroups = Build4RuleGroups(
         pTriInfos.as_mut_ptr(),
         pGroups.as_mut_ptr(),
-        piGroupTrianglesBuffer.as_mut_ptr(),
         piTriListIn.as_ptr(),
         iNrTrianglesIn,
     );
@@ -1131,13 +1126,11 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
 unsafe fn Build4RuleGroups(
     mut pTriInfos: *mut STriInfo,
     mut pGroups: *mut SGroup,
-    mut piGroupTrianglesBuffer: *mut c_int,
     mut piTriListIn: *const c_int,
     iNrTrianglesIn: c_int,
 ) -> c_int {
     let iNrMaxGroups: c_int = iNrTrianglesIn * 3 as c_int;
     let mut iNrActiveGroups: c_int = 0 as c_int;
-    let mut iOffset: c_int = 0 as c_int;
 
     let mut f: c_int = 0 as c_int;
     let mut i: c_int = 0 as c_int;
@@ -1161,9 +1154,7 @@ unsafe fn Build4RuleGroups(
                 this_group.iVertexRepresentitive = vert_index;
                 this_group.bOrientPreservering =
                     (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
-                this_group.iNrFaces = 0 as c_int;
-                let fresh4 = &mut this_group.pFaceIndices;
-                *fresh4 = &mut *piGroupTrianglesBuffer.offset(iOffset as isize) as *mut c_int;
+                this_group.pFaceIndices = Vec::new();
                 iNrActiveGroups += 1;
 
                 AddTriToGroup(this_group, f);
@@ -1196,14 +1187,6 @@ unsafe fn Build4RuleGroups(
                     let bDiff_0: bool = bOrPre != bOrPre2_0;
                     assert!(bAnswer_0 || bDiff_0);
                 }
-
-                // update offset
-                iOffset += this_group.iNrFaces;
-
-                // since the groups are disjoint a triangle can never
-                // belong to more than 3 groups. Subsequently something
-                // is completely screwed if this assertion ever hits.
-                assert!(iOffset <= iNrMaxGroups);
             }
             i += 1;
         }
@@ -1213,9 +1196,8 @@ unsafe fn Build4RuleGroups(
     iNrActiveGroups
 }
 
-unsafe fn AddTriToGroup(mut pGroup: *mut SGroup, iTriIndex: c_int) {
-    *((*pGroup).pFaceIndices).offset((*pGroup).iNrFaces as isize) = iTriIndex;
-    (*pGroup).iNrFaces += 1;
+fn AddTriToGroup(mut pGroup: &mut SGroup, iTriIndex: c_int) {
+    pGroup.pFaceIndices.push(iTriIndex);
 }
 
 unsafe fn AssignRecur(
@@ -1267,7 +1249,7 @@ unsafe fn AssignRecur(
         return false;
     }
 
-    AddTriToGroup(pGroup, iMyTriIndex);
+    AddTriToGroup(&mut *pGroup, iMyTriIndex);
     (*pMyTriInfo).AssignedGroup[i as usize] = Some((*pGroup).id);
 
     let neigh_indexL: c_int = (*pMyTriInfo).FaceNeighbors[i as usize];
@@ -1301,8 +1283,8 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     let mut i: c_int = 0 as c_int;
     g = 0 as c_int;
     while g < iNrActiveGroups {
-        if iMaxNrFaces < (*pGroups.offset(g as isize)).iNrFaces {
-            iMaxNrFaces = (*pGroups.offset(g as isize)).iNrFaces;
+        if iMaxNrFaces < (*pGroups.offset(g as isize)).pFaceIndices.len() as c_int {
+            iMaxNrFaces = (*pGroups.offset(g as isize)).pFaceIndices.len() as c_int;
         }
         g += 1;
     }
@@ -1321,9 +1303,9 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
 
         // triangles
         i = 0 as c_int;
-        while i < (*pGroup).iNrFaces {
+        while i < (*pGroup).pFaceIndices.len() as c_int {
             // triangle number
-            let f: c_int = *((*pGroup).pFaceIndices).offset(i as isize);
+            let f: c_int = ((*pGroup).pFaceIndices)[i as usize];
             let mut index: c_int = -(1 as c_int);
             let mut iVertIndex: c_int = -(1 as c_int);
             let mut iOF_1: c_int = -(1 as c_int);
@@ -1367,9 +1349,9 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
             iOF_1 = (*pTriInfos.offset(f as isize)).iOrgFaceNumber;
 
             j = 0 as c_int;
-            while j < (*pGroup).iNrFaces {
+            while j < (*pGroup).pFaceIndices.len() as c_int {
                 // triangle number
-                let t: c_int = *((*pGroup).pFaceIndices).offset(j as isize);
+                let t: c_int = ((*pGroup).pFaceIndices)[j as usize];
                 let iOF_2: c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
 
                 // project
