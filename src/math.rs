@@ -68,6 +68,12 @@ impl Mul<SVec3> for f32 {
     }
 }
 
+impl PartialEq for SVec3 {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.z == other.z
+    }
+}
+
 pub fn acos(x: c_double) -> c_double {
     unsafe {
         extern "C" {
@@ -102,10 +108,6 @@ pub fn fabsf(x: c_float) -> c_float {
         }
         fabsf(x)
     }
-}
-
-pub fn veq(v1: SVec3, v2: SVec3) -> c_int {
-    (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as c_int
 }
 
 pub fn length_squared(v: SVec3) -> c_float {

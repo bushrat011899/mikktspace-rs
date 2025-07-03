@@ -171,8 +171,8 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
     };
     if (*pTS0).fMagS == (*pTS1).fMagS
         && (*pTS0).fMagT == (*pTS1).fMagT
-        && veq((*pTS0).vOs, (*pTS1).vOs) != 0
-        && veq((*pTS0).vOt, (*pTS1).vOt) != 0
+        && ((*pTS0).vOs == (*pTS1).vOs)
+        && ((*pTS0).vOt == (*pTS1).vOt)
     {
         ts_res.fMagS = (*pTS0).fMagS;
         ts_res.fMagT = (*pTS0).fMagT;
@@ -275,7 +275,7 @@ pub unsafe extern "C" fn genTangSpace(
         let p0: SVec3 = GetPosition(pContext, i0);
         let p1: SVec3 = GetPosition(pContext, i1);
         let p2: SVec3 = GetPosition(pContext, i2);
-        if veq(p0, p1) != 0 || veq(p0, p2) != 0 || veq(p1, p2) != 0 {
+        if (p0 == p1) || (p0 == p2) || (p1 == p2) {
             (*pTriInfos.offset(t as isize)).iFlag |= MARK_DEGENERATE;
             iDegenTriangles += 1;
         }
@@ -817,7 +817,7 @@ unsafe extern "C" fn MergeVertsSlow(
             let vN2: SVec3 = GetNormal(pContext, index2);
             let vT2: SVec3 = GetTexCoord(pContext, index2);
             i2rec = i2;
-            if veq(vP, vP2) != 0 && veq(vN, vN2) != 0 && veq(vT, vT2) != 0 {
+            if (vP == vP2) && (vN == vN2) && (vT == vT2) {
                 bNotFound = TFALSE;
             } else {
                 e2 += 1;
@@ -856,7 +856,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
                     let vP2: SVec3 = GetPosition(pContext, index2);
                     let vN2: SVec3 = GetNormal(pContext, index2);
                     let vT2: SVec3 = GetTexCoord(pContext, index2);
-                    if veq(vP, vP2) != 0 && veq(vN, vN2) != 0 && veq(vT, vT2) != 0 {
+                    if (vP == vP2) && (vN == vN2) && (vT == vT2) {
                         bFound = TTRUE;
                     } else {
                         j += 1;
@@ -2404,7 +2404,7 @@ unsafe extern "C" fn DegenEpilogue(
             while bNotFound_0 != 0 && i_0 < 3 as libc::c_int {
                 let iVert_0: libc::c_int = *pV.offset(i_0 as isize) as libc::c_int;
                 let vSrcP: SVec3 = GetPosition(pContext, MakeIndex(iOrgF, iVert_0));
-                if veq(vSrcP, vDstP) == TTRUE {
+                if vSrcP == vDstP {
                     let iOffs: libc::c_int = (*pTriInfos.offset(t as isize)).iTSpacesOffs;
                     *psTspace.offset((iOffs + iMissingIndex) as isize) =
                         *psTspace.offset((iOffs + iVert_0) as isize);
