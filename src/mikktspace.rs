@@ -153,6 +153,14 @@ pub struct STmpVert {
     pub vert: [c_float; 3],
     pub index: c_int,
 }
+
+impl STmpVert {
+    pub const ZERO: STmpVert = STmpVert {
+        vert: [0.; 3],
+        index: 0,
+    };
+}
+
 pub const NULL: c_int = 0 as c_int;
 pub const INTERNAL_RND_SORT_SEED: c_int = 39871946 as c_int;
 pub const MARK_DEGENERATE: c_int = 1 as c_int;
@@ -389,7 +397,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: c_int,
 ) {
-    let mut pTmpVert: *mut STmpVert = NULL as *mut STmpVert;
     let mut i: c_int = 0 as c_int;
     let mut iChannel: c_int = 0 as c_int;
     let mut k: c_int = 0 as c_int;
@@ -498,47 +505,40 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         }
         k += 1;
     }
-    pTmpVert =
-        malloc((::core::mem::size_of::<STmpVert>() as c_ulong).wrapping_mul(iMaxCount as c_ulong))
-            as *mut STmpVert;
+    let mut pTmpVert: Vec<STmpVert> = vec![STmpVert::ZERO; iMaxCount as usize];
     k = 0 as c_int;
     while k < g_iCells {
         let mut pTable_0: *mut c_int =
             &mut piHashTable[piHashOffsets[k as usize] as usize] as *mut c_int;
         let iEntries: c_int = piHashCount[k as usize];
         if iEntries >= 2 as c_int {
-            if !pTmpVert.is_null() {
-                e = 0 as c_int;
-                while e < iEntries {
-                    let mut i_0: c_int = *pTable_0.offset(e as isize);
-                    let vP_2: SVec3 =
-                        GetPosition(pContext, *piTriList_in_and_out.offset(i_0 as isize));
-                    (*pTmpVert.offset(e as isize)).vert[0 as c_int as usize] = vP_2.x;
-                    (*pTmpVert.offset(e as isize)).vert[1 as c_int as usize] = vP_2.y;
-                    (*pTmpVert.offset(e as isize)).vert[2 as c_int as usize] = vP_2.z;
-                    (*pTmpVert.offset(e as isize)).index = i_0;
-                    e += 1;
-                }
-                MergeVertsFast(
-                    piTriList_in_and_out,
-                    pTmpVert,
-                    pContext,
-                    0 as c_int,
-                    iEntries - 1 as c_int,
-                );
-            } else {
-                MergeVertsSlow(
-                    piTriList_in_and_out,
-                    pContext,
-                    pTable_0 as *const c_int,
-                    iEntries,
-                );
+            // if /* couldn't allocate pTmpVert? */ {
+            //     MergeVertsSlow(
+            //         piTriList_in_and_out,
+            //         pContext,
+            //         pTable_0 as *const c_int,
+            //         iEntries,
+            //     );
+            // }
+            e = 0 as c_int;
+            while e < iEntries {
+                let mut i_0: c_int = *pTable_0.offset(e as isize);
+                let vP_2: SVec3 = GetPosition(pContext, *piTriList_in_and_out.offset(i_0 as isize));
+                pTmpVert[e as usize].vert[0 as c_int as usize] = vP_2.x;
+                pTmpVert[e as usize].vert[1 as c_int as usize] = vP_2.y;
+                pTmpVert[e as usize].vert[2 as c_int as usize] = vP_2.z;
+                pTmpVert[e as usize].index = i_0;
+                e += 1;
             }
+            MergeVertsFast(
+                piTriList_in_and_out,
+                pTmpVert.as_mut_ptr(),
+                pContext,
+                0 as c_int,
+                iEntries - 1 as c_int,
+            );
         }
         k += 1;
-    }
-    if !pTmpVert.is_null() {
-        free(pTmpVert as *mut c_void);
     }
 }
 unsafe extern "C" fn MergeVertsFast(
@@ -682,6 +682,8 @@ unsafe extern "C" fn MergeVertsFast(
         }
     };
 }
+
+#[expect(dead_code)]
 unsafe extern "C" fn MergeVertsSlow(
     mut piTriList_in_and_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
