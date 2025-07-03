@@ -1864,13 +1864,13 @@ fn QuickSortEdges(
 
 /// Finds the index of the edge `(i0_in, i1_in)` within `indices`, additionally
 /// returning `i0_in` and `i1_in` in the same order as they are stored within `indices`.
-fn get_edge(indices: &[c_int], i0_in: c_int, i1_in: c_int) -> Option<(c_int, c_int, c_int)> {
+fn get_edge(indices: &[c_int], i0: c_int, i1: c_int) -> Option<(c_int, c_int, c_int)> {
     indices
         .iter()
         .copied()
         .zip(indices.iter().copied().cycle().skip(1))
         .enumerate()
-        .find(|&(_, (a, b))| (a == i0_in || a == i1_in) && (b == i0_in || b == i1_in))
+        .find(|&(_, (a, b))| (a.min(b), a.max(b)) == (i0.min(i1), i0.max(i1)))
         .map(|(edgenum, (a, b))| (edgenum as c_int, a as c_int, b as c_int))
 }
 
