@@ -1168,8 +1168,8 @@ unsafe extern "C" fn InitTriInfo(
             };
         if not_zero(fSignedAreaSTx2) != 0 {
             let fAbsArea: libc::c_float = fabsf(fSignedAreaSTx2);
-            let fLenOs: libc::c_float = length(vOs);
-            let fLenOt: libc::c_float = length(vOt);
+            let fLenOs: libc::c_float = vOs.length();
+            let fLenOt: libc::c_float = vOt.length();
             let fS: libc::c_float =
                 if (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING == 0 as libc::c_int {
                     -1.0f32
