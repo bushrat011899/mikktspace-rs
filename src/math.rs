@@ -20,7 +20,7 @@ impl SVec3 {
     }
 
     pub fn normalize_or_zero(&mut self) {
-        if not_zero(self.x) != 0 || not_zero(self.y) != 0 || not_zero(self.z) != 0 {
+        if not_zero(self.x) || not_zero(self.y) || not_zero(self.z) {
             *self = (1 as c_int as c_float / self.length()) * *self
         }
     }
@@ -124,6 +124,6 @@ pub fn fabsf(x: c_float) -> c_float {
     }
 }
 
-pub fn not_zero(x: c_float) -> c_int {
-    (fabsf(x) > FLT_MIN) as c_int
+pub fn not_zero(x: c_float) -> bool {
+    fabsf(x) > FLT_MIN
 }

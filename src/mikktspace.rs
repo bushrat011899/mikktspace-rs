@@ -1166,7 +1166,7 @@ unsafe extern "C" fn InitTriInfo(
             } else {
                 0 as libc::c_int
             };
-        if not_zero(fSignedAreaSTx2) != 0 {
+        if not_zero(fSignedAreaSTx2) {
             let fAbsArea: libc::c_float = fabsf(fSignedAreaSTx2);
             let fLenOs: libc::c_float = vOs.length();
             let fLenOt: libc::c_float = vOt.length();
@@ -1176,16 +1176,16 @@ unsafe extern "C" fn InitTriInfo(
                 } else {
                     1.0f32
                 };
-            if not_zero(fLenOs) != 0 {
+            if not_zero(fLenOs) {
                 (*pTriInfos.offset(f as isize)).vOs = (fS / fLenOs) * vOs;
             }
-            if not_zero(fLenOt) != 0 {
+            if not_zero(fLenOt) {
                 (*pTriInfos.offset(f as isize)).vOt = (fS / fLenOt) * vOt;
             }
             (*pTriInfos.offset(f as isize)).fMagS = fLenOs / fAbsArea;
             (*pTriInfos.offset(f as isize)).fMagT = fLenOt / fAbsArea;
-            if not_zero((*pTriInfos.offset(f as isize)).fMagS) != 0
-                && not_zero((*pTriInfos.offset(f as isize)).fMagT) != 0
+            if not_zero((*pTriInfos.offset(f as isize)).fMagS)
+                && not_zero((*pTriInfos.offset(f as isize)).fMagT)
             {
                 (*pTriInfos.offset(f as isize)).iFlag &= !GROUP_WITH_ANY;
             }
