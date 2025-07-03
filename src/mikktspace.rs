@@ -5,7 +5,6 @@ use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
 use super::math::*;
 
 extern "C" {
-    fn memcpy(_: *mut c_void, _: *const c_void, _: c_ulong) -> *mut c_void;
     fn memset(_: *mut c_void, _: c_int, _: c_ulong) -> *mut c_void;
     fn malloc(_: c_ulong) -> *mut c_void;
     fn free(_: *mut c_void);
@@ -59,6 +58,17 @@ pub struct STSpace {
     pub fMagT: c_float,
     pub iCounter: c_int,
     pub bOrient: bool,
+}
+
+impl STSpace {
+    pub const ZERO: STSpace = STSpace {
+        vOs: SVec3::ZERO,
+        fMagS: 0.,
+        vOt: SVec3::ZERO,
+        fMagT: 0.,
+        iCounter: 0,
+        bOrient: false,
+    };
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -277,21 +287,15 @@ pub unsafe extern "C" fn genTangSpace(
         free(piGroupTrianglesBuffer as *mut c_void);
         return false;
     }
-    memset(
-        psTspace as *mut c_void,
-        0 as c_int,
-        (::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iNrTSPaces as c_ulong),
-    );
     t = 0 as c_int;
     while t < iNrTSPaces {
-        (*psTspace.offset(t as isize)).vOs.x = 1.0f32;
-        (*psTspace.offset(t as isize)).vOs.y = 0.0f32;
-        (*psTspace.offset(t as isize)).vOs.z = 0.0f32;
-        (*psTspace.offset(t as isize)).fMagS = 1.0f32;
-        (*psTspace.offset(t as isize)).vOt.x = 0.0f32;
-        (*psTspace.offset(t as isize)).vOt.y = 1.0f32;
-        (*psTspace.offset(t as isize)).vOt.z = 0.0f32;
-        (*psTspace.offset(t as isize)).fMagT = 1.0f32;
+        *psTspace.offset(t as isize) = STSpace {
+            vOs: SVec3 { x: 1.0, y: 0.0, z: 0.0 },
+            fMagS: 1.0,
+            vOt: SVec3 { x: 0.0, y: 1.0, z: 0.0 },
+            fMagT: 1.0,
+            ..STSpace::ZERO
+        };
         t += 1;
     }
     bRes = GenerateTSpaces(
@@ -1434,11 +1438,14 @@ unsafe extern "C" fn GenerateTSpaces(
                 (*pUniSubGroups.offset(iUniqueSubGroups as isize)).iNrFaces = iMembers;
                 let fresh6 = &mut (*pUniSubGroups.offset(iUniqueSubGroups as isize)).pTriMembers;
                 *fresh6 = pIndices;
-                memcpy(
-                    pIndices as *mut c_void,
-                    tmp_group.pTriMembers as *const c_void,
-                    (iMembers as c_ulong).wrapping_mul(::core::mem::size_of::<c_int>() as c_ulong),
-                );
+                {
+                    let len = (iMembers as c_ulong)
+                        .wrapping_mul(::core::mem::size_of::<c_int>() as c_ulong)
+                        as usize;
+                    let mut dest = core::slice::from_raw_parts_mut::<c_int>(pIndices, len);
+                    let mut src = core::slice::from_raw_parts::<c_int>(tmp_group.pTriMembers, len);
+                    dest.copy_from_slice(src);
+                }
                 *pSubGroupTspace.offset(iUniqueSubGroups as isize) = EvalTspace(
                     tmp_group.pTriMembers,
                     iMembers,
