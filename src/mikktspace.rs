@@ -1253,7 +1253,6 @@ unsafe extern "C" fn GenerateTSpaces(
     fThresCos: c_float,
     mut pContext: *const SMikkTSpaceContext,
 ) -> bool {
-    let mut pSubGroupTspace: *mut STSpace = NULL as *mut STSpace;
     let mut pUniSubGroups: *mut SSubGroup = NULL as *mut SSubGroup;
     let mut pTmpMembers: *mut c_int = NULL as *mut c_int;
     let mut iMaxNrFaces: c_int = 0 as c_int;
@@ -1269,19 +1268,14 @@ unsafe extern "C" fn GenerateTSpaces(
     if iMaxNrFaces == 0 as c_int {
         return true;
     }
-    pSubGroupTspace =
-        malloc((::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iMaxNrFaces as c_ulong))
-            as *mut STSpace;
+    let mut pSubGroupTspace: Vec<STSpace> = vec![STSpace::ZERO; iMaxNrFaces as usize];
     pUniSubGroups = malloc(
         (::core::mem::size_of::<SSubGroup>() as c_ulong).wrapping_mul(iMaxNrFaces as c_ulong),
     ) as *mut SSubGroup;
     pTmpMembers =
         malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(iMaxNrFaces as c_ulong))
             as *mut c_int;
-    if pSubGroupTspace.is_null() || pUniSubGroups.is_null() || pTmpMembers.is_null() {
-        if !pSubGroupTspace.is_null() {
-            free(pSubGroupTspace as *mut c_void);
-        }
+    if pUniSubGroups.is_null() || pTmpMembers.is_null() {
         if !pUniSubGroups.is_null() {
             free(pUniSubGroups as *mut c_void);
         }
@@ -1390,7 +1384,6 @@ unsafe extern "C" fn GenerateTSpaces(
                     }
                     free(pUniSubGroups as *mut c_void);
                     free(pTmpMembers as *mut c_void);
-                    free(pSubGroupTspace as *mut c_void);
                     return false;
                 }
                 (*pUniSubGroups.offset(iUniqueSubGroups as isize)).iNrFaces = iMembers;
@@ -1402,7 +1395,7 @@ unsafe extern "C" fn GenerateTSpaces(
                     let mut src = core::slice::from_raw_parts::<c_int>(tmp_group.pTriMembers, len);
                     dest.copy_from_slice(src);
                 }
-                *pSubGroupTspace.offset(iUniqueSubGroups as isize) = EvalTspace(
+                pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
                     tmp_group.pTriMembers,
                     iMembers,
                     piTriListIn,
@@ -1422,12 +1415,12 @@ unsafe extern "C" fn GenerateTSpaces(
                     == (*pGroup).bOrientPreservering
             );
             if (*pTS_out).iCounter == 1 as c_int {
-                *pTS_out = AvgTSpace(pTS_out, &*pSubGroupTspace.offset(l as isize));
+                *pTS_out = AvgTSpace(pTS_out, &pSubGroupTspace[l as usize]);
                 (*pTS_out).iCounter = 2 as c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             } else {
                 assert!((*pTS_out).iCounter == 0 as c_int);
-                *pTS_out = *pSubGroupTspace.offset(l as isize);
+                *pTS_out = pSubGroupTspace[l as usize];
                 (*pTS_out).iCounter = 1 as c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             }
@@ -1442,7 +1435,6 @@ unsafe extern "C" fn GenerateTSpaces(
     }
     free(pUniSubGroups as *mut c_void);
     free(pTmpMembers as *mut c_void);
-    free(pSubGroupTspace as *mut c_void);
     true
 }
 unsafe extern "C" fn EvalTspace(
