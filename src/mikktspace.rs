@@ -192,8 +192,6 @@ pub unsafe extern "C" fn genTangSpace(
     let mut iNrMaxGroups: c_int = 0 as c_int;
     let mut iNrActiveGroups: c_int = 0 as c_int;
     let mut index: c_int = 0 as c_int;
-    let iNrFaces: c_int =
-        ((*(*pContext).m_pInterface).m_getNumFaces).expect("non-null function pointer")(pContext);
     let mut bRes: bool = false;
     let fThresCos: c_float = cos(deg_to_rad(fAngularThreshold) as c_double) as c_float;
     if ((*(*pContext).m_pInterface).m_getNumFaces).is_none()
@@ -204,6 +202,8 @@ pub unsafe extern "C" fn genTangSpace(
     {
         return false;
     }
+    let iNrFaces: c_int =
+        ((*(*pContext).m_pInterface).m_getNumFaces).expect("non-null function pointer")(pContext);
     f = 0 as c_int;
     while f < iNrFaces {
         let verts: c_int = ((*(*pContext).m_pInterface).m_getNumVerticesOfFace)
