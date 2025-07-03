@@ -80,11 +80,7 @@ impl Mul<SVec3> for f32 {
     type Output = SVec3;
 
     fn mul(self, rhs: SVec3) -> Self::Output {
-        SVec3 {
-            x: self * rhs.x,
-            y: self * rhs.y,
-            z: self * rhs.z,
-        }
+        rhs * self
     }
 }
 
