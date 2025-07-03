@@ -116,7 +116,7 @@ impl SGroup {
     };
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[repr(C)]
 pub struct SSubGroup {
     pub pTriMembers: Vec<c_int>,
@@ -1343,7 +1343,7 @@ unsafe extern "C" fn GenerateTSpaces(
             bFound = false;
             l = 0 as c_int;
             while l < iUniqueSubGroups && !bFound {
-                bFound = CompareSubGroups(&tmp_group, &pUniSubGroups[l as usize]);
+                bFound = tmp_group == pUniSubGroups[l as usize];
                 if !bFound {
                     l += 1;
                 }
@@ -1511,23 +1511,6 @@ unsafe extern "C" fn EvalTspace(
         res.fMagT /= fAngleSum;
     }
     res
-}
-unsafe extern "C" fn CompareSubGroups(
-    mut pg1: *const SSubGroup,
-    mut pg2: *const SSubGroup,
-) -> bool {
-    let mut bStillSame: bool = true;
-    let mut i = 0;
-    if (*pg1).pTriMembers.len() != (*pg2).pTriMembers.len() {
-        return false;
-    }
-    while i < (*pg1).pTriMembers.len() && bStillSame {
-        bStillSame = (&(*pg1).pTriMembers)[i as usize] == (&(*pg2).pTriMembers)[i as usize];
-        if bStillSame {
-            i += 1;
-        }
-    }
-    bStillSame
 }
 unsafe extern "C" fn BuildNeighborsFast(
     mut pTriInfos: *mut STriInfo,
