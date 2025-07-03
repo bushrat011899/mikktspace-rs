@@ -156,13 +156,13 @@ impl Index<usize> for SEdge {
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct STmpVert {
-    pub vert: [c_float; 3],
+    pub vert: SVec3,
     pub index: c_int,
 }
 
 impl STmpVert {
     pub const ZERO: STmpVert = STmpVert {
-        vert: [0.; 3],
+        vert: SVec3::ZERO,
         index: 0,
     };
 }
@@ -530,9 +530,7 @@ unsafe fn GenerateSharedVerticesIndexList(
             while e < iEntries {
                 let mut i_0: c_int = *pTable_0.offset(e as isize);
                 let vP_2: SVec3 = GetPosition(pContext, *piTriList_in_and_out.offset(i_0 as isize));
-                pTmpVert[e as usize].vert[0 as c_int as usize] = vP_2.x;
-                pTmpVert[e as usize].vert[1 as c_int as usize] = vP_2.y;
-                pTmpVert[e as usize].vert[2 as c_int as usize] = vP_2.z;
+                pTmpVert[e as usize].vert = vP_2;
                 pTmpVert[e as usize].index = i_0;
                 e += 1;
             }

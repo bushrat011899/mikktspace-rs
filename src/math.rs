@@ -1,5 +1,5 @@
 use core::ffi::{c_double, c_float, c_int};
-use core::ops::{Add, Mul, Sub};
+use core::ops::{Add, Index, Mul, Sub};
 
 #[expect(clippy::approx_constant)]
 const M_PI: c_double = 3.141_592_653_589_793;
@@ -36,6 +36,19 @@ impl SVec3 {
 
     pub fn length(self) -> c_float {
         sqrtf(self.length_squared())
+    }
+}
+
+impl Index<usize> for SVec3 {
+    type Output = c_float;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!(),
+        }
     }
 }
 
