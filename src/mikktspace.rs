@@ -202,7 +202,6 @@ pub unsafe extern "C" fn genTangSpace(
     mut pContext: *const SMikkTSpaceContext,
     fAngularThreshold: c_float,
 ) -> bool {
-    let mut psTspace: *mut STSpace = NULL as *mut STSpace;
     let mut iNrTrianglesIn: c_int = 0 as c_int;
     let mut f: c_int = 0 as c_int;
     let mut t: c_int = 0 as c_int;
@@ -288,15 +287,10 @@ pub unsafe extern "C" fn genTangSpace(
         piTriListIn.as_ptr(),
         iNrTrianglesIn,
     );
-    psTspace =
-        malloc((::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iNrTSPaces as c_ulong))
-            as *mut STSpace;
-    if psTspace.is_null() {
-        return false;
-    }
+    let mut psTspace: Vec<STSpace> = vec![STSpace::ZERO; iNrTSPaces as usize];
     t = 0 as c_int;
     while t < iNrTSPaces {
-        *psTspace.offset(t as isize) = STSpace {
+        psTspace[t as usize] = STSpace {
             vOs: SVec3 {
                 x: 1.0,
                 y: 0.0,
@@ -314,7 +308,7 @@ pub unsafe extern "C" fn genTangSpace(
         t += 1;
     }
     bRes = GenerateTSpaces(
-        psTspace,
+        psTspace.as_mut_ptr(),
         pTriInfos.as_ptr(),
         pGroups.as_ptr(),
         iNrActiveGroups,
@@ -323,11 +317,10 @@ pub unsafe extern "C" fn genTangSpace(
         pContext,
     );
     if !bRes {
-        free(psTspace as *mut c_void);
         return false;
     }
     DegenEpilogue(
-        psTspace,
+        psTspace.as_mut_ptr(),
         pTriInfos.as_mut_ptr(),
         piTriListIn.as_mut_ptr(),
         pContext,
@@ -342,8 +335,7 @@ pub unsafe extern "C" fn genTangSpace(
         if !(verts_0 != 3 as c_int && verts_0 != 4 as c_int) {
             i = 0 as c_int;
             while i < verts_0 {
-                let mut pTSpace: *const STSpace =
-                    &mut *psTspace.offset(index as isize) as *mut STSpace;
+                let mut pTSpace: *const STSpace = &mut psTspace[index as usize] as *mut STSpace;
                 let mut tang: [c_float; 3] = [(*pTSpace).vOs.x, (*pTSpace).vOs.y, (*pTSpace).vOs.z];
                 let mut bitang: [c_float; 3] =
                     [(*pTSpace).vOt.x, (*pTSpace).vOt.y, (*pTSpace).vOt.z];
@@ -375,7 +367,6 @@ pub unsafe extern "C" fn genTangSpace(
         }
         f += 1;
     }
-    free(psTspace as *mut c_void);
     true
 }
 const g_iCells: c_int = 2048 as c_int;
@@ -398,8 +389,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: c_int,
 ) {
-    let mut piHashTable: *mut c_int = NULL as *mut c_int;
-    let mut piHashOffsets: *mut c_int = NULL as *mut c_int;
     let mut pTmpVert: *mut STmpVert = NULL as *mut STmpVert;
     let mut i: c_int = 0 as c_int;
     let mut iChannel: c_int = 0 as c_int;
@@ -445,26 +434,14 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         fMin = vMin.z;
         fMax = vMax.z;
     }
-    piHashTable = malloc(
-        (::core::mem::size_of::<c_int>() as c_ulong)
-            .wrapping_mul(iNrTrianglesIn as c_ulong)
-            .wrapping_mul(3 as c_int as c_ulong),
-    ) as *mut c_int;
+    // if /* can't allocate? */ {
+    //     GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, pContext, iNrTrianglesIn);
+    //     return;
+    // }
+    let mut piHashTable: Vec<c_int> = vec![0; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
     let mut piHashCount: Vec<c_int> = vec![0; g_iCells as usize];
-    piHashOffsets =
-        malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
-            as *mut c_int;
+    let mut piHashOffsets: Vec<c_int> = vec![0; g_iCells as usize];
     let mut piHashCount2: Vec<c_int> = vec![0; g_iCells as usize];
-    if piHashTable.is_null() || piHashOffsets.is_null() {
-        if !piHashTable.is_null() {
-            free(piHashTable as *mut c_void);
-        }
-        if !piHashOffsets.is_null() {
-            free(piHashOffsets as *mut c_void);
-        }
-        GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, pContext, iNrTrianglesIn);
-        return;
-    }
     i = 0 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
         let index_0: c_int = *piTriList_in_and_out.offset(i as isize);
@@ -481,11 +458,11 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         *fresh0 += 1;
         i += 1;
     }
-    *piHashOffsets.offset(0 as c_int as isize) = 0 as c_int;
+    piHashOffsets[0 as c_int as usize] = 0 as c_int;
     k = 1 as c_int;
     while k < g_iCells {
-        *piHashOffsets.offset(k as isize) = *piHashOffsets.offset((k - 1 as c_int) as isize)
-            + piHashCount[(k - 1 as c_int) as usize];
+        piHashOffsets[k as usize] =
+            piHashOffsets[(k - 1 as c_int) as usize] + piHashCount[(k - 1 as c_int) as usize];
         k += 1;
     }
     i = 0 as c_int;
@@ -502,8 +479,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         let iCell_0: c_int = FindGridCell(fMin, fMax, fVal_0);
         let mut pTable: *mut c_int = NULL as *mut c_int;
         assert!(piHashCount2[iCell_0 as usize] < piHashCount[iCell_0 as usize]);
-        pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
-            as *mut c_int;
+        pTable = &mut piHashTable[piHashOffsets[iCell_0 as usize] as usize] as *mut c_int;
         *pTable.offset(piHashCount2[iCell_0 as usize] as isize) = i;
         let fresh1 = &mut piHashCount2[iCell_0 as usize];
         *fresh1 += 1;
@@ -528,7 +504,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     k = 0 as c_int;
     while k < g_iCells {
         let mut pTable_0: *mut c_int =
-            &mut *piHashTable.offset(*piHashOffsets.offset(k as isize) as isize) as *mut c_int;
+            &mut piHashTable[piHashOffsets[k as usize] as usize] as *mut c_int;
         let iEntries: c_int = piHashCount[k as usize];
         if iEntries >= 2 as c_int {
             if !pTmpVert.is_null() {
@@ -564,8 +540,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     if !pTmpVert.is_null() {
         free(pTmpVert as *mut c_void);
     }
-    free(piHashTable as *mut c_void);
-    free(piHashOffsets as *mut c_void);
 }
 unsafe extern "C" fn MergeVertsFast(
     mut piTriList_in_and_out: *mut c_int,
@@ -744,6 +718,8 @@ unsafe extern "C" fn MergeVertsSlow(
         e += 1;
     }
 }
+
+#[expect(dead_code)]
 unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
     mut piTriList_in_and_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
