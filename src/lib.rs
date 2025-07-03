@@ -112,7 +112,7 @@ extern "C" fn set_tspace_callback(
     bi_tangent: *const c_float,
     mag_s: c_float,
     mag_t: c_float,
-    is_orientation_preserving: c_int,
+    is_orientation_preserving: bool,
     face: c_int,
     vert: c_int,
 ) {
@@ -129,7 +129,7 @@ extern "C" fn set_tspace_callback(
             bi_tangent_arr,
             mag_s,
             mag_t,
-            is_orientation_preserving != 0,
+            is_orientation_preserving,
             face as usize,
             vert as usize,
         );
@@ -163,7 +163,7 @@ where
 {
     let interface_wrapper = InterfaceWrapper { interface };
     let context = create_context(&interface_wrapper);
-    unsafe { genTangSpaceDefault(&context) != 0 }
+    unsafe { genTangSpaceDefault(&context) }
 }
 
 pub fn gen_tang_space<I>(interface: &mut I, angular_threshold: f32) -> bool
@@ -172,5 +172,5 @@ where
 {
     let interface_wrapper = InterfaceWrapper { interface };
     let context = create_context(&interface_wrapper);
-    unsafe { genTangSpace(&context, angular_threshold) != 0 }
+    unsafe { genTangSpace(&context, angular_threshold) }
 }
