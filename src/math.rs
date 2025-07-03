@@ -3,8 +3,7 @@ use core::ops::{Add, Mul, Sub};
 
 #[expect(clippy::approx_constant)]
 const M_PI: c_double = 3.141_592_653_589_793;
-const __FLT_MIN__: c_float = 1.175_494_4e-38;
-const FLT_MIN: c_float = __FLT_MIN__;
+const FLT_MIN: c_float = 1.175_494_4e-38;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
