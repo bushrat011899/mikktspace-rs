@@ -356,9 +356,9 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     // all other degenerate triangles will just copy a space from any good triangle
     // with the same welded index in piTriListIn[].
     DegenEpilogue(
-        psTspace.as_mut_ptr(),
-        pTriInfos.as_mut_ptr(),
-        piTriListIn.as_mut_ptr(),
+        &mut psTspace,
+        &pTriInfos,
+        &piTriListIn,
         pContext,
         iNrTrianglesIn,
         iTotTris,
@@ -1966,10 +1966,10 @@ unsafe fn DegenPrologue(
     assert!(iNrTrianglesIn == t);
 }
 
-unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
-    mut psTspace: *mut STSpace,
-    mut pTriInfos: *const STriInfo,
-    mut piTriListIn: *const c_int,
+fn DegenEpilogue<I: MikkTSpaceInterface>(
+    mut psTspace: &mut [STSpace],
+    mut pTriInfos: &[STriInfo],
+    mut piTriListIn: &[c_int],
     mut pContext: &I,
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
@@ -1983,17 +1983,17 @@ unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
     while t < iTotTris {
         // degenerate triangles on a quad with one good triangle are skipped
         // here but processed in the next loop
-        let bSkip: bool = (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
+        let bSkip: bool = pTriInfos[t as usize].iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
 
         if !bSkip {
             i = 0 as c_int;
             while i < 3 as c_int {
-                let index1: c_int = *piTriListIn.offset((t * 3 as c_int + i) as isize);
+                let index1: c_int = piTriListIn[(t * 3 as c_int + i) as usize];
                 // search through the good triangles
                 let mut bNotFound: bool = true;
                 let mut j: c_int = 0 as c_int;
                 while bNotFound && j < 3 as c_int * iNrTrianglesIn {
-                    let index2: c_int = *piTriListIn.offset(j as isize);
+                    let index2: c_int = piTriListIn[j as usize];
                     if index1 == index2 {
                         bNotFound = false;
                     } else {
@@ -2005,15 +2005,14 @@ unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
                     let iTri: c_int = j / 3 as c_int;
                     let iVert: c_int = j % 3 as c_int;
                     let iSrcVert: c_int =
-                        (*pTriInfos.offset(iTri as isize)).vert_num[iVert as usize] as c_int;
-                    let iSrcOffs: c_int = (*pTriInfos.offset(iTri as isize)).iTSpacesOffs;
-                    let iDstVert: c_int =
-                        (*pTriInfos.offset(t as isize)).vert_num[i as usize] as c_int;
-                    let iDstOffs: c_int = (*pTriInfos.offset(t as isize)).iTSpacesOffs;
+                        pTriInfos[iTri as usize].vert_num[iVert as usize] as c_int;
+                    let iSrcOffs: c_int = pTriInfos[iTri as usize].iTSpacesOffs;
+                    let iDstVert: c_int = pTriInfos[t as usize].vert_num[i as usize] as c_int;
+                    let iDstOffs: c_int = pTriInfos[t as usize].iTSpacesOffs;
 
                     // copy tspace
-                    *psTspace.offset((iDstOffs + iDstVert) as isize) =
-                        *psTspace.offset((iSrcOffs + iSrcVert) as isize);
+                    psTspace[(iDstOffs + iDstVert) as usize] =
+                        psTspace[(iSrcOffs + iSrcVert) as usize];
                 }
 
                 i += 1;
@@ -2028,15 +2027,15 @@ unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
     while t < iNrTrianglesIn {
         // this triangle belongs to a quad where the
         // other triangle is degenerate
-        if (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int {
+        if pTriInfos[t as usize].iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int {
             let mut vDstP: SVec3 = SVec3::ZERO;
             let mut iOrgF: c_int = -(1 as c_int);
             let mut i_0: c_int = 0 as c_int;
             let mut bNotFound_0: bool = false;
-            let mut pV: *const c_uchar = ((*pTriInfos.offset(t as isize)).vert_num).as_ptr();
-            let mut iFlag: c_int = (1 as c_int) << *pV.offset(0 as c_int as isize) as c_int
-                | (1 as c_int) << *pV.offset(1 as c_int as isize) as c_int
-                | (1 as c_int) << *pV.offset(2 as c_int as isize) as c_int;
+            let mut pV: [u8; 4] = pTriInfos[t as usize].vert_num;
+            let mut iFlag: c_int = (1 as c_int) << pV[0] as c_int
+                | (1 as c_int) << pV[1] as c_int
+                | (1 as c_int) << pV[2] as c_int;
             let mut iMissingIndex: c_int = 0 as c_int;
             if iFlag & 2 as c_int == 0 as c_int {
                 iMissingIndex = 1 as c_int;
@@ -2046,17 +2045,17 @@ unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
                 iMissingIndex = 3 as c_int;
             }
 
-            iOrgF = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
+            iOrgF = pTriInfos[t as usize].iOrgFaceNumber;
             vDstP = GetPosition(pContext, MakeIndex(iOrgF, iMissingIndex));
             bNotFound_0 = true;
             i_0 = 0 as c_int;
             while bNotFound_0 && i_0 < 3 as c_int {
-                let iVert_0: c_int = *pV.offset(i_0 as isize) as c_int;
+                let iVert_0: c_int = pV[i_0 as usize] as c_int;
                 let vSrcP: SVec3 = GetPosition(pContext, MakeIndex(iOrgF, iVert_0));
                 if vSrcP == vDstP {
-                    let iOffs: c_int = (*pTriInfos.offset(t as isize)).iTSpacesOffs;
-                    *psTspace.offset((iOffs + iMissingIndex) as isize) =
-                        *psTspace.offset((iOffs + iVert_0) as isize);
+                    let iOffs: c_int = pTriInfos[t as usize].iTSpacesOffs;
+                    psTspace[(iOffs + iMissingIndex) as usize] =
+                        psTspace[(iOffs + iVert_0) as usize];
                     bNotFound_0 = false;
                 } else {
                     i_0 += 1;
