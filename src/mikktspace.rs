@@ -119,13 +119,11 @@ impl SGroup {
 #[derive(Clone)]
 #[repr(C)]
 pub struct SSubGroup {
-    pub iNrFaces: c_int,
     pub pTriMembers: Vec<c_int>,
 }
 
 impl SSubGroup {
     pub const ZERO: SSubGroup = SSubGroup {
-        iNrFaces: 0,
         pTriMembers: Vec::new(),
     };
 }
@@ -1286,7 +1284,6 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut j: c_int = 0 as c_int;
             let mut l: c_int = 0 as c_int;
             let mut tmp_group: SSubGroup = SSubGroup {
-                iNrFaces: 0,
                 pTriMembers: Vec::new(),
             };
             let mut bFound: bool = false;
@@ -1342,7 +1339,6 @@ unsafe extern "C" fn GenerateTSpaces(
                 }
                 j += 1;
             }
-            tmp_group.iNrFaces = iMembers;
             if iMembers > 1 as c_int {
                 let mut uSeed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
                 QuickSort(
@@ -1362,7 +1358,6 @@ unsafe extern "C" fn GenerateTSpaces(
             }
             assert!(bFound || l == iUniqueSubGroups);
             if !bFound {
-                pUniSubGroups[iUniqueSubGroups as usize].iNrFaces = iMembers;
                 let fresh6 = &mut pUniSubGroups[iUniqueSubGroups as usize].pTriMembers;
                 {
                     let len = (iMembers as c_ulong) as usize;
@@ -1530,11 +1525,11 @@ unsafe extern "C" fn CompareSubGroups(
     mut pg2: *const SSubGroup,
 ) -> bool {
     let mut bStillSame: bool = true;
-    let mut i: c_int = 0 as c_int;
-    if (*pg1).iNrFaces != (*pg2).iNrFaces {
+    let mut i = 0;
+    if (*pg1).pTriMembers.len() != (*pg2).pTriMembers.len() {
         return false;
     }
-    while i < (*pg1).iNrFaces && bStillSame {
+    while i < (*pg1).pTriMembers.len() && bStillSame {
         bStillSame = (&(*pg1).pTriMembers)[i as usize] == (&(*pg2).pTriMembers)[i as usize];
         if bStillSame {
             i += 1;
