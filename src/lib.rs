@@ -8,14 +8,15 @@ mod mikktspace;
 use core::ffi::{c_float, c_int};
 use mikktspace::{genTangSpace, genTangSpaceDefault, SMikkTSpaceContext, SMikkTSpaceInterface};
 
-#[allow(unused_variables, clippy::too_many_arguments)]
 pub trait MikkTSpaceInterface {
     fn get_num_faces(&self) -> usize;
     fn get_num_vertices_of_face(&self, face: usize) -> usize;
     fn get_position(&self, face: usize, vert: usize) -> [f32; 3];
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3];
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2];
+    #[expect(unused_variables)]
     fn set_tspace_basic(&mut self, tangent: [f32; 3], sign: f32, face: usize, vert: usize) {}
+    #[expect(unused_variables, clippy::too_many_arguments)]
     fn set_tspace(
         &mut self,
         tangent: [f32; 3],
