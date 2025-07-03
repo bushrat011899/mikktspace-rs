@@ -175,7 +175,7 @@ fn IndexToData(iIndexIn: c_int) -> (c_int, c_int) {
     (iIndexIn >> 2 as c_int, iIndexIn & 0x3 as c_int)
 }
 
-unsafe fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpace {
+fn AvgTSpace(mut pTS0: STSpace, mut pTS1: STSpace) -> STSpace {
     let mut ts_res: STSpace = STSpace {
         vOs: SVec3::ZERO,
         fMagS: 0.,
@@ -188,20 +188,20 @@ unsafe fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpa
     // this if is important. Due to floating point precision
     // averaging when ts0==ts1 will cause a slight difference
     // which results in tangent space splits later on
-    if (*pTS0).fMagS == (*pTS1).fMagS
-        && (*pTS0).fMagT == (*pTS1).fMagT
-        && ((*pTS0).vOs == (*pTS1).vOs)
-        && ((*pTS0).vOt == (*pTS1).vOt)
+    if pTS0.fMagS == pTS1.fMagS
+        && pTS0.fMagT == pTS1.fMagT
+        && (pTS0.vOs == pTS1.vOs)
+        && (pTS0.vOt == pTS1.vOt)
     {
-        ts_res.fMagS = (*pTS0).fMagS;
-        ts_res.fMagT = (*pTS0).fMagT;
-        ts_res.vOs = (*pTS0).vOs;
-        ts_res.vOt = (*pTS0).vOt;
+        ts_res.fMagS = pTS0.fMagS;
+        ts_res.fMagT = pTS0.fMagT;
+        ts_res.vOs = pTS0.vOs;
+        ts_res.vOt = pTS0.vOt;
     } else {
-        ts_res.fMagS = 0.5f32 * ((*pTS0).fMagS + (*pTS1).fMagS);
-        ts_res.fMagT = 0.5f32 * ((*pTS0).fMagT + (*pTS1).fMagT);
-        ts_res.vOs = (*pTS0).vOs + (*pTS1).vOs;
-        ts_res.vOt = (*pTS0).vOt + (*pTS1).vOt;
+        ts_res.fMagS = 0.5f32 * (pTS0.fMagS + pTS1.fMagS);
+        ts_res.fMagT = 0.5f32 * (pTS0.fMagT + pTS1.fMagT);
+        ts_res.vOs = pTS0.vOs + pTS1.vOs;
+        ts_res.vOt = pTS0.vOt + pTS1.vOt;
         ts_res.vOs.normalize_or_zero();
         ts_res.vOt.normalize_or_zero();
     }
@@ -1421,7 +1421,7 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
                     == (*pGroup).bOrientPreservering
             );
             if (*pTS_out).iCounter == 1 as c_int {
-                *pTS_out = AvgTSpace(pTS_out, &pSubGroupTspace[l as usize]);
+                *pTS_out = AvgTSpace(*pTS_out, pSubGroupTspace[l as usize]);
                 // update counter
                 (*pTS_out).iCounter = 2 as c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
