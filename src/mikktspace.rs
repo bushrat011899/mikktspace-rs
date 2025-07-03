@@ -202,7 +202,6 @@ pub unsafe extern "C" fn genTangSpace(
     mut pContext: *const SMikkTSpaceContext,
     fAngularThreshold: c_float,
 ) -> bool {
-    let mut piGroupTrianglesBuffer: *mut c_int = NULL as *mut c_int;
     let mut psTspace: *mut STSpace = NULL as *mut STSpace;
     let mut iNrTrianglesIn: c_int = 0 as c_int;
     let mut f: c_int = 0 as c_int;
@@ -280,21 +279,12 @@ pub unsafe extern "C" fn genTangSpace(
     );
     iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
     let mut pGroups: Vec<SGroup> = vec![SGroup::ZERO; iNrMaxGroups as usize];
-    piGroupTrianglesBuffer = malloc(
-        (::core::mem::size_of::<c_int>() as c_ulong)
-            .wrapping_mul(iNrTrianglesIn as c_ulong)
-            .wrapping_mul(3 as c_int as c_ulong),
-    ) as *mut c_int;
-    if piGroupTrianglesBuffer.is_null() {
-        if !piGroupTrianglesBuffer.is_null() {
-            free(piGroupTrianglesBuffer as *mut c_void);
-        }
-        return false;
-    }
+    let mut piGroupTrianglesBuffer: Vec<c_int> =
+        vec![0; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
     iNrActiveGroups = Build4RuleGroups(
         pTriInfos.as_mut_ptr(),
         pGroups.as_mut_ptr(),
-        piGroupTrianglesBuffer,
+        piGroupTrianglesBuffer.as_mut_ptr(),
         piTriListIn.as_ptr(),
         iNrTrianglesIn,
     );
@@ -302,7 +292,6 @@ pub unsafe extern "C" fn genTangSpace(
         malloc((::core::mem::size_of::<STSpace>() as c_ulong).wrapping_mul(iNrTSPaces as c_ulong))
             as *mut STSpace;
     if psTspace.is_null() {
-        free(piGroupTrianglesBuffer as *mut c_void);
         return false;
     }
     t = 0 as c_int;
@@ -333,7 +322,6 @@ pub unsafe extern "C" fn genTangSpace(
         fThresCos,
         pContext,
     );
-    free(piGroupTrianglesBuffer as *mut c_void);
     if !bRes {
         free(psTspace as *mut c_void);
         return false;
