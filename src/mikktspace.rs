@@ -1261,7 +1261,6 @@ unsafe extern "C" fn GenerateTSpaces(
     fThresCos: c_float,
     mut pContext: *const SMikkTSpaceContext,
 ) -> bool {
-    let mut pTmpMembers: *mut c_int = NULL as *mut c_int;
     let mut iMaxNrFaces: c_int = 0 as c_int;
     let mut g: c_int = 0 as c_int;
     let mut i: c_int = 0 as c_int;
@@ -1277,15 +1276,7 @@ unsafe extern "C" fn GenerateTSpaces(
     }
     let mut pSubGroupTspace: Vec<STSpace> = vec![STSpace::ZERO; iMaxNrFaces as usize];
     let mut pUniSubGroups: Vec<SSubGroup> = vec![SSubGroup::ZERO; iMaxNrFaces as usize];
-    pTmpMembers =
-        malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(iMaxNrFaces as c_ulong))
-            as *mut c_int;
-    if pTmpMembers.is_null() {
-        if !pTmpMembers.is_null() {
-            free(pTmpMembers as *mut c_void);
-        }
-        return false;
-    }
+    let mut pTmpMembers: Vec<c_int> = vec![0; iMaxNrFaces as usize];
     g = 0 as c_int;
     while g < iNrActiveGroups {
         let mut pGroup: *const SGroup = &*pGroups.offset(g as isize) as *const SGroup;
@@ -1353,15 +1344,15 @@ unsafe extern "C" fn GenerateTSpaces(
                 if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
                     iMembers += 1;
-                    *pTmpMembers.offset(fresh5 as isize) = t;
+                    pTmpMembers[fresh5 as usize] = t;
                 }
                 j += 1;
             }
             tmp_group.iNrFaces = iMembers;
-            tmp_group.pTriMembers = pTmpMembers;
+            tmp_group.pTriMembers = pTmpMembers.as_mut_ptr();
             if iMembers > 1 as c_int {
                 let mut uSeed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
-                QuickSort(pTmpMembers, 0 as c_int, iMembers - 1 as c_int, uSeed);
+                QuickSort(pTmpMembers.as_mut_ptr(), 0 as c_int, iMembers - 1 as c_int, uSeed);
             }
             bFound = false;
             l = 0 as c_int;
@@ -1377,7 +1368,6 @@ unsafe extern "C" fn GenerateTSpaces(
                     (::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(iMembers as c_ulong),
                 ) as *mut c_int;
                 if pIndices.is_null() {
-                    free(pTmpMembers as *mut c_void);
                     return false;
                 }
                 pUniSubGroups[iUniqueSubGroups as usize].iNrFaces = iMembers;
@@ -1427,7 +1417,6 @@ unsafe extern "C" fn GenerateTSpaces(
         }
         g += 1;
     }
-    free(pTmpMembers as *mut c_void);
     true
 }
 unsafe extern "C" fn EvalTspace(
