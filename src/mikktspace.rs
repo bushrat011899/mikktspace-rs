@@ -1546,9 +1546,9 @@ unsafe extern "C" fn GenerateTSpaces(
             assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
             n = GetNormal(pContext, iVertIndex);
             vOs = (*pTriInfos.offset(f as isize)).vOs
-                - (vdot(n, (*pTriInfos.offset(f as isize)).vOs) * n);
+                - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
-                - (vdot(n, (*pTriInfos.offset(f as isize)).vOt) * n);
+                - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1562,9 +1562,9 @@ unsafe extern "C" fn GenerateTSpaces(
                 let t: libc::c_int = *((*pGroup).pFaceIndices).offset(j as isize);
                 let iOF_2: libc::c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
                 let mut vOs2: SVec3 = (*pTriInfos.offset(t as isize)).vOs
-                    - (vdot(n, (*pTriInfos.offset(t as isize)).vOs) * n);
+                    - ((n.dot((*pTriInfos.offset(t as isize)).vOs)) * n);
                 let mut vOt2: SVec3 = (*pTriInfos.offset(t as isize)).vOt
-                    - (vdot(n, (*pTriInfos.offset(t as isize)).vOt) * n);
+                    - ((n.dot((*pTriInfos.offset(t as isize)).vOt)) * n);
                 if v_not_zero(vOs2) != 0 {
                     vOs2 = normalize(vOs2);
                 }
@@ -1581,8 +1581,8 @@ unsafe extern "C" fn GenerateTSpaces(
                     TFALSE
                 };
                 let bSameOrgFace: tbool = if iOF_1 == iOF_2 { TTRUE } else { TFALSE };
-                let fCosS: libc::c_float = vdot(vOs, vOs2);
-                let fCosT: libc::c_float = vdot(vOt, vOt2);
+                let fCosS: libc::c_float = vOs.dot(vOs2);
+                let fCosT: libc::c_float = vOt.dot(vOt2);
                 assert!(f != t || bSameOrgFace != 0);
                 if bAny != 0 || bSameOrgFace != 0 || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
@@ -1788,9 +1788,9 @@ unsafe extern "C" fn EvalTspace(
             index = *piTriListIn.offset((3 as libc::c_int * f + i) as isize);
             n = GetNormal(pContext, index);
             vOs = (*pTriInfos.offset(f as isize)).vOs
-                - (vdot(n, (*pTriInfos.offset(f as isize)).vOs) * n);
+                - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
-                - (vdot(n, (*pTriInfos.offset(f as isize)).vOt) * n);
+                - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
             if v_not_zero(vOs) != 0 {
                 vOs = normalize(vOs);
             }
@@ -1819,15 +1819,15 @@ unsafe extern "C" fn EvalTspace(
             p2 = GetPosition(pContext, i2);
             v1 = p0 - p1;
             v2 = p2 - p1;
-            v1 = v1 - (vdot(n, v1) * n);
+            v1 = v1 - ((n.dot(v1)) * n);
             if v_not_zero(v1) != 0 {
                 v1 = normalize(v1);
             }
-            v2 = v2 - (vdot(n, v2) * n);
+            v2 = v2 - ((n.dot(v2)) * n);
             if v_not_zero(v2) != 0 {
                 v2 = normalize(v2);
             }
-            fCos = vdot(v1, v2);
+            fCos = v1.dot(v2);
             fCos = if fCos > 1 as libc::c_int as libc::c_float {
                 1 as libc::c_int as libc::c_float
             } else if fCos < -(1 as libc::c_int) as libc::c_float {

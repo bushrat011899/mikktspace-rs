@@ -3,8 +3,8 @@ use core::ops::{Add, Mul, Sub};
 use crate::libc::{c_double, c_float, c_int};
 
 pub const M_PI: c_double = 3.141_592_653_589_793;
-pub const __FLT_MIN__: c_float = 1.175_494_4e-38;
-pub const FLT_MIN: c_float = __FLT_MIN__;
+const __FLT_MIN__: c_float = 1.175_494_4e-38;
+const FLT_MIN: c_float = __FLT_MIN__;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -12,6 +12,12 @@ pub struct SVec3 {
     pub x: c_float,
     pub y: c_float,
     pub z: c_float,
+}
+
+impl SVec3 {
+    pub fn dot(self, rhs: Self) -> c_float {
+        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
+    }
 }
 
 impl Add for SVec3 {
@@ -112,10 +118,6 @@ pub fn length(v: SVec3) -> c_float {
 
 pub fn normalize(v: SVec3) -> SVec3 {
     (1 as c_int as c_float / length(v)) * v
-}
-
-pub fn vdot(v1: SVec3, v2: SVec3) -> c_float {
-    v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 }
 
 pub fn not_zero(x: c_float) -> c_int {
