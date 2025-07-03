@@ -744,8 +744,11 @@ unsafe extern "C" fn MergeVertsFast(
             let mut bReadyRightSwap: tbool = TFALSE;
             while bReadyLeftSwap == 0 && iL < iR {
                 assert!(iL >= iL_in && iL <= iR_in);
-                bReadyLeftSwap =
-                    !((*pTmpVert.offset(iL as isize)).vert[channel as usize] < fSep) as libc::c_int;
+                #[expect(clippy::neg_cmp_op_on_partial_ord)]
+                {
+                    bReadyLeftSwap = !((*pTmpVert.offset(iL as isize)).vert[channel as usize]
+                        < fSep) as libc::c_int;
+                }
                 if bReadyLeftSwap == 0 {
                     iL += 1;
                 }
@@ -1226,6 +1229,7 @@ unsafe extern "C" fn InitTriInfo(
                 };
                 if bOrientA != bOrientB {
                     let mut bChooseOrientFirstTri: tbool = TFALSE;
+                    #[expect(clippy::if_same_then_else)]
                     if (*pTriInfos.offset((t + 1 as libc::c_int) as isize)).iFlag & GROUP_WITH_ANY
                         != 0 as libc::c_int
                     {
@@ -1374,7 +1378,6 @@ unsafe extern "C" fn Build4RuleGroups(
 unsafe extern "C" fn AddTriToGroup(mut pGroup: *mut SGroup, iTriIndex: libc::c_int) {
     *((*pGroup).pFaceIndices).offset((*pGroup).iNrFaces as isize) = iTriIndex;
     (*pGroup).iNrFaces += 1;
-    (*pGroup).iNrFaces;
 }
 unsafe extern "C" fn AssignRecur(
     mut piTriListIn: *const libc::c_int,
@@ -1590,7 +1593,7 @@ unsafe extern "C" fn GenerateTSpaces(
             bFound = TFALSE;
             l = 0 as libc::c_int;
             while l < iUniqueSubGroups && bFound == 0 {
-                bFound = CompareSubGroups(&mut tmp_group, &mut *pUniSubGroups.offset(l as isize));
+                bFound = CompareSubGroups(&tmp_group, &*pUniSubGroups.offset(l as isize));
                 if bFound == 0 {
                     l += 1;
                 }
@@ -1646,7 +1649,7 @@ unsafe extern "C" fn GenerateTSpaces(
                     == (*pGroup).bOrientPreservering
             );
             if (*pTS_out).iCounter == 1 as libc::c_int {
-                *pTS_out = AvgTSpace(pTS_out, &mut *pSubGroupTspace.offset(l as isize));
+                *pTS_out = AvgTSpace(pTS_out, &*pSubGroupTspace.offset(l as isize));
                 (*pTS_out).iCounter = 2 as libc::c_int;
                 (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
             } else {
@@ -2119,6 +2122,7 @@ unsafe extern "C" fn QuickSortEdges(
         c2rust_unnamed: C2RustUnnamed { i0: 0, i1: 0, f: 0 },
     };
     let iElems: libc::c_int = iRight - iLeft + 1 as libc::c_int;
+    #[expect(clippy::comparison_chain)]
     if iElems < 2 as libc::c_int {
         return;
     } else if iElems == 2 as libc::c_int {
