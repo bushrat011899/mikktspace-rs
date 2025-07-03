@@ -173,15 +173,15 @@ pub const MARK_DEGENERATE: c_int = 1 as c_int;
 pub const QUAD_ONE_DEGEN_TRI: c_int = 2 as c_int;
 pub const GROUP_WITH_ANY: c_int = 4 as c_int;
 pub const ORIENT_PRESERVING: c_int = 8 as c_int;
-unsafe extern "C" fn MakeIndex(iFace: c_int, iVert: c_int) -> c_int {
+unsafe fn MakeIndex(iFace: c_int, iVert: c_int) -> c_int {
     assert!(iVert >= 0 as c_int && iVert < 4 as c_int && iFace >= 0 as c_int);
     iFace << 2 as c_int | iVert & 0x3 as c_int
 }
-unsafe extern "C" fn IndexToData(mut piFace: *mut c_int, mut piVert: *mut c_int, iIndexIn: c_int) {
+unsafe fn IndexToData(mut piFace: *mut c_int, mut piVert: *mut c_int, iIndexIn: c_int) {
     *piVert.offset(0 as c_int as isize) = iIndexIn & 0x3 as c_int;
     *piFace.offset(0 as c_int as isize) = iIndexIn >> 2 as c_int;
 }
-unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpace {
+unsafe fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpace {
     let mut ts_res: STSpace = STSpace {
         vOs: SVec3::ZERO,
         fMagS: 0.,
@@ -209,10 +209,10 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
     }
     ts_res
 }
-pub unsafe extern "C" fn genTangSpaceDefault(mut pContext: *const SMikkTSpaceContext) -> bool {
+pub unsafe fn genTangSpaceDefault(mut pContext: *const SMikkTSpaceContext) -> bool {
     genTangSpace(pContext, 180.0f32)
 }
-pub unsafe extern "C" fn genTangSpace(
+pub unsafe fn genTangSpace(
     mut pContext: *const SMikkTSpaceContext,
     fAngularThreshold: c_float,
 ) -> bool {
@@ -385,7 +385,7 @@ pub unsafe extern "C" fn genTangSpace(
 }
 const g_iCells: c_int = 2048 as c_int;
 #[inline(never)]
-unsafe extern "C" fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
+unsafe fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
     let fIndex: c_float = g_iCells as c_float * ((fVal - fMin) / (fMax - fMin));
     let iIndex: c_int = fIndex as c_int;
     if iIndex < g_iCells {
@@ -398,7 +398,7 @@ unsafe extern "C" fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -
         g_iCells - 1 as c_int
     }
 }
-unsafe extern "C" fn GenerateSharedVerticesIndexList(
+unsafe fn GenerateSharedVerticesIndexList(
     mut piTriList_in_and_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: c_int,
@@ -547,7 +547,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         k += 1;
     }
 }
-unsafe extern "C" fn MergeVertsFast(
+unsafe fn MergeVertsFast(
     mut piTriList_in_and_out: *mut c_int,
     mut pTmpVert: *mut STmpVert,
     mut pContext: *const SMikkTSpaceContext,
@@ -690,7 +690,7 @@ unsafe extern "C" fn MergeVertsFast(
 }
 
 #[expect(dead_code)]
-unsafe extern "C" fn MergeVertsSlow(
+unsafe fn MergeVertsSlow(
     mut piTriList_in_and_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
     mut pTable: *const c_int,
@@ -728,7 +728,7 @@ unsafe extern "C" fn MergeVertsSlow(
 }
 
 #[expect(dead_code)]
-unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
+unsafe fn GenerateSharedVerticesIndexListSlow(
     mut piTriList_in_and_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: c_int,
@@ -772,7 +772,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
         t += 1;
     }
 }
-unsafe extern "C" fn GenerateInitialVerticesIndexList(
+unsafe fn GenerateInitialVerticesIndexList(
     mut pTriInfos: *mut STriInfo,
     mut piTriList_out: *mut c_int,
     mut pContext: *const SMikkTSpaceContext,
@@ -884,7 +884,7 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
     }
     iTSpacesOffs
 }
-unsafe extern "C" fn GetPosition(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetPosition(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
@@ -901,7 +901,7 @@ unsafe extern "C" fn GetPosition(mut pContext: *const SMikkTSpaceContext, index:
     res.z = pos[2 as c_int as usize];
     res
 }
-unsafe extern "C" fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
@@ -918,7 +918,7 @@ unsafe extern "C" fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c
     res.z = norm[2 as c_int as usize];
     res
 }
-unsafe extern "C" fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
@@ -935,7 +935,7 @@ unsafe extern "C" fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index:
     res.z = 1.0f32;
     res
 }
-unsafe extern "C" fn CalcTexArea(
+unsafe fn CalcTexArea(
     mut pContext: *const SMikkTSpaceContext,
     mut indices: *const c_int,
 ) -> c_float {
@@ -953,7 +953,7 @@ unsafe extern "C" fn CalcTexArea(
         fSignedAreaSTx2
     }
 }
-unsafe extern "C" fn InitTriInfo(
+unsafe fn InitTriInfo(
     mut pTriInfos: *mut STriInfo,
     mut piTriListIn: *const c_int,
     mut pContext: *const SMikkTSpaceContext,
@@ -1106,7 +1106,7 @@ unsafe extern "C" fn InitTriInfo(
         vec![SEdge::ZERO; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
     BuildNeighborsFast(pTriInfos, pEdges.as_mut_ptr(), piTriListIn, iNrTrianglesIn);
 }
-unsafe extern "C" fn Build4RuleGroups(
+unsafe fn Build4RuleGroups(
     mut pTriInfos: *mut STriInfo,
     mut pGroups: *mut SGroup,
     mut piGroupTrianglesBuffer: *mut c_int,
@@ -1185,11 +1185,11 @@ unsafe extern "C" fn Build4RuleGroups(
     }
     iNrActiveGroups
 }
-unsafe extern "C" fn AddTriToGroup(mut pGroup: *mut SGroup, iTriIndex: c_int) {
+unsafe fn AddTriToGroup(mut pGroup: *mut SGroup, iTriIndex: c_int) {
     *((*pGroup).pFaceIndices).offset((*pGroup).iNrFaces as isize) = iTriIndex;
     (*pGroup).iNrFaces += 1;
 }
-unsafe extern "C" fn AssignRecur(
+unsafe fn AssignRecur(
     mut piTriListIn: *const c_int,
     mut psTriInfos: *mut STriInfo,
     iMyTriIndex: c_int,
@@ -1246,7 +1246,7 @@ unsafe extern "C" fn AssignRecur(
     }
     true
 }
-unsafe extern "C" fn GenerateTSpaces(
+unsafe fn GenerateTSpaces(
     mut psTspace: *mut STSpace,
     mut pTriInfos: *const STriInfo,
     mut pGroups: *const SGroup,
@@ -1501,7 +1501,7 @@ unsafe fn EvalTspace(
     }
     res
 }
-unsafe extern "C" fn BuildNeighborsFast(
+unsafe fn BuildNeighborsFast(
     mut pTriInfos: *mut STriInfo,
     mut pEdges: *mut SEdge,
     mut piTriListIn: *const c_int,
@@ -1625,7 +1625,7 @@ unsafe extern "C" fn BuildNeighborsFast(
 }
 
 #[expect(dead_code)]
-unsafe extern "C" fn BuildNeighborsSlow(
+unsafe fn BuildNeighborsSlow(
     mut pTriInfos: *mut STriInfo,
     mut piTriListIn: *const c_int,
     iNrTrianglesIn: c_int,
@@ -1745,7 +1745,7 @@ fn QuickSortEdges(
         QuickSortEdges(pSortBuffer, iL, iRight, channel, uSeed);
     }
 }
-unsafe extern "C" fn GetEdge(
+unsafe fn GetEdge(
     mut i0_out: *mut c_int,
     mut i1_out: *mut c_int,
     mut edgenum_out: *mut c_int,
@@ -1774,7 +1774,7 @@ unsafe extern "C" fn GetEdge(
         *i1_out.offset(0 as c_int as isize) = *indices.offset(2 as c_int as isize);
     };
 }
-unsafe extern "C" fn DegenPrologue(
+unsafe fn DegenPrologue(
     mut pTriInfos: *mut STriInfo,
     mut piTriList_out: *mut c_int,
     iNrTrianglesIn: c_int,
@@ -1853,7 +1853,7 @@ unsafe extern "C" fn DegenPrologue(
     assert!(bStillFindingGoodOnes);
     assert!(iNrTrianglesIn == t);
 }
-unsafe extern "C" fn DegenEpilogue(
+unsafe fn DegenEpilogue(
     mut psTspace: *mut STSpace,
     mut pTriInfos: *mut STriInfo,
     mut piTriListIn: *mut c_int,
