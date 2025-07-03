@@ -1581,7 +1581,8 @@ unsafe fn BuildNeighborsFast(
             core::slice::from_raw_parts(piTriListIn.offset((f_0 * 3 as c_int) as isize), 3),
             i0_0,
             i1_0,
-        );
+        )
+        .unwrap();
         bUnassigned_A =
             (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
         if bUnassigned_A {
@@ -1601,7 +1602,8 @@ unsafe fn BuildNeighborsFast(
                     core::slice::from_raw_parts(piTriListIn.offset((t * 3 as c_int) as isize), 3),
                     (*pEdges.offset(j as isize)).i0,
                     (*pEdges.offset(j as isize)).i1,
-                );
+                )
+                .unwrap();
                 bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize]
                     == -(1 as c_int);
                 if i0_A == i0_B && i1_A == i1_B && bUnassigned_B {
@@ -1742,28 +1744,16 @@ fn QuickSortEdges(
     }
 }
 
-fn get_edge(mut indices: &[c_int], i0_in: c_int, i1_in: c_int) -> (c_int, c_int, c_int) {
-    let mut i0_out: c_int;
-    let mut i1_out: c_int;
-    let mut edgenum_out: c_int;
-
-    if indices[0] == i0_in || indices[0] == i1_in {
-        if indices[1] == i0_in || indices[1] == i1_in {
-            edgenum_out = 0 as c_int;
-            i0_out = indices[0];
-            i1_out = indices[1];
-        } else {
-            edgenum_out = 2 as c_int;
-            i0_out = indices[2];
-            i1_out = indices[0];
-        }
-    } else {
-        edgenum_out = 1 as c_int;
-        i0_out = indices[1];
-        i1_out = indices[2];
-    };
-
-    (edgenum_out, i0_out, i1_out)
+/// Finds the index of the edge `(i0_in, i1_in)` within `indices`, additionally
+/// returning `i0_in` and `i1_in` in the same order as they are stored within `indices`.
+fn get_edge(indices: &[c_int], i0_in: c_int, i1_in: c_int) -> Option<(c_int, c_int, c_int)> {
+    indices
+        .iter()
+        .copied()
+        .zip(indices.iter().copied().cycle().skip(1))
+        .enumerate()
+        .find(|&(_, (a, b))| (a == i0_in || a == i1_in) && (b == i0_in || b == i1_in))
+        .map(|(edgenum, (a, b))| (edgenum as c_int, a as c_int, b as c_int))
 }
 
 unsafe fn DegenPrologue(
