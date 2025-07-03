@@ -359,11 +359,7 @@ pub unsafe extern "C" fn genTangSpace(
                         .expect("non-null function pointer")(
                         pContext,
                         tang.as_mut_ptr() as *const c_float,
-                        if (*pTSpace).bOrient {
-                            1.0f32
-                        } else {
-                            -1.0f32
-                        },
+                        if (*pTSpace).bOrient { 1.0f32 } else { -1.0f32 },
                         f,
                         i,
                     );
@@ -1114,12 +1110,14 @@ unsafe extern "C" fn InitTriInfo(
             let bIsDeg_a: bool =
                 (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
             let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE != 0 as c_int;
+                & MARK_DEGENERATE
+                != 0 as c_int;
             if !(bIsDeg_a || bIsDeg_b) {
                 let bOrientA: bool =
                     (*pTriInfos.offset(t as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
                 let bOrientB: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                    & ORIENT_PRESERVING != 0 as c_int;
+                    & ORIENT_PRESERVING
+                    != 0 as c_int;
                 if bOrientA != bOrientB {
                     let mut bChooseOrientFirstTri: bool = false;
                     #[expect(clippy::if_same_then_else)]
@@ -1220,7 +1218,8 @@ unsafe extern "C" fn Build4RuleGroups(
                         (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
                     );
                     let bOrPre2: bool = (*pTriInfos.offset(neigh_indexL as isize)).iFlag
-                        & ORIENT_PRESERVING != 0 as c_int;
+                        & ORIENT_PRESERVING
+                        != 0 as c_int;
                     let bDiff: bool = bOrPre != bOrPre2;
                     assert!(bAnswer || bDiff);
                 }
@@ -1232,7 +1231,8 @@ unsafe extern "C" fn Build4RuleGroups(
                         (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
                     );
                     let bOrPre2_0: bool = (*pTriInfos.offset(neigh_indexR as isize)).iFlag
-                        & ORIENT_PRESERVING != 0 as c_int;
+                        & ORIENT_PRESERVING
+                        != 0 as c_int;
                     let bDiff_0: bool = bOrPre != bOrPre2_0;
                     assert!(bAnswer_0 || bDiff_0);
                 }
@@ -1423,13 +1423,13 @@ unsafe extern "C" fn GenerateTSpaces(
                 vOt2.normalize_or_zero();
                 let bAny: bool = ((*pTriInfos.offset(f as isize)).iFlag
                     | (*pTriInfos.offset(t as isize)).iFlag)
-                    & GROUP_WITH_ANY != 0 as c_int;
+                    & GROUP_WITH_ANY
+                    != 0 as c_int;
                 let bSameOrgFace: bool = iOF_1 == iOF_2;
                 let fCosS: c_float = vOs.dot(vOs2);
                 let fCosT: c_float = vOt.dot(vOt2);
                 assert!(f != t || bSameOrgFace);
-                if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos
-                {
+                if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos {
                     let fresh5 = iMembers;
                     iMembers += 1;
                     *pTmpMembers.offset(fresh5 as isize) = t;
@@ -1689,7 +1689,8 @@ unsafe extern "C" fn CompareSubGroups(
         return false;
     }
     while i < (*pg1).iNrFaces && bStillSame {
-        bStillSame = *((*pg1).pTriMembers).offset(i as isize) == *((*pg2).pTriMembers).offset(i as isize);
+        bStillSame =
+            *((*pg1).pTriMembers).offset(i as isize) == *((*pg2).pTriMembers).offset(i as isize);
         if bStillSame {
             i += 1;
         }
@@ -1833,7 +1834,8 @@ unsafe extern "C" fn BuildNeighborsFast(
             i0_0,
             i1_0,
         );
-        bUnassigned_A = (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
+        bUnassigned_A =
+            (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
         if bUnassigned_A {
             let mut j: c_int = i + 1 as c_int;
             let mut t: c_int = 0;
@@ -1855,7 +1857,8 @@ unsafe extern "C" fn BuildNeighborsFast(
                     (*pEdges.offset(j as isize)).c2rust_unnamed.i0,
                     (*pEdges.offset(j as isize)).c2rust_unnamed.i1,
                 );
-                bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize] == -(1 as c_int);
+                bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize]
+                    == -(1 as c_int);
                 if i0_A == i0_B && i1_A == i1_B && bUnassigned_B {
                     bNotFound = false;
                 } else {
@@ -2038,7 +2041,8 @@ unsafe extern "C" fn DegenPrologue(
             let bIsDeg_a: bool =
                 (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
             let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE != 0 as c_int;
+                & MARK_DEGENERATE
+                != 0 as c_int;
             if bIsDeg_a ^ bIsDeg_b {
                 (*pTriInfos.offset(t as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
                 (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
@@ -2064,7 +2068,8 @@ unsafe extern "C" fn DegenPrologue(
             while bJustADegenerate && iNextGoodTriangleSearchIndex < iTotTris {
                 let bIsGood_0: bool = (*pTriInfos.offset(iNextGoodTriangleSearchIndex as isize))
                     .iFlag
-                    & MARK_DEGENERATE == 0 as c_int;
+                    & MARK_DEGENERATE
+                    == 0 as c_int;
                 if bIsGood_0 {
                     bJustADegenerate = false;
                 } else {
@@ -2111,8 +2116,7 @@ unsafe extern "C" fn DegenEpilogue(
     let mut i: c_int = 0 as c_int;
     t = iNrTrianglesIn;
     while t < iTotTris {
-        let bSkip: bool =
-            (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
+        let bSkip: bool = (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
         if !bSkip {
             i = 0 as c_int;
             while i < 3 as c_int {
