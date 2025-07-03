@@ -6,7 +6,6 @@ use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
 use super::math::*;
 
 extern "C" {
-    fn memset(_: *mut c_void, _: c_int, _: c_ulong) -> *mut c_void;
     fn malloc(_: c_ulong) -> *mut c_void;
     fn free(_: *mut c_void);
 }
@@ -400,7 +399,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
 ) {
     let mut piHashTable: *mut c_int = NULL as *mut c_int;
     let mut piHashOffsets: *mut c_int = NULL as *mut c_int;
-    let mut piHashCount2: *mut c_int = NULL as *mut c_int;
     let mut pTmpVert: *mut STmpVert = NULL as *mut STmpVert;
     let mut i: c_int = 0 as c_int;
     let mut iChannel: c_int = 0 as c_int;
@@ -455,27 +453,17 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     piHashOffsets =
         malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
             as *mut c_int;
-    piHashCount2 =
-        malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
-            as *mut c_int;
-    if piHashTable.is_null() || piHashOffsets.is_null() || piHashCount2.is_null() {
+    let mut piHashCount2: Vec<c_int> = vec![0; g_iCells as usize];
+    if piHashTable.is_null() || piHashOffsets.is_null() {
         if !piHashTable.is_null() {
             free(piHashTable as *mut c_void);
         }
         if !piHashOffsets.is_null() {
             free(piHashOffsets as *mut c_void);
         }
-        if !piHashCount2.is_null() {
-            free(piHashCount2 as *mut c_void);
-        }
         GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, pContext, iNrTrianglesIn);
         return;
     }
-    memset(
-        piHashCount2 as *mut c_void,
-        0 as c_int,
-        (::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong),
-    );
     i = 0 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
         let index_0: c_int = *piTriList_in_and_out.offset(i as isize);
@@ -512,20 +500,19 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         };
         let iCell_0: c_int = FindGridCell(fMin, fMax, fVal_0);
         let mut pTable: *mut c_int = NULL as *mut c_int;
-        assert!(*piHashCount2.offset(iCell_0 as isize) < piHashCount[iCell_0 as usize]);
+        assert!(piHashCount2[iCell_0 as usize] < piHashCount[iCell_0 as usize]);
         pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
             as *mut c_int;
-        *pTable.offset(*piHashCount2.offset(iCell_0 as isize) as isize) = i;
-        let fresh1 = &mut (*piHashCount2.offset(iCell_0 as isize));
+        *pTable.offset(piHashCount2[iCell_0 as usize] as isize) = i;
+        let fresh1 = &mut piHashCount2[iCell_0 as usize];
         *fresh1 += 1;
         i += 1;
     }
     k = 0 as c_int;
     while k < g_iCells {
-        assert!(*piHashCount2.offset(k as isize) == piHashCount[k as usize]);
+        assert!(piHashCount2[k as usize] == piHashCount[k as usize]);
         k += 1;
     }
-    free(piHashCount2 as *mut c_void);
     iMaxCount = piHashCount[0 as c_int as usize];
     k = 1 as c_int;
     while k < g_iCells {
