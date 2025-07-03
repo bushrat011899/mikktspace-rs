@@ -2,7 +2,7 @@ use core::ops::{Add, Mul, Sub};
 
 use crate::libc::{c_double, c_float, c_int};
 
-pub const M_PI: c_double = 3.141_592_653_589_793;
+const M_PI: c_double = 3.141_592_653_589_793;
 const __FLT_MIN__: c_float = 1.175_494_4e-38;
 const FLT_MIN: c_float = __FLT_MIN__;
 
@@ -126,4 +126,8 @@ pub fn fabsf(x: c_float) -> c_float {
 
 pub fn not_zero(x: c_float) -> bool {
     fabsf(x) > FLT_MIN
+}
+
+pub fn deg_to_rad(x: c_float) -> c_float {
+    x * M_PI as c_float / 180.0f32
 }

@@ -214,8 +214,7 @@ pub unsafe extern "C" fn genTangSpace(
         ((*(*pContext).m_pInterface).m_getNumFaces).expect("non-null function pointer")(pContext);
     let mut bRes: tbool = TFALSE;
     let fThresCos: libc::c_float =
-        cos((fAngularThreshold * M_PI as libc::c_float / 180.0f32) as libc::c_double)
-            as libc::c_float;
+        cos(deg_to_rad(fAngularThreshold) as libc::c_double) as libc::c_float;
     if ((*(*pContext).m_pInterface).m_getNumFaces).is_none()
         || ((*(*pContext).m_pInterface).m_getNumVerticesOfFace).is_none()
         || ((*(*pContext).m_pInterface).m_getPosition).is_none()
