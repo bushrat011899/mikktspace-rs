@@ -123,17 +123,9 @@ unsafe extern "C" fn IndexToData(mut piFace: *mut c_int, mut piVert: *mut c_int,
 }
 unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpace {
     let mut ts_res: STSpace = STSpace {
-        vOs: SVec3 {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        },
+        vOs: SVec3::ZERO,
         fMagS: 0.,
-        vOt: SVec3 {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        },
+        vOt: SVec3::ZERO,
         fMagT: 0.,
         iCounter: 0,
         bOrient: false,
@@ -405,11 +397,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     let mut iMaxCount: c_int = 0 as c_int;
     let mut vMin: SVec3 = GetPosition(pContext, 0 as c_int);
     let mut vMax: SVec3 = vMin;
-    let mut vDim: SVec3 = SVec3 {
-        x: 0.,
-        y: 0.,
-        z: 0.,
-    };
+    let mut vDim: SVec3 = SVec3::ZERO;
     let mut fMin: c_float = 0.;
     let mut fMax: c_float = 0.;
     i = 1 as c_int;
@@ -930,11 +918,7 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
 unsafe extern "C" fn GetPosition(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
-    let mut res: SVec3 = SVec3 {
-        x: 0.,
-        y: 0.,
-        z: 0.,
-    };
+    let mut res: SVec3 = SVec3::ZERO;
     let mut pos: [c_float; 3] = [0.; 3];
     IndexToData(&mut iF, &mut iI, index);
     ((*(*pContext).m_pInterface).m_getPosition).expect("non-null function pointer")(
@@ -951,11 +935,7 @@ unsafe extern "C" fn GetPosition(mut pContext: *const SMikkTSpaceContext, index:
 unsafe extern "C" fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
-    let mut res: SVec3 = SVec3 {
-        x: 0.,
-        y: 0.,
-        z: 0.,
-    };
+    let mut res: SVec3 = SVec3::ZERO;
     let mut norm: [c_float; 3] = [0.; 3];
     IndexToData(&mut iF, &mut iI, index);
     ((*(*pContext).m_pInterface).m_getNormal).expect("non-null function pointer")(
@@ -972,11 +952,7 @@ unsafe extern "C" fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c
 unsafe extern "C" fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
-    let mut res: SVec3 = SVec3 {
-        x: 0.,
-        y: 0.,
-        z: 0.,
-    };
+    let mut res: SVec3 = SVec3::ZERO;
     let mut texc: [c_float; 2] = [0.; 2];
     IndexToData(&mut iF, &mut iI, index);
     ((*(*pContext).m_pInterface).m_getTexCoord).expect("non-null function pointer")(
@@ -1371,21 +1347,9 @@ unsafe extern "C" fn GenerateTSpaces(
                 pTriMembers: core::ptr::null_mut::<c_int>(),
             };
             let mut bFound: bool = false;
-            let mut n: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut vOs: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut vOt: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
+            let mut n: SVec3 = SVec3::ZERO;
+            let mut vOs: SVec3 = SVec3::ZERO;
+            let mut vOt: SVec3 = SVec3::ZERO;
             if (*pTriInfos.offset(f as isize)).AssignedGroup[0 as c_int as usize]
                 == pGroup as *mut SGroup
             {
@@ -1527,17 +1491,9 @@ unsafe extern "C" fn EvalTspace(
     iVertexRepresentitive: c_int,
 ) -> STSpace {
     let mut res: STSpace = STSpace {
-        vOs: SVec3 {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        },
+        vOs: SVec3::ZERO,
         fMagS: 0.,
-        vOt: SVec3 {
-            x: 0.,
-            y: 0.,
-            z: 0.,
-        },
+        vOt: SVec3::ZERO,
         fMagT: 0.,
         iCounter: 0,
         bOrient: false,
@@ -1556,46 +1512,14 @@ unsafe extern "C" fn EvalTspace(
     while face < iFaces {
         let f: c_int = *face_indices.offset(face as isize);
         if (*pTriInfos.offset(f as isize)).iFlag & GROUP_WITH_ANY == 0 as c_int {
-            let mut n: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut vOs: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut vOt: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut p0: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut p1: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut p2: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut v1: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
-            let mut v2: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
+            let mut n: SVec3 = SVec3::ZERO;
+            let mut vOs: SVec3 = SVec3::ZERO;
+            let mut vOt: SVec3 = SVec3::ZERO;
+            let mut p0: SVec3 = SVec3::ZERO;
+            let mut p1: SVec3 = SVec3::ZERO;
+            let mut p2: SVec3 = SVec3::ZERO;
+            let mut v1: SVec3 = SVec3::ZERO;
+            let mut v2: SVec3 = SVec3::ZERO;
             let mut fCos: c_float = 0.;
             let mut fAngle: c_float = 0.;
             let mut fMagS: c_float = 0.;
@@ -2151,11 +2075,7 @@ unsafe extern "C" fn DegenEpilogue(
     t = 0 as c_int;
     while t < iNrTrianglesIn {
         if (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int {
-            let mut vDstP: SVec3 = SVec3 {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            };
+            let mut vDstP: SVec3 = SVec3::ZERO;
             let mut iOrgF: c_int = -(1 as c_int);
             let mut i_0: c_int = 0 as c_int;
             let mut bNotFound_0: bool = false;

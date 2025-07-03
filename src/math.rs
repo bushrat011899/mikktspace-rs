@@ -15,6 +15,12 @@ pub struct SVec3 {
 }
 
 impl SVec3 {
+    pub const ZERO: SVec3 = SVec3 {
+        x: 0.,
+        y: 0.,
+        z: 0.,
+    };
+
     pub fn dot(self, rhs: Self) -> c_float {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
