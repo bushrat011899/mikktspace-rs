@@ -1116,7 +1116,14 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
     // match up edge pairs
     let mut pEdges: Vec<SEdge> =
         vec![SEdge::ZERO; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
-    BuildNeighborsFast(pTriInfos, pEdges.as_mut_ptr(), piTriListIn, iNrTrianglesIn);
+    let vert_count = pEdges.len();
+    let face_count = vert_count / 3;
+    BuildNeighborsFast(
+        core::slice::from_raw_parts_mut(pTriInfos, face_count),
+        &mut pEdges,
+        core::slice::from_raw_parts(piTriListIn, vert_count),
+        iNrTrianglesIn,
+    );
 }
 
 unsafe fn Build4RuleGroups(
@@ -1586,10 +1593,10 @@ fn EvalTspace<I: MikkTSpaceInterface>(
     res
 }
 
-unsafe fn BuildNeighborsFast(
-    mut pTriInfos: *mut STriInfo,
-    mut pEdges: *mut SEdge,
-    mut piTriListIn: *const c_int,
+fn BuildNeighborsFast(
+    mut pTriInfos: &mut [STriInfo],
+    mut pEdges: &mut [SEdge],
+    mut piTriListIn: &[c_int],
     iNrTrianglesIn: c_int,
 ) {
     // build array of edges
@@ -1602,22 +1609,20 @@ unsafe fn BuildNeighborsFast(
     while f < iNrTrianglesIn {
         i = 0 as c_int;
         while i < 3 as c_int {
-            let i0: c_int = *piTriListIn.offset((f * 3 as c_int + i) as isize);
-            let i1: c_int = *piTriListIn.offset(
-                (f * 3 as c_int
-                    + (if i < 2 as c_int {
-                        i + 1 as c_int
-                    } else {
-                        0 as c_int
-                    })) as isize,
-            );
+            let i0: c_int = piTriListIn[(f * 3 as c_int + i) as usize];
+            let i1: c_int = piTriListIn[(f * 3 as c_int
+                + (if i < 2 as c_int {
+                    i + 1 as c_int
+                } else {
+                    0 as c_int
+                })) as usize];
 
             // put minimum index in i0
-            (*pEdges.offset((f * 3 as c_int + i) as isize)).i0 = i0.min(i1);
+            pEdges[(f * 3 as c_int + i) as usize].i0 = i0.min(i1);
             // put maximum index in i1
-            (*pEdges.offset((f * 3 as c_int + i) as isize)).i1 = i0.max(i1);
+            pEdges[(f * 3 as c_int + i) as usize].i1 = i0.max(i1);
             // record face number
-            (*pEdges.offset((f * 3 as c_int + i) as isize)).f = f;
+            pEdges[(f * 3 as c_int + i) as usize].f = f;
 
             i += 1;
         }
@@ -1626,9 +1631,8 @@ unsafe fn BuildNeighborsFast(
     }
 
     // sort over all edges by i0, this is the pricy one.
-    let pEdges2 = core::slice::from_raw_parts_mut(pEdges, (iNrTrianglesIn * 3 as c_int) as usize);
     QuickSortEdges(
-        pEdges2,
+        pEdges,
         0 as c_int,
         iNrTrianglesIn * 3 as c_int - 1 as c_int,
         0 as c_int,
@@ -1638,24 +1642,24 @@ unsafe fn BuildNeighborsFast(
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if pEdges2[iCurStartIndex as usize].i0 != pEdges2[i as usize].i0 {
+        if pEdges[iCurStartIndex as usize].i0 != pEdges[i as usize].i0 {
             let iL: c_int = iCurStartIndex;
             let iR: c_int = i - 1 as c_int;
             iCurStartIndex = i;
-            QuickSortEdges(pEdges2, iL, iR, 1 as c_int, uSeed);
+            QuickSortEdges(pEdges, iL, iR, 1 as c_int, uSeed);
         }
         i += 1;
     }
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if pEdges2[iCurStartIndex as usize].i0 != pEdges2[i as usize].i0
-            || pEdges2[iCurStartIndex as usize].i1 != pEdges2[i as usize].i1
+        if pEdges[iCurStartIndex as usize].i0 != pEdges[i as usize].i0
+            || pEdges[iCurStartIndex as usize].i1 != pEdges[i as usize].i1
         {
             let iL_0: c_int = iCurStartIndex;
             let iR_0: c_int = i - 1 as c_int;
             iCurStartIndex = i;
-            QuickSortEdges(pEdges2, iL_0, iR_0, 2 as c_int, uSeed);
+            QuickSortEdges(pEdges, iL_0, iR_0, 2 as c_int, uSeed);
         }
         i += 1;
     }
@@ -1663,9 +1667,9 @@ unsafe fn BuildNeighborsFast(
     // pair up, adjacent triangles
     i = 0 as c_int;
     while i < iEntries {
-        let i0_0: c_int = (*pEdges.offset(i as isize)).i0;
-        let i1_0: c_int = (*pEdges.offset(i as isize)).i1;
-        let f_0: c_int = (*pEdges.offset(i as isize)).f;
+        let i0_0: c_int = pEdges[i as usize].i0;
+        let i1_0: c_int = pEdges[i as usize].i1;
+        let f_0: c_int = pEdges[i as usize].f;
         let mut bUnassigned_A: bool = false;
 
         let mut i0_A: c_int = 0;
@@ -1675,13 +1679,16 @@ unsafe fn BuildNeighborsFast(
 
         // resolve index ordering and edge_num
         (edgenum_A, i0_A, i1_A) = get_edge(
-            core::slice::from_raw_parts(piTriListIn.offset((f_0 * 3 as c_int) as isize), 3),
+            &piTriListIn[{
+                let a = (f_0 * 3 as c_int) as usize;
+                let b = a + 3;
+                a..b
+            }],
             i0_0,
             i1_0,
         )
         .unwrap();
-        bUnassigned_A =
-            (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
+        bUnassigned_A = pTriInfos[f_0 as usize].FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
 
         if bUnassigned_A {
             // get true index ordering
@@ -1689,24 +1696,28 @@ unsafe fn BuildNeighborsFast(
             let mut t: c_int = 0;
             let mut bNotFound: bool = true;
             while j < iEntries
-                && i0_0 == (*pEdges.offset(j as isize)).i0
-                && i1_0 == (*pEdges.offset(j as isize)).i1
+                && i0_0 == pEdges[j as usize].i0
+                && i1_0 == pEdges[j as usize].i1
                 && bNotFound
             {
                 let mut bUnassigned_B: bool = false;
                 let mut i0_B: c_int = 0;
                 let mut i1_B: c_int = 0;
-                t = (*pEdges.offset(j as isize)).f;
+                t = pEdges[j as usize].f;
                 // flip i0_B and i1_B
                 // resolve index ordering and edge_num
                 (edgenum_B, i1_B, i0_B) = get_edge(
-                    core::slice::from_raw_parts(piTriListIn.offset((t * 3 as c_int) as isize), 3),
-                    (*pEdges.offset(j as isize)).i0,
-                    (*pEdges.offset(j as isize)).i1,
+                    &piTriListIn[{
+                        let a = (t * 3 as c_int) as usize;
+                        let b = a + 3;
+                        a..b
+                    }],
+                    pEdges[j as usize].i0,
+                    pEdges[j as usize].i1,
                 )
                 .unwrap();
-                bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize]
-                    == -(1 as c_int);
+                bUnassigned_B =
+                    pTriInfos[t as usize].FaceNeighbors[edgenum_B as usize] == -(1 as c_int);
 
                 if i0_A == i0_B && i1_A == i1_B && bUnassigned_B {
                     bNotFound = false;
@@ -1716,9 +1727,9 @@ unsafe fn BuildNeighborsFast(
             }
 
             if !bNotFound {
-                let mut t_0: c_int = (*pEdges.offset(j as isize)).f;
-                (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] = t_0;
-                (*pTriInfos.offset(t_0 as isize)).FaceNeighbors[edgenum_B as usize] = f_0;
+                let mut t_0: c_int = pEdges[j as usize].f;
+                pTriInfos[f_0 as usize].FaceNeighbors[edgenum_A as usize] = t_0;
+                pTriInfos[t_0 as usize].FaceNeighbors[edgenum_B as usize] = f_0;
             }
         }
 
