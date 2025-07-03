@@ -134,6 +134,10 @@ pub struct SEdge {
     pub f: c_int,
 }
 
+impl SEdge {
+    pub const ZERO: SEdge = SEdge { i0: 0, i1: 0, f: 0 };
+}
+
 impl Index<usize> for SEdge {
     type Output = c_int;
 
@@ -1093,17 +1097,12 @@ unsafe extern "C" fn InitTriInfo(
             t += 1;
         }
     }
-    let mut pEdges: *mut SEdge = malloc(
-        (::core::mem::size_of::<SEdge>() as c_ulong)
-            .wrapping_mul(iNrTrianglesIn as c_ulong)
-            .wrapping_mul(3 as c_int as c_ulong),
-    ) as *mut SEdge;
-    if pEdges.is_null() {
-        BuildNeighborsSlow(pTriInfos, piTriListIn, iNrTrianglesIn);
-    } else {
-        BuildNeighborsFast(pTriInfos, pEdges, piTriListIn, iNrTrianglesIn);
-        free(pEdges as *mut c_void);
-    };
+    // if /* can't allocate */ {
+    //     BuildNeighborsSlow(pTriInfos, piTriListIn, iNrTrianglesIn);
+    // }
+    let mut pEdges: Vec<SEdge> =
+        vec![SEdge::ZERO; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
+    BuildNeighborsFast(pTriInfos, pEdges.as_mut_ptr(), piTriListIn, iNrTrianglesIn);
 }
 unsafe extern "C" fn Build4RuleGroups(
     mut pTriInfos: *mut STriInfo,
@@ -1752,6 +1751,8 @@ unsafe extern "C" fn BuildNeighborsFast(
         i += 1;
     }
 }
+
+#[expect(dead_code)]
 unsafe extern "C" fn BuildNeighborsSlow(
     mut pTriInfos: *mut STriInfo,
     mut piTriListIn: *const c_int,
