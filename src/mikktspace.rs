@@ -933,13 +933,10 @@ unsafe fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> 
     res.z = 1.0f32;
     res
 }
-unsafe fn CalcTexArea(
-    mut pContext: *const SMikkTSpaceContext,
-    mut indices: *const c_int,
-) -> c_float {
-    let t1: SVec3 = GetTexCoord(pContext, *indices.offset(0 as c_int as isize));
-    let t2: SVec3 = GetTexCoord(pContext, *indices.offset(1 as c_int as isize));
-    let t3: SVec3 = GetTexCoord(pContext, *indices.offset(2 as c_int as isize));
+unsafe fn CalcTexArea(mut pContext: *const SMikkTSpaceContext, mut indices: &[c_int]) -> c_float {
+    let t1: SVec3 = GetTexCoord(pContext, indices[0]);
+    let t2: SVec3 = GetTexCoord(pContext, indices[1]);
+    let t3: SVec3 = GetTexCoord(pContext, indices[2]);
     let t21x: c_float = t2.x - t1.x;
     let t21y: c_float = t2.y - t1.y;
     let t31x: c_float = t3.x - t1.x;
@@ -1070,10 +1067,17 @@ unsafe fn InitTriInfo(
                         bChooseOrientFirstTri = true;
                     } else if CalcTexArea(
                         pContext,
-                        &*piTriListIn.offset((t * 3 as c_int + 0 as c_int) as isize),
+                        core::slice::from_raw_parts(
+                            piTriListIn.offset((t * 3 as c_int + 0 as c_int) as isize),
+                            3,
+                        ),
                     ) >= CalcTexArea(
                         pContext,
-                        &*piTriListIn.offset(((t + 1 as c_int) * 3 as c_int + 0 as c_int) as isize),
+                        core::slice::from_raw_parts(
+                            piTriListIn
+                                .offset(((t + 1 as c_int) * 3 as c_int + 0 as c_int) as isize),
+                            3,
+                        ),
                     ) {
                         bChooseOrientFirstTri = true;
                     }
@@ -1577,7 +1581,7 @@ unsafe fn BuildNeighborsFast(
             &mut i0_A,
             &mut i1_A,
             &mut edgenum_A,
-            &*piTriListIn.offset((f_0 * 3 as c_int) as isize),
+            core::slice::from_raw_parts(piTriListIn.offset((f_0 * 3 as c_int) as isize), 3),
             i0_0,
             i1_0,
         );
@@ -1600,7 +1604,7 @@ unsafe fn BuildNeighborsFast(
                     &mut i1_B,
                     &mut i0_B,
                     &mut edgenum_B,
-                    &*piTriListIn.offset((t * 3 as c_int) as isize),
+                    core::slice::from_raw_parts(piTriListIn.offset((t * 3 as c_int) as isize), 3),
                     (*pEdges.offset(j as isize)).i0,
                     (*pEdges.offset(j as isize)).i1,
                 );
@@ -1747,29 +1751,25 @@ unsafe fn GetEdge(
     mut i0_out: *mut c_int,
     mut i1_out: *mut c_int,
     mut edgenum_out: *mut c_int,
-    mut indices: *const c_int,
+    mut indices: &[c_int],
     i0_in: c_int,
     i1_in: c_int,
 ) {
     *edgenum_out = -(1 as c_int);
-    if *indices.offset(0 as c_int as isize) == i0_in
-        || *indices.offset(0 as c_int as isize) == i1_in
-    {
-        if *indices.offset(1 as c_int as isize) == i0_in
-            || *indices.offset(1 as c_int as isize) == i1_in
-        {
-            *edgenum_out.offset(0 as c_int as isize) = 0 as c_int;
-            *i0_out.offset(0 as c_int as isize) = *indices.offset(0 as c_int as isize);
-            *i1_out.offset(0 as c_int as isize) = *indices.offset(1 as c_int as isize);
+    if indices[0] == i0_in || indices[0] == i1_in {
+        if indices[1] == i0_in || indices[1] == i1_in {
+            *edgenum_out = 0 as c_int;
+            *i0_out = indices[0];
+            *i1_out = indices[1];
         } else {
-            *edgenum_out.offset(0 as c_int as isize) = 2 as c_int;
-            *i0_out.offset(0 as c_int as isize) = *indices.offset(2 as c_int as isize);
-            *i1_out.offset(0 as c_int as isize) = *indices.offset(0 as c_int as isize);
+            *edgenum_out = 2 as c_int;
+            *i0_out = indices[2];
+            *i1_out.offset(0 as c_int as isize) = indices[0];
         }
     } else {
-        *edgenum_out.offset(0 as c_int as isize) = 1 as c_int;
-        *i0_out.offset(0 as c_int as isize) = *indices.offset(1 as c_int as isize);
-        *i1_out.offset(0 as c_int as isize) = *indices.offset(2 as c_int as isize);
+        *edgenum_out = 1 as c_int;
+        *i0_out = indices[1];
+        *i1_out = indices[2];
     };
 }
 unsafe fn DegenPrologue(
@@ -1853,8 +1853,8 @@ unsafe fn DegenPrologue(
 }
 unsafe fn DegenEpilogue(
     mut psTspace: *mut STSpace,
-    mut pTriInfos: *mut STriInfo,
-    mut piTriListIn: *mut c_int,
+    mut pTriInfos: *const STriInfo,
+    mut piTriListIn: *const c_int,
     mut pContext: *const SMikkTSpaceContext,
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
@@ -1902,7 +1902,7 @@ unsafe fn DegenEpilogue(
             let mut iOrgF: c_int = -(1 as c_int);
             let mut i_0: c_int = 0 as c_int;
             let mut bNotFound_0: bool = false;
-            let mut pV: *mut c_uchar = ((*pTriInfos.offset(t as isize)).vert_num).as_mut_ptr();
+            let mut pV: *const c_uchar = ((*pTriInfos.offset(t as isize)).vert_num).as_ptr();
             let mut iFlag: c_int = (1 as c_int) << *pV.offset(0 as c_int as isize) as c_int
                 | (1 as c_int) << *pV.offset(1 as c_int as isize) as c_int
                 | (1 as c_int) << *pV.offset(2 as c_int as isize) as c_int;
