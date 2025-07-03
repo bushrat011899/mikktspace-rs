@@ -916,8 +916,8 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                 let T1: SVec3 = GetTexCoord(pContext, i1);
                 let T2: SVec3 = GetTexCoord(pContext, i2);
                 let T3: SVec3 = GetTexCoord(pContext, i3);
-                let distSQ_02: libc::c_float = length_squared(T2 - T0);
-                let distSQ_13: libc::c_float = length_squared(T3 - T1);
+                let distSQ_02: libc::c_float = (T2 - T0).length_squared();
+                let distSQ_13: libc::c_float = (T3 - T1).length_squared();
                 let mut bQuadDiagIs_02: tbool = 0;
                 if distSQ_02 < distSQ_13 {
                     bQuadDiagIs_02 = TTRUE;
@@ -928,8 +928,8 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     let P1: SVec3 = GetPosition(pContext, i1);
                     let P2: SVec3 = GetPosition(pContext, i2);
                     let P3: SVec3 = GetPosition(pContext, i3);
-                    let distSQ_02_0: libc::c_float = length_squared(P2 - P0);
-                    let distSQ_13_0: libc::c_float = length_squared(P3 - P1);
+                    let distSQ_02_0: libc::c_float = (P2 - P0).length_squared();
+                    let distSQ_13_0: libc::c_float = (P3 - P1).length_squared();
                     bQuadDiagIs_02 = if distSQ_13_0 < distSQ_02_0 {
                         TFALSE
                     } else {

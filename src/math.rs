@@ -24,6 +24,10 @@ impl SVec3 {
             *self = (1 as c_int as c_float / length(*self)) * *self;
         }
     }
+
+    pub fn length_squared(self) -> c_float {
+        self.dot(self)
+    }
 }
 
 impl Add for SVec3 {
@@ -116,12 +120,8 @@ pub fn fabsf(x: c_float) -> c_float {
     }
 }
 
-pub fn length_squared(v: SVec3) -> c_float {
-    v.dot(v)
-}
-
 pub fn length(v: SVec3) -> c_float {
-    sqrtf(length_squared(v))
+    sqrtf(v.length_squared())
 }
 
 pub fn not_zero(x: c_float) -> c_int {
