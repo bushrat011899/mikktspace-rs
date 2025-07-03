@@ -124,7 +124,7 @@ pub trait MikkTSpaceInterface {
     /// Note that the results are returned unindexed. It is possible to generate a new index list
     /// But averaging/overwriting tangent spaces by using an already existing index list WILL produce INCRORRECT results.
     /// DO NOT! use an already existing index list.
-    #[expect(unused_variables, clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn set_tspace(
         &mut self,
         tangent: [f32; 3],
@@ -134,8 +134,7 @@ pub trait MikkTSpaceInterface {
         is_orientation_preserving: bool,
         face: usize,
         vert: usize,
-    ) {
-    }
+    );
 }
 
 /// Default (recommended) fAngularThreshold is 180 degrees (which means threshold disabled)

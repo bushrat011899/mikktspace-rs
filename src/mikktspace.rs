@@ -259,7 +259,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     );
 
     // make a welded index list of identical positions and attributes (pos, norm, texc)
-    GenerateSharedVerticesIndexList(piTriListIn.as_mut_ptr(), pContext, iNrTrianglesIn);
+    GenerateSharedVerticesIndexList(&mut piTriListIn, pContext, iNrTrianglesIn);
 
     // Mark all degenerate triangles
     iTotTris = iNrTrianglesIn;
@@ -437,7 +437,7 @@ unsafe fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
 }
 
 unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
-    mut piTriList_in_and_out: *mut c_int,
+    mut piTriList_in_and_out: &mut [c_int],
     mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) {
@@ -454,7 +454,7 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     let mut fMax: c_float = 0.;
     i = 1 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
-        let index: c_int = *piTriList_in_and_out.offset(i as isize);
+        let index: c_int = piTriList_in_and_out[i as usize];
         let vP: SVec3 = GetPosition(pContext, index);
         if vMin.x > vP.x {
             vMin.x = vP.x;
@@ -501,7 +501,7 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     // count amount of elements in each cell unit
     i = 0 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
-        let index_0: c_int = *piTriList_in_and_out.offset(i as isize);
+        let index_0: c_int = piTriList_in_and_out[i as usize];
         let vP_0: SVec3 = GetPosition(pContext, index_0);
         let fVal: c_float = if iChannel == 0 as c_int {
             vP_0.x
@@ -528,7 +528,7 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     // insert vertices
     i = 0 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
-        let index_1: c_int = *piTriList_in_and_out.offset(i as isize);
+        let index_1: c_int = piTriList_in_and_out[i as usize];
         let vP_1: SVec3 = GetPosition(pContext, index_1);
         let fVal_0: c_float = if iChannel == 0 as c_int {
             vP_1.x
@@ -584,14 +584,14 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
             e = 0 as c_int;
             while e < iEntries {
                 let mut i_0: c_int = *pTable_0.offset(e as isize);
-                let vP_2: SVec3 = GetPosition(pContext, *piTriList_in_and_out.offset(i_0 as isize));
+                let vP_2: SVec3 = GetPosition(pContext, piTriList_in_and_out[i_0 as usize]);
                 pTmpVert[e as usize].vert = vP_2;
                 pTmpVert[e as usize].index = i_0;
                 e += 1;
             }
             MergeVertsFast(
                 piTriList_in_and_out,
-                pTmpVert.as_mut_ptr(),
+                &mut pTmpVert,
                 pContext,
                 0 as c_int,
                 iEntries - 1 as c_int,
@@ -602,8 +602,8 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
 }
 
 unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
-    mut piTriList_in_and_out: *mut c_int,
-    mut pTmpVert: *mut STmpVert,
+    mut piTriList_in_and_out: &mut [c_int],
+    mut pTmpVert: &mut [STmpVert],
     mut pContext: &I,
     iL_in: c_int,
     iR_in: c_int,
@@ -621,7 +621,7 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
 
     c = 0 as c_int;
     while c < 3 as c_int {
-        fvMin[c as usize] = (*pTmpVert.offset(iL_in as isize)).vert[c as usize];
+        fvMin[c as usize] = pTmpVert[iL_in as usize].vert[c as usize];
         fvMax[c as usize] = fvMin[c as usize];
         c += 1;
     }
@@ -629,11 +629,11 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
     while l <= iR_in {
         c = 0 as c_int;
         while c < 3 as c_int {
-            if fvMin[c as usize] > (*pTmpVert.offset(l as isize)).vert[c as usize] {
-                fvMin[c as usize] = (*pTmpVert.offset(l as isize)).vert[c as usize];
+            if fvMin[c as usize] > pTmpVert[l as usize].vert[c as usize] {
+                fvMin[c as usize] = pTmpVert[l as usize].vert[c as usize];
             }
-            if fvMax[c as usize] < (*pTmpVert.offset(l as isize)).vert[c as usize] {
-                fvMax[c as usize] = (*pTmpVert.offset(l as isize)).vert[c as usize];
+            if fvMax[c as usize] < pTmpVert[l as usize].vert[c as usize] {
+                fvMax[c as usize] = pTmpVert[l as usize].vert[c as usize];
             }
             c += 1;
         }
@@ -664,8 +664,8 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
         // complete the weld
         l = iL_in;
         while l <= iR_in {
-            let mut i: c_int = (*pTmpVert.offset(l as isize)).index;
-            let index: c_int = *piTriList_in_and_out.offset(i as isize);
+            let mut i: c_int = pTmpVert[l as usize].index;
+            let index: c_int = piTriList_in_and_out[i as usize];
             let vP: SVec3 = GetPosition(pContext, index);
             let vN: SVec3 = GetNormal(pContext, index);
             let vT: SVec3 = GetTexCoord(pContext, index);
@@ -674,8 +674,8 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
             let mut l2: c_int = iL_in;
             let mut i2rec: c_int = -(1 as c_int);
             while l2 < l && bNotFound {
-                let i2: c_int = (*pTmpVert.offset(l2 as isize)).index;
-                let index2: c_int = *piTriList_in_and_out.offset(i2 as isize);
+                let i2: c_int = pTmpVert[l2 as usize].index;
+                let index2: c_int = piTriList_in_and_out[i2 as usize];
                 let vP2: SVec3 = GetPosition(pContext, index2);
                 let vN2: SVec3 = GetNormal(pContext, index2);
                 let vT2: SVec3 = GetTexCoord(pContext, index2);
@@ -700,8 +700,7 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
 
             // merge if previously found
             if !bNotFound {
-                *piTriList_in_and_out.offset(i as isize) =
-                    *piTriList_in_and_out.offset(i2rec as isize);
+                piTriList_in_and_out[i as usize] = piTriList_in_and_out[i2rec as usize];
             }
 
             l += 1;
@@ -719,8 +718,7 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
                 assert!(iL >= iL_in && iL <= iR_in);
                 #[expect(clippy::neg_cmp_op_on_partial_ord)]
                 {
-                    bReadyLeftSwap =
-                        !((*pTmpVert.offset(iL as isize)).vert[channel as usize] < fSep);
+                    bReadyLeftSwap = !(pTmpVert[iL as usize].vert[channel as usize] < fSep);
                 }
                 if !bReadyLeftSwap {
                     iL += 1;
@@ -728,7 +726,7 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
             }
             while !bReadyRightSwap && iL < iR {
                 assert!(iR >= iL_in && iR <= iR_in);
-                bReadyRightSwap = (*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep;
+                bReadyRightSwap = pTmpVert[iR as usize].vert[channel as usize] < fSep;
                 if !bReadyRightSwap {
                     iR -= 1;
                 }
@@ -736,10 +734,10 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
             assert!(iL < iR || !(bReadyLeftSwap && bReadyRightSwap));
 
             if bReadyLeftSwap && bReadyRightSwap {
-                let sTmp: STmpVert = *pTmpVert.offset(iL as isize);
+                let sTmp: STmpVert = pTmpVert[iL as usize];
                 assert!(iL < iR);
-                *pTmpVert.offset(iL as isize) = *pTmpVert.offset(iR as isize);
-                *pTmpVert.offset(iR as isize) = sTmp;
+                pTmpVert[iL as usize] = pTmpVert[iR as usize];
+                pTmpVert[iR as usize] = sTmp;
                 iL += 1;
                 iR -= 1;
             }
@@ -747,8 +745,7 @@ unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
 
         assert!(iL == iR + 1 as c_int || iL == iR);
         if iL == iR {
-            let bReadyRightSwap_0: bool =
-                (*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep;
+            let bReadyRightSwap_0: bool = pTmpVert[iR as usize].vert[channel as usize] < fSep;
             if bReadyRightSwap_0 {
                 iL += 1;
             } else {
