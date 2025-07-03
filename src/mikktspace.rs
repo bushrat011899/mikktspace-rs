@@ -313,7 +313,7 @@ pub unsafe extern "C" fn genTangSpace(
     );
     free(pGroups as *mut c_void);
     free(piGroupTrianglesBuffer as *mut c_void);
-    if bRes == false {
+    if !bRes {
         free(pTriInfos as *mut c_void);
         free(piTriListIn as *mut c_void);
         free(psTspace as *mut c_void);
@@ -359,7 +359,7 @@ pub unsafe extern "C" fn genTangSpace(
                         .expect("non-null function pointer")(
                         pContext,
                         tang.as_mut_ptr() as *const c_float,
-                        if (*pTSpace).bOrient == true {
+                        if (*pTSpace).bOrient {
                             1.0f32
                         } else {
                             -1.0f32
@@ -658,7 +658,7 @@ unsafe extern "C" fn MergeVertsFast(
             let mut bNotFound: bool = true;
             let mut l2: c_int = iL_in;
             let mut i2rec: c_int = -(1 as c_int);
-            while l2 < l && bNotFound != false {
+            while l2 < l && bNotFound {
                 let i2: c_int = (*pTmpVert.offset(l2 as isize)).index;
                 let index2: c_int = *piTriList_in_and_out.offset(i2 as isize);
                 let vP2: SVec3 = GetPosition(pContext, index2);
@@ -680,7 +680,7 @@ unsafe extern "C" fn MergeVertsFast(
                     l2 += 1;
                 }
             }
-            if bNotFound == false {
+            if !bNotFound {
                 *piTriList_in_and_out.offset(i as isize) =
                     *piTriList_in_and_out.offset(i2rec as isize);
             }
@@ -693,26 +693,26 @@ unsafe extern "C" fn MergeVertsFast(
         while iL < iR {
             let mut bReadyLeftSwap: bool = false;
             let mut bReadyRightSwap: bool = false;
-            while bReadyLeftSwap == false && iL < iR {
+            while !bReadyLeftSwap && iL < iR {
                 assert!(iL >= iL_in && iL <= iR_in);
                 #[expect(clippy::neg_cmp_op_on_partial_ord)]
                 {
                     bReadyLeftSwap =
                         !((*pTmpVert.offset(iL as isize)).vert[channel as usize] < fSep);
                 }
-                if bReadyLeftSwap == false {
+                if !bReadyLeftSwap {
                     iL += 1;
                 }
             }
-            while bReadyRightSwap == false && iL < iR {
+            while !bReadyRightSwap && iL < iR {
                 assert!(iR >= iL_in && iR <= iR_in);
                 bReadyRightSwap = (*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep;
-                if bReadyRightSwap == false {
+                if !bReadyRightSwap {
                     iR -= 1;
                 }
             }
-            assert!(iL < iR || !(bReadyLeftSwap != false && bReadyRightSwap != false));
-            if bReadyLeftSwap != false && bReadyRightSwap != false {
+            assert!(iL < iR || !(bReadyLeftSwap && bReadyRightSwap));
+            if bReadyLeftSwap && bReadyRightSwap {
                 let sTmp: STmpVert = *pTmpVert.offset(iL as isize);
                 assert!(iL < iR);
                 *pTmpVert.offset(iL as isize) = *pTmpVert.offset(iR as isize);
@@ -725,7 +725,7 @@ unsafe extern "C" fn MergeVertsFast(
         if iL == iR {
             let bReadyRightSwap_0: bool =
                 (*pTmpVert.offset(iR as isize)).vert[channel as usize] < fSep;
-            if bReadyRightSwap_0 != false {
+            if bReadyRightSwap_0 {
                 iL += 1;
             } else {
                 iR -= 1;
@@ -756,7 +756,7 @@ unsafe extern "C" fn MergeVertsSlow(
         let mut bNotFound: bool = true;
         let mut e2: c_int = 0 as c_int;
         let mut i2rec: c_int = -(1 as c_int);
-        while e2 < e && bNotFound != false {
+        while e2 < e && bNotFound {
             let i2: c_int = *pTable.offset(e2 as isize);
             let index2: c_int = *piTriList_in_and_out.offset(i2 as isize);
             let vP2: SVec3 = GetPosition(pContext, index2);
@@ -769,7 +769,7 @@ unsafe extern "C" fn MergeVertsSlow(
                 e2 += 1;
             }
         }
-        if bNotFound == false {
+        if !bNotFound {
             *piTriList_in_and_out.offset(i as isize) = *piTriList_in_and_out.offset(i2rec as isize);
         }
         e += 1;
@@ -794,9 +794,9 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
             let mut bFound: bool = false;
             let mut t2: c_int = 0 as c_int;
             let mut index2rec: c_int = -(1 as c_int);
-            while bFound == false && t2 <= t {
+            while !bFound && t2 <= t {
                 let mut j: c_int = 0 as c_int;
-                while bFound == false && j < 3 as c_int {
+                while !bFound && j < 3 as c_int {
                     let index2: c_int =
                         *piTriList_in_and_out.offset((t2 * 3 as c_int + j) as isize);
                     let vP2: SVec3 = GetPosition(pContext, index2);
@@ -808,11 +808,11 @@ unsafe extern "C" fn GenerateSharedVerticesIndexListSlow(
                         j += 1;
                     }
                 }
-                if bFound == false {
+                if !bFound {
                     t2 += 1;
                 }
             }
-            assert!(bFound != false);
+            assert!(bFound);
             *piTriList_in_and_out.offset(offs as isize) = index2rec;
             i += 1;
         }
@@ -877,13 +877,9 @@ unsafe extern "C" fn GenerateInitialVerticesIndexList(
                     let P3: SVec3 = GetPosition(pContext, i3);
                     let distSQ_02_0: c_float = (P2 - P0).length_squared();
                     let distSQ_13_0: c_float = (P3 - P1).length_squared();
-                    bQuadDiagIs_02 = if distSQ_13_0 < distSQ_02_0 {
-                        false
-                    } else {
-                        true
-                    };
+                    bQuadDiagIs_02 = distSQ_13_0 >= distSQ_02_0;
                 }
-                if bQuadDiagIs_02 != false {
+                if bQuadDiagIs_02 {
                     let mut pVerts_A: *mut c_uchar =
                         ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
                     *pVerts_A.offset(0 as c_int as isize) = 0 as c_int as c_uchar;
@@ -1116,34 +1112,14 @@ unsafe extern "C" fn InitTriInfo(
         let iFO_b: c_int = (*pTriInfos.offset((t + 1 as c_int) as isize)).iOrgFaceNumber;
         if iFO_a == iFO_b {
             let bIsDeg_a: bool =
-                if (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int {
-                    true
-                } else {
-                    false
-                };
-            let bIsDeg_b: bool = if (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE
-                != 0 as c_int
-            {
-                true
-            } else {
-                false
-            };
-            if (bIsDeg_a != false || bIsDeg_b != false) == false {
+                (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
+            let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
+                & MARK_DEGENERATE != 0 as c_int;
+            if !(bIsDeg_a || bIsDeg_b) {
                 let bOrientA: bool =
-                    if (*pTriInfos.offset(t as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int {
-                        true
-                    } else {
-                        false
-                    };
-                let bOrientB: bool = if (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                    & ORIENT_PRESERVING
-                    != 0 as c_int
-                {
-                    true
-                } else {
-                    false
-                };
+                    (*pTriInfos.offset(t as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
+                let bOrientB: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
+                    & ORIENT_PRESERVING != 0 as c_int;
                 if bOrientA != bOrientB {
                     let mut bChooseOrientFirstTri: bool = false;
                     #[expect(clippy::if_same_then_else)]
@@ -1160,12 +1136,12 @@ unsafe extern "C" fn InitTriInfo(
                     ) {
                         bChooseOrientFirstTri = true;
                     }
-                    let t0: c_int = if bChooseOrientFirstTri != false {
+                    let t0: c_int = if bChooseOrientFirstTri {
                         t
                     } else {
                         t + 1 as c_int
                     };
-                    let t1_0: c_int = if bChooseOrientFirstTri != false {
+                    let t1_0: c_int = if bChooseOrientFirstTri {
                         t + 1 as c_int
                     } else {
                         t
@@ -1228,12 +1204,7 @@ unsafe extern "C" fn Build4RuleGroups(
                 *fresh4 = &mut *piGroupTrianglesBuffer.offset(iOffset as isize) as *mut c_int;
                 iNrActiveGroups += 1;
                 AddTriToGroup((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize], f);
-                bOrPre = if (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int
-                {
-                    true
-                } else {
-                    false
-                };
+                bOrPre = (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
                 neigh_indexL = (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize];
                 neigh_indexR = (*pTriInfos.offset(f as isize)).FaceNeighbors[(if i > 0 as c_int {
                     i - 1 as c_int
@@ -1248,16 +1219,10 @@ unsafe extern "C" fn Build4RuleGroups(
                         neigh_indexL,
                         (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
                     );
-                    let bOrPre2: bool = if (*pTriInfos.offset(neigh_indexL as isize)).iFlag
-                        & ORIENT_PRESERVING
-                        != 0 as c_int
-                    {
-                        true
-                    } else {
-                        false
-                    };
-                    let bDiff: bool = if bOrPre != bOrPre2 { true } else { false };
-                    assert!(bAnswer != false || bDiff != false);
+                    let bOrPre2: bool = (*pTriInfos.offset(neigh_indexL as isize)).iFlag
+                        & ORIENT_PRESERVING != 0 as c_int;
+                    let bDiff: bool = bOrPre != bOrPre2;
+                    assert!(bAnswer || bDiff);
                 }
                 if neigh_indexR >= 0 as c_int {
                     let bAnswer_0: bool = AssignRecur(
@@ -1266,16 +1231,10 @@ unsafe extern "C" fn Build4RuleGroups(
                         neigh_indexR,
                         (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize],
                     );
-                    let bOrPre2_0: bool = if (*pTriInfos.offset(neigh_indexR as isize)).iFlag
-                        & ORIENT_PRESERVING
-                        != 0 as c_int
-                    {
-                        true
-                    } else {
-                        false
-                    };
-                    let bDiff_0: bool = if bOrPre != bOrPre2_0 { true } else { false };
-                    assert!(bAnswer_0 != false || bDiff_0 != false);
+                    let bOrPre2_0: bool = (*pTriInfos.offset(neigh_indexR as isize)).iFlag
+                        & ORIENT_PRESERVING != 0 as c_int;
+                    let bDiff_0: bool = bOrPre != bOrPre2_0;
+                    assert!(bAnswer_0 || bDiff_0);
                 }
                 iOffset += (*(*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).iNrFaces;
                 assert!(iOffset <= iNrMaxGroups);
@@ -1321,17 +1280,13 @@ unsafe extern "C" fn AssignRecur(
         && ((*pMyTriInfo).AssignedGroup[2 as c_int as usize]).is_null()
     {
         (*pMyTriInfo).iFlag &= !ORIENT_PRESERVING;
-        (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering != false {
+        (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering {
             ORIENT_PRESERVING
         } else {
             0 as c_int
         };
     }
-    let bOrient: bool = if (*pMyTriInfo).iFlag & ORIENT_PRESERVING != 0 as c_int {
-        true
-    } else {
-        false
-    };
+    let bOrient: bool = (*pMyTriInfo).iFlag & ORIENT_PRESERVING != 0 as c_int;
     if bOrient != (*pGroup).bOrientPreservering {
         return false;
     }
@@ -1466,20 +1421,14 @@ unsafe extern "C" fn GenerateTSpaces(
                     - ((n.dot((*pTriInfos.offset(t as isize)).vOt)) * n);
                 vOs2.normalize_or_zero();
                 vOt2.normalize_or_zero();
-                let bAny: bool = if ((*pTriInfos.offset(f as isize)).iFlag
+                let bAny: bool = ((*pTriInfos.offset(f as isize)).iFlag
                     | (*pTriInfos.offset(t as isize)).iFlag)
-                    & GROUP_WITH_ANY
-                    != 0 as c_int
-                {
-                    true
-                } else {
-                    false
-                };
-                let bSameOrgFace: bool = if iOF_1 == iOF_2 { true } else { false };
+                    & GROUP_WITH_ANY != 0 as c_int;
+                let bSameOrgFace: bool = iOF_1 == iOF_2;
                 let fCosS: c_float = vOs.dot(vOs2);
                 let fCosT: c_float = vOt.dot(vOt2);
-                assert!(f != t || bSameOrgFace != false);
-                if bAny != false || bSameOrgFace != false || fCosS > fThresCos && fCosT > fThresCos
+                assert!(f != t || bSameOrgFace);
+                if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos
                 {
                     let fresh5 = iMembers;
                     iMembers += 1;
@@ -1495,14 +1444,14 @@ unsafe extern "C" fn GenerateTSpaces(
             }
             bFound = false;
             l = 0 as c_int;
-            while l < iUniqueSubGroups && bFound == false {
+            while l < iUniqueSubGroups && !bFound {
                 bFound = CompareSubGroups(&tmp_group, &*pUniSubGroups.offset(l as isize));
-                if bFound == false {
+                if !bFound {
                     l += 1;
                 }
             }
-            assert!(bFound != false || l == iUniqueSubGroups);
-            if bFound == false {
+            assert!(bFound || l == iUniqueSubGroups);
+            if !bFound {
                 let mut pIndices: *mut c_int = malloc(
                     (::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(iMembers as c_ulong),
                 ) as *mut c_int;
@@ -1739,15 +1688,9 @@ unsafe extern "C" fn CompareSubGroups(
     if (*pg1).iNrFaces != (*pg2).iNrFaces {
         return false;
     }
-    while i < (*pg1).iNrFaces && bStillSame != false {
-        bStillSame = if *((*pg1).pTriMembers).offset(i as isize)
-            == *((*pg2).pTriMembers).offset(i as isize)
-        {
-            true
-        } else {
-            false
-        };
-        if bStillSame != false {
+    while i < (*pg1).iNrFaces && bStillSame {
+        bStillSame = *((*pg1).pTriMembers).offset(i as isize) == *((*pg2).pTriMembers).offset(i as isize);
+        if bStillSame {
             i += 1;
         }
     }
@@ -1890,21 +1833,15 @@ unsafe extern "C" fn BuildNeighborsFast(
             i0_0,
             i1_0,
         );
-        bUnassigned_A = if (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize]
-            == -(1 as c_int)
-        {
-            true
-        } else {
-            false
-        };
-        if bUnassigned_A != false {
+        bUnassigned_A = (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
+        if bUnassigned_A {
             let mut j: c_int = i + 1 as c_int;
             let mut t: c_int = 0;
             let mut bNotFound: bool = true;
             while j < iEntries
                 && i0_0 == (*pEdges.offset(j as isize)).c2rust_unnamed.i0
                 && i1_0 == (*pEdges.offset(j as isize)).c2rust_unnamed.i1
-                && bNotFound != false
+                && bNotFound
             {
                 let mut bUnassigned_B: bool = false;
                 let mut i0_B: c_int = 0;
@@ -1918,20 +1855,14 @@ unsafe extern "C" fn BuildNeighborsFast(
                     (*pEdges.offset(j as isize)).c2rust_unnamed.i0,
                     (*pEdges.offset(j as isize)).c2rust_unnamed.i1,
                 );
-                bUnassigned_B = if (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize]
-                    == -(1 as c_int)
-                {
-                    true
-                } else {
-                    false
-                };
-                if i0_A == i0_B && i1_A == i1_B && bUnassigned_B != false {
+                bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize] == -(1 as c_int);
+                if i0_A == i0_B && i1_A == i1_B && bUnassigned_B {
                     bNotFound = false;
                 } else {
                     j += 1;
                 }
             }
-            if bNotFound == false {
+            if !bNotFound {
                 let mut t_0: c_int = (*pEdges.offset(j as isize)).c2rust_unnamed.f;
                 (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] = t_0;
                 (*pTriInfos.offset(t_0 as isize)).FaceNeighbors[edgenum_B as usize] = f_0;
@@ -1964,10 +1895,10 @@ unsafe extern "C" fn BuildNeighborsSlow(
                 let mut bFound: bool = false;
                 let mut t: c_int = 0 as c_int;
                 let mut j: c_int = 0 as c_int;
-                while bFound == false && t < iNrTrianglesIn {
+                while !bFound && t < iNrTrianglesIn {
                     if t != f {
                         j = 0 as c_int;
-                        while bFound == false && j < 3 as c_int {
+                        while !bFound && j < 3 as c_int {
                             let i1_B: c_int = *piTriListIn.offset((t * 3 as c_int + j) as isize);
                             let i0_B: c_int = *piTriListIn.offset(
                                 (t * 3 as c_int
@@ -1984,11 +1915,11 @@ unsafe extern "C" fn BuildNeighborsSlow(
                             }
                         }
                     }
-                    if bFound == false {
+                    if !bFound {
                         t += 1;
                     }
                 }
-                if bFound != false {
+                if bFound {
                     (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] = t;
                     (*pTriInfos.offset(t as isize)).FaceNeighbors[j as usize] = f;
                 }
@@ -2105,20 +2036,10 @@ unsafe extern "C" fn DegenPrologue(
         let iFO_b: c_int = (*pTriInfos.offset((t + 1 as c_int) as isize)).iOrgFaceNumber;
         if iFO_a == iFO_b {
             let bIsDeg_a: bool =
-                if (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int {
-                    true
-                } else {
-                    false
-                };
-            let bIsDeg_b: bool = if (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE
-                != 0 as c_int
-            {
-                true
-            } else {
-                false
-            };
-            if bIsDeg_a ^ bIsDeg_b != false {
+                (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
+            let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
+                & MARK_DEGENERATE != 0 as c_int;
+            if bIsDeg_a ^ bIsDeg_b {
                 (*pTriInfos.offset(t as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
                 (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
             }
@@ -2130,14 +2051,9 @@ unsafe extern "C" fn DegenPrologue(
     iNextGoodTriangleSearchIndex = 1 as c_int;
     t = 0 as c_int;
     bStillFindingGoodOnes = true;
-    while t < iNrTrianglesIn && bStillFindingGoodOnes != false {
-        let bIsGood: bool = if (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE == 0 as c_int
-        {
-            true
-        } else {
-            false
-        };
-        if bIsGood != false {
+    while t < iNrTrianglesIn && bStillFindingGoodOnes {
+        let bIsGood: bool = (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE == 0 as c_int;
+        if bIsGood {
             if iNextGoodTriangleSearchIndex < t + 2 as c_int {
                 iNextGoodTriangleSearchIndex = t + 2 as c_int;
             }
@@ -2145,17 +2061,11 @@ unsafe extern "C" fn DegenPrologue(
             let mut t0: c_int = 0;
             let mut t1: c_int = 0;
             let mut bJustADegenerate: bool = true;
-            while bJustADegenerate != false && iNextGoodTriangleSearchIndex < iTotTris {
-                let bIsGood_0: bool = if (*pTriInfos.offset(iNextGoodTriangleSearchIndex as isize))
+            while bJustADegenerate && iNextGoodTriangleSearchIndex < iTotTris {
+                let bIsGood_0: bool = (*pTriInfos.offset(iNextGoodTriangleSearchIndex as isize))
                     .iFlag
-                    & MARK_DEGENERATE
-                    == 0 as c_int
-                {
-                    true
-                } else {
-                    false
-                };
-                if bIsGood_0 != false {
+                    & MARK_DEGENERATE == 0 as c_int;
+                if bIsGood_0 {
                     bJustADegenerate = false;
                 } else {
                     iNextGoodTriangleSearchIndex += 1;
@@ -2165,7 +2075,7 @@ unsafe extern "C" fn DegenPrologue(
             t1 = iNextGoodTriangleSearchIndex;
             iNextGoodTriangleSearchIndex += 1;
             assert!(iNextGoodTriangleSearchIndex > t + 1 as c_int);
-            if bJustADegenerate == false {
+            if !bJustADegenerate {
                 let mut i: c_int = 0 as c_int;
                 i = 0 as c_int;
                 while i < 3 as c_int {
@@ -2182,11 +2092,11 @@ unsafe extern "C" fn DegenPrologue(
                 bStillFindingGoodOnes = false;
             }
         }
-        if bStillFindingGoodOnes != false {
+        if bStillFindingGoodOnes {
             t += 1;
         }
     }
-    assert!(bStillFindingGoodOnes != false);
+    assert!(bStillFindingGoodOnes);
     assert!(iNrTrianglesIn == t);
 }
 unsafe extern "C" fn DegenEpilogue(
@@ -2202,18 +2112,14 @@ unsafe extern "C" fn DegenEpilogue(
     t = iNrTrianglesIn;
     while t < iTotTris {
         let bSkip: bool =
-            if (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int {
-                true
-            } else {
-                false
-            };
-        if bSkip == false {
+            (*pTriInfos.offset(t as isize)).iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
+        if !bSkip {
             i = 0 as c_int;
             while i < 3 as c_int {
                 let index1: c_int = *piTriListIn.offset((t * 3 as c_int + i) as isize);
                 let mut bNotFound: bool = true;
                 let mut j: c_int = 0 as c_int;
-                while bNotFound != false && j < 3 as c_int * iNrTrianglesIn {
+                while bNotFound && j < 3 as c_int * iNrTrianglesIn {
                     let index2: c_int = *piTriListIn.offset(j as isize);
                     if index1 == index2 {
                         bNotFound = false;
@@ -2221,7 +2127,7 @@ unsafe extern "C" fn DegenEpilogue(
                         j += 1;
                     }
                 }
-                if bNotFound == false {
+                if !bNotFound {
                     let iTri: c_int = j / 3 as c_int;
                     let iVert: c_int = j % 3 as c_int;
                     let iSrcVert: c_int =
@@ -2277,7 +2183,7 @@ unsafe extern "C" fn DegenEpilogue(
                     i_0 += 1;
                 }
             }
-            assert!(bNotFound_0 == false);
+            assert!(!bNotFound_0);
         }
         t += 1;
     }

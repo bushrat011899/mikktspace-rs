@@ -1,7 +1,8 @@
 use core::ffi::{c_double, c_float, c_int};
 use core::ops::{Add, Mul, Sub};
 
-const M_PI: c_double = 3.1415926535897932384626433832795;
+#[expect(clippy::approx_constant)]
+const M_PI: c_double = 3.141_592_653_589_793;
 const __FLT_MIN__: c_float = 1.175_494_4e-38;
 const FLT_MIN: c_float = __FLT_MIN__;
 
