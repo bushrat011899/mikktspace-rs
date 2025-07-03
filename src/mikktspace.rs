@@ -1280,7 +1280,6 @@ unsafe extern "C" fn GenerateTSpaces(
             let mut index: c_int = -(1 as c_int);
             let mut iVertIndex: c_int = -(1 as c_int);
             let mut iOF_1: c_int = -(1 as c_int);
-            let mut iMembers: c_int = 0 as c_int;
             let mut j: c_int = 0 as c_int;
             let mut l: c_int = 0 as c_int;
             let mut tmp_group: SSubGroup = SSubGroup::ZERO;
@@ -1312,7 +1311,6 @@ unsafe extern "C" fn GenerateTSpaces(
             vOs.normalize_or_zero();
             vOt.normalize_or_zero();
             iOF_1 = (*pTriInfos.offset(f as isize)).iOrgFaceNumber;
-            iMembers = 0 as c_int;
             j = 0 as c_int;
             while j < (*pGroup).iNrFaces {
                 let t: c_int = *((*pGroup).pFaceIndices).offset(j as isize);
@@ -1332,7 +1330,6 @@ unsafe extern "C" fn GenerateTSpaces(
                 let fCosT: c_float = vOt.dot(vOt2);
                 assert!(f != t || bSameOrgFace);
                 if bAny || bSameOrgFace || fCosS > fThresCos && fCosT > fThresCos {
-                    iMembers += 1;
                     tmp_group.pTriMembers.push(t);
                 }
                 j += 1;
@@ -1348,15 +1345,9 @@ unsafe extern "C" fn GenerateTSpaces(
             }
             assert!(bFound || l == iUniqueSubGroups);
             if !bFound {
-                let fresh6 = &mut pUniSubGroups[iUniqueSubGroups as usize].pTriMembers;
-                {
-                    let len = (iMembers as c_ulong) as usize;
-                    fresh6.clear();
-                    fresh6.extend_from_slice(&tmp_group.pTriMembers[0..len]);
-                }
+                pUniSubGroups[iUniqueSubGroups as usize].pTriMembers = tmp_group.pTriMembers.clone();
                 pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
-                    tmp_group.pTriMembers.as_mut_ptr(),
-                    iMembers,
+                    &tmp_group.pTriMembers,
                     piTriListIn,
                     pTriInfos,
                     pContext,
@@ -1389,14 +1380,14 @@ unsafe extern "C" fn GenerateTSpaces(
     }
     true
 }
-unsafe extern "C" fn EvalTspace(
-    mut face_indices: *mut c_int,
-    iFaces: c_int,
+unsafe fn EvalTspace(
+    mut face_indices: &[c_int],
     mut piTriListIn: *const c_int,
     mut pTriInfos: *const STriInfo,
     mut pContext: *const SMikkTSpaceContext,
     iVertexRepresentitive: c_int,
 ) -> STSpace {
+    let iFaces = face_indices.len() as c_int;
     let mut res: STSpace = STSpace {
         vOs: SVec3::ZERO,
         fMagS: 0.,
@@ -1417,7 +1408,7 @@ unsafe extern "C" fn EvalTspace(
     res.fMagT = 0 as c_int as c_float;
     face = 0 as c_int;
     while face < iFaces {
-        let f: c_int = *face_indices.offset(face as isize);
+        let f: c_int = face_indices[face as usize];
         if (*pTriInfos.offset(f as isize)).iFlag & GROUP_WITH_ANY == 0 as c_int {
             let mut n: SVec3 = SVec3::ZERO;
             let mut vOs: SVec3 = SVec3::ZERO;
