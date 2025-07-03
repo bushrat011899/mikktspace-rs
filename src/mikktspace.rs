@@ -1,7 +1,10 @@
 #![expect(non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
 
 use alloc::{vec, vec::Vec};
-use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
+use core::{
+    ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void},
+    ops::Index,
+};
 
 use super::math::*;
 
@@ -100,17 +103,25 @@ pub struct SSubGroup {
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union SEdge {
-    pub c2rust_unnamed: C2RustUnnamed,
-    pub array: [c_int; 3],
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct C2RustUnnamed {
+pub struct SEdge {
     pub i0: c_int,
     pub i1: c_int,
     pub f: c_int,
 }
+
+impl Index<usize> for SEdge {
+    type Output = c_int;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.i0,
+            1 => &self.i1,
+            2 => &self.f,
+            _ => panic!(),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct STmpVert {
@@ -1676,15 +1687,9 @@ unsafe extern "C" fn BuildNeighborsFast(
                         0 as c_int
                     })) as isize,
             );
-            (*pEdges.offset((f * 3 as c_int + i) as isize))
-                .c2rust_unnamed
-                .i0 = if i0 < i1 { i0 } else { i1 };
-            (*pEdges.offset((f * 3 as c_int + i) as isize))
-                .c2rust_unnamed
-                .i1 = if i0 >= i1 { i0 } else { i1 };
-            (*pEdges.offset((f * 3 as c_int + i) as isize))
-                .c2rust_unnamed
-                .f = f;
+            (*pEdges.offset((f * 3 as c_int + i) as isize)).i0 = if i0 < i1 { i0 } else { i1 };
+            (*pEdges.offset((f * 3 as c_int + i) as isize)).i1 = if i0 >= i1 { i0 } else { i1 };
+            (*pEdges.offset((f * 3 as c_int + i) as isize)).f = f;
             i += 1;
         }
         f += 1;
@@ -1700,9 +1705,7 @@ unsafe extern "C" fn BuildNeighborsFast(
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if (*pEdges.offset(iCurStartIndex as isize)).c2rust_unnamed.i0
-            != (*pEdges.offset(i as isize)).c2rust_unnamed.i0
-        {
+        if (*pEdges.offset(iCurStartIndex as isize)).i0 != (*pEdges.offset(i as isize)).i0 {
             let iL: c_int = iCurStartIndex;
             let iR: c_int = i - 1 as c_int;
             iCurStartIndex = i;
@@ -1713,10 +1716,8 @@ unsafe extern "C" fn BuildNeighborsFast(
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if (*pEdges.offset(iCurStartIndex as isize)).c2rust_unnamed.i0
-            != (*pEdges.offset(i as isize)).c2rust_unnamed.i0
-            || (*pEdges.offset(iCurStartIndex as isize)).c2rust_unnamed.i1
-                != (*pEdges.offset(i as isize)).c2rust_unnamed.i1
+        if (*pEdges.offset(iCurStartIndex as isize)).i0 != (*pEdges.offset(i as isize)).i0
+            || (*pEdges.offset(iCurStartIndex as isize)).i1 != (*pEdges.offset(i as isize)).i1
         {
             let iL_0: c_int = iCurStartIndex;
             let iR_0: c_int = i - 1 as c_int;
@@ -1727,9 +1728,9 @@ unsafe extern "C" fn BuildNeighborsFast(
     }
     i = 0 as c_int;
     while i < iEntries {
-        let i0_0: c_int = (*pEdges.offset(i as isize)).c2rust_unnamed.i0;
-        let i1_0: c_int = (*pEdges.offset(i as isize)).c2rust_unnamed.i1;
-        let f_0: c_int = (*pEdges.offset(i as isize)).c2rust_unnamed.f;
+        let i0_0: c_int = (*pEdges.offset(i as isize)).i0;
+        let i1_0: c_int = (*pEdges.offset(i as isize)).i1;
+        let f_0: c_int = (*pEdges.offset(i as isize)).f;
         let mut bUnassigned_A: bool = false;
         let mut i0_A: c_int = 0;
         let mut i1_A: c_int = 0;
@@ -1750,21 +1751,21 @@ unsafe extern "C" fn BuildNeighborsFast(
             let mut t: c_int = 0;
             let mut bNotFound: bool = true;
             while j < iEntries
-                && i0_0 == (*pEdges.offset(j as isize)).c2rust_unnamed.i0
-                && i1_0 == (*pEdges.offset(j as isize)).c2rust_unnamed.i1
+                && i0_0 == (*pEdges.offset(j as isize)).i0
+                && i1_0 == (*pEdges.offset(j as isize)).i1
                 && bNotFound
             {
                 let mut bUnassigned_B: bool = false;
                 let mut i0_B: c_int = 0;
                 let mut i1_B: c_int = 0;
-                t = (*pEdges.offset(j as isize)).c2rust_unnamed.f;
+                t = (*pEdges.offset(j as isize)).f;
                 GetEdge(
                     &mut i1_B,
                     &mut i0_B,
                     &mut edgenum_B,
                     &*piTriListIn.offset((t * 3 as c_int) as isize),
-                    (*pEdges.offset(j as isize)).c2rust_unnamed.i0,
-                    (*pEdges.offset(j as isize)).c2rust_unnamed.i1,
+                    (*pEdges.offset(j as isize)).i0,
+                    (*pEdges.offset(j as isize)).i1,
                 );
                 bUnassigned_B = (*pTriInfos.offset(t as isize)).FaceNeighbors[edgenum_B as usize]
                     == -(1 as c_int);
@@ -1775,7 +1776,7 @@ unsafe extern "C" fn BuildNeighborsFast(
                 }
             }
             if !bNotFound {
-                let mut t_0: c_int = (*pEdges.offset(j as isize)).c2rust_unnamed.f;
+                let mut t_0: c_int = (*pEdges.offset(j as isize)).f;
                 (*pTriInfos.offset(f_0 as isize)).FaceNeighbors[edgenum_A as usize] = t_0;
                 (*pTriInfos.offset(t_0 as isize)).FaceNeighbors[edgenum_B as usize] = f_0;
             }
@@ -1854,16 +1855,14 @@ unsafe extern "C" fn QuickSortEdges(
     let mut n: c_int = 0;
     let mut index: c_int = 0;
     let mut iMid: c_int = 0;
-    let mut sTmp: SEdge = SEdge {
-        c2rust_unnamed: C2RustUnnamed { i0: 0, i1: 0, f: 0 },
-    };
+    let mut sTmp: SEdge = SEdge { i0: 0, i1: 0, f: 0 };
     let iElems: c_int = iRight - iLeft + 1 as c_int;
     #[expect(clippy::comparison_chain)]
     if iElems < 2 as c_int {
         return;
     } else if iElems == 2 as c_int {
-        if (*pSortBuffer.offset(iLeft as isize)).array[channel as usize]
-            > (*pSortBuffer.offset(iRight as isize)).array[channel as usize]
+        if (&(*pSortBuffer.offset(iLeft as isize)))[channel as usize]
+            > (&(*pSortBuffer.offset(iRight as isize)))[channel as usize]
         {
             sTmp = *pSortBuffer.offset(iLeft as isize);
             *pSortBuffer.offset(iLeft as isize) = *pSortBuffer.offset(iRight as isize);
@@ -1879,12 +1878,12 @@ unsafe extern "C" fn QuickSortEdges(
     n = iR - iL + 1 as c_int;
     assert!(n >= 0 as c_int);
     index = uSeed.wrapping_rem(n as c_uint) as c_int;
-    iMid = (*pSortBuffer.offset((index + iL) as isize)).array[channel as usize];
+    iMid = (&(*pSortBuffer.offset((index + iL) as isize)))[channel as usize];
     loop {
-        while (*pSortBuffer.offset(iL as isize)).array[channel as usize] < iMid {
+        while (&(*pSortBuffer.offset(iL as isize)))[channel as usize] < iMid {
             iL += 1;
         }
-        while (*pSortBuffer.offset(iR as isize)).array[channel as usize] > iMid {
+        while (&(*pSortBuffer.offset(iR as isize)))[channel as usize] > iMid {
             iR -= 1;
         }
         if iL <= iR {
