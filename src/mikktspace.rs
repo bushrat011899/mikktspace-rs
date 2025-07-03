@@ -22,53 +22,11 @@
 
 use alloc::{vec, vec::Vec};
 use core::{
-    ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void},
+    ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong},
     ops::Index,
 };
 
-use super::math::*;
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct SMikkTSpaceContext {
-    pub m_pInterface: *mut SMikkTSpaceInterface,
-    pub m_pUserData: *mut c_void,
-}
-
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct SMikkTSpaceInterface {
-    pub m_getNumFaces: Option<unsafe extern "C" fn(*const SMikkTSpaceContext) -> c_int>,
-    pub m_getNumVerticesOfFace:
-        Option<unsafe extern "C" fn(*const SMikkTSpaceContext, c_int) -> c_int>,
-    pub m_getPosition:
-        Option<unsafe extern "C" fn(*const SMikkTSpaceContext, *mut c_float, c_int, c_int) -> ()>,
-    pub m_getNormal:
-        Option<unsafe extern "C" fn(*const SMikkTSpaceContext, *mut c_float, c_int, c_int) -> ()>,
-    pub m_getTexCoord:
-        Option<unsafe extern "C" fn(*const SMikkTSpaceContext, *mut c_float, c_int, c_int) -> ()>,
-    pub m_setTSpaceBasic: Option<
-        unsafe extern "C" fn(
-            *const SMikkTSpaceContext,
-            *const c_float,
-            c_float,
-            c_int,
-            c_int,
-        ) -> (),
-    >,
-    pub m_setTSpace: Option<
-        unsafe extern "C" fn(
-            *const SMikkTSpaceContext,
-            *const c_float,
-            *const c_float,
-            c_float,
-            c_float,
-            bool,
-            c_int,
-            c_int,
-        ) -> (),
-    >,
-}
+use crate::{math::*, MikkTSpaceInterface};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
@@ -251,12 +209,12 @@ unsafe fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpace) -> STSpa
     ts_res
 }
 
-pub unsafe fn genTangSpaceDefault(mut pContext: *const SMikkTSpaceContext) -> bool {
+pub unsafe fn genTangSpaceDefault<I: MikkTSpaceInterface>(mut pContext: &mut I) -> bool {
     genTangSpace(pContext, 180.0f32)
 }
 
-pub unsafe fn genTangSpace(
-    mut pContext: *const SMikkTSpaceContext,
+pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
+    mut pContext: &mut I,
     fAngularThreshold: c_float,
 ) -> bool {
     let mut iNrTrianglesIn: c_int = 0 as c_int;
@@ -272,23 +230,11 @@ pub unsafe fn genTangSpace(
     let mut bRes: bool = false;
     let fThresCos: c_float = cos(deg_to_rad(fAngularThreshold) as c_double) as c_float;
 
-    // verify all call-backs have been set
-    if ((*(*pContext).m_pInterface).m_getNumFaces).is_none()
-        || ((*(*pContext).m_pInterface).m_getNumVerticesOfFace).is_none()
-        || ((*(*pContext).m_pInterface).m_getPosition).is_none()
-        || ((*(*pContext).m_pInterface).m_getNormal).is_none()
-        || ((*(*pContext).m_pInterface).m_getTexCoord).is_none()
-    {
-        return false;
-    }
-
     // count triangles on supported faces
-    let iNrFaces: c_int =
-        ((*(*pContext).m_pInterface).m_getNumFaces).expect("non-null function pointer")(pContext);
+    let iNrFaces: c_int = pContext.get_num_faces() as c_int;
     f = 0 as c_int;
     while f < iNrFaces {
-        let verts: c_int = ((*(*pContext).m_pInterface).m_getNumVerticesOfFace)
-            .expect("non-null function pointer")(pContext, f);
+        let verts: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if verts == 3 as c_int {
             iNrTrianglesIn += 1;
         } else if verts == 4 as c_int {
@@ -421,8 +367,7 @@ pub unsafe fn genTangSpace(
     index = 0 as c_int;
     f = 0 as c_int;
     while f < iNrFaces {
-        let verts_0: c_int = ((*(*pContext).m_pInterface).m_getNumVerticesOfFace)
-            .expect("non-null function pointer")(pContext, f);
+        let verts_0: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if !(verts_0 != 3 as c_int && verts_0 != 4 as c_int) {
             // I've decided to let degenerate triangles and group-with-anythings
             // vary between left/right hand coordinate systems at the vertices.
@@ -452,28 +397,16 @@ pub unsafe fn genTangSpace(
                 let mut tang: [c_float; 3] = [(*pTSpace).vOs.x, (*pTSpace).vOs.y, (*pTSpace).vOs.z];
                 let mut bitang: [c_float; 3] =
                     [(*pTSpace).vOt.x, (*pTSpace).vOt.y, (*pTSpace).vOt.z];
-                if ((*(*pContext).m_pInterface).m_setTSpace).is_some() {
-                    ((*(*pContext).m_pInterface).m_setTSpace).expect("non-null function pointer")(
-                        pContext,
-                        tang.as_mut_ptr() as *const c_float,
-                        bitang.as_mut_ptr() as *const c_float,
-                        (*pTSpace).fMagS,
-                        (*pTSpace).fMagT,
-                        (*pTSpace).bOrient,
-                        f,
-                        i,
-                    );
-                }
-                if ((*(*pContext).m_pInterface).m_setTSpaceBasic).is_some() {
-                    ((*(*pContext).m_pInterface).m_setTSpaceBasic)
-                        .expect("non-null function pointer")(
-                        pContext,
-                        tang.as_mut_ptr() as *const c_float,
-                        if (*pTSpace).bOrient { 1.0f32 } else { -1.0f32 },
-                        f,
-                        i,
-                    );
-                }
+
+                pContext.set_tspace(
+                    tang,
+                    bitang,
+                    (*pTSpace).fMagS,
+                    (*pTSpace).fMagT,
+                    (*pTSpace).bOrient,
+                    f as usize,
+                    i as usize,
+                );
                 index += 1;
                 i += 1;
             }
@@ -503,9 +436,9 @@ unsafe fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
     }
 }
 
-unsafe fn GenerateSharedVerticesIndexList(
+unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     mut piTriList_in_and_out: *mut c_int,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) {
     // Generate bounding box
@@ -668,10 +601,10 @@ unsafe fn GenerateSharedVerticesIndexList(
     }
 }
 
-unsafe fn MergeVertsFast(
+unsafe fn MergeVertsFast<I: MikkTSpaceInterface>(
     mut piTriList_in_and_out: *mut c_int,
     mut pTmpVert: *mut STmpVert,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iL_in: c_int,
     iR_in: c_int,
 ) {
@@ -835,103 +768,10 @@ unsafe fn MergeVertsFast(
     };
 }
 
-#[expect(dead_code)]
-unsafe fn MergeVertsSlow(
-    mut piTriList_in_and_out: *mut c_int,
-    mut pContext: *const SMikkTSpaceContext,
-    mut pTable: *const c_int,
-    iEntries: c_int,
-) {
-    // this can be optimized further using a tree structure or more hashing.
-    let mut e: c_int = 0 as c_int;
-    e = 0 as c_int;
-    while e < iEntries {
-        let mut i: c_int = *pTable.offset(e as isize);
-        let index: c_int = *piTriList_in_and_out.offset(i as isize);
-        let vP: SVec3 = GetPosition(pContext, index);
-        let vN: SVec3 = GetNormal(pContext, index);
-        let vT: SVec3 = GetTexCoord(pContext, index);
-
-        let mut bNotFound: bool = true;
-        let mut e2: c_int = 0 as c_int;
-        let mut i2rec: c_int = -(1 as c_int);
-        while e2 < e && bNotFound {
-            let i2: c_int = *pTable.offset(e2 as isize);
-            let index2: c_int = *piTriList_in_and_out.offset(i2 as isize);
-            let vP2: SVec3 = GetPosition(pContext, index2);
-            let vN2: SVec3 = GetNormal(pContext, index2);
-            let vT2: SVec3 = GetTexCoord(pContext, index2);
-            i2rec = i2;
-            if (vP == vP2) && (vN == vN2) && (vT == vT2) {
-                bNotFound = false;
-            } else {
-                e2 += 1;
-            }
-        }
-
-        // merge if previously found
-        if !bNotFound {
-            *piTriList_in_and_out.offset(i as isize) = *piTriList_in_and_out.offset(i2rec as isize);
-        }
-
-        e += 1;
-    }
-}
-
-#[expect(dead_code)]
-unsafe fn GenerateSharedVerticesIndexListSlow(
-    mut piTriList_in_and_out: *mut c_int,
-    mut pContext: *const SMikkTSpaceContext,
-    iNrTrianglesIn: c_int,
-) {
-    let mut t: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    t = 0 as c_int;
-    while t < iNrTrianglesIn {
-        i = 0 as c_int;
-        while i < 3 as c_int {
-            let offs: c_int = t * 3 as c_int + i;
-            let index: c_int = *piTriList_in_and_out.offset(offs as isize);
-            let vP: SVec3 = GetPosition(pContext, index);
-            let vN: SVec3 = GetNormal(pContext, index);
-            let vT: SVec3 = GetTexCoord(pContext, index);
-
-            let mut bFound: bool = false;
-            let mut t2: c_int = 0 as c_int;
-            let mut index2rec: c_int = -(1 as c_int);
-            while !bFound && t2 <= t {
-                let mut j: c_int = 0 as c_int;
-                while !bFound && j < 3 as c_int {
-                    let index2: c_int =
-                        *piTriList_in_and_out.offset((t2 * 3 as c_int + j) as isize);
-                    let vP2: SVec3 = GetPosition(pContext, index2);
-                    let vN2: SVec3 = GetNormal(pContext, index2);
-                    let vT2: SVec3 = GetTexCoord(pContext, index2);
-                    if (vP == vP2) && (vN == vN2) && (vT == vT2) {
-                        bFound = true;
-                    } else {
-                        j += 1;
-                    }
-                }
-
-                if !bFound {
-                    t2 += 1;
-                }
-            }
-
-            assert!(bFound);
-            *piTriList_in_and_out.offset(offs as isize) = index2rec;
-
-            i += 1;
-        }
-        t += 1;
-    }
-}
-
-unsafe fn GenerateInitialVerticesIndexList(
+unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
     mut pTriInfos: *mut STriInfo,
     mut piTriList_out: *mut c_int,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) -> c_int {
     let mut iTSpacesOffs: c_int = 0 as c_int;
@@ -939,11 +779,8 @@ unsafe fn GenerateInitialVerticesIndexList(
     let mut t: c_int = 0 as c_int;
     let mut iDstTriIndex: c_int = 0 as c_int;
     f = 0 as c_int;
-    while f
-        < ((*(*pContext).m_pInterface).m_getNumFaces).expect("non-null function pointer")(pContext)
-    {
-        let verts: c_int = ((*(*pContext).m_pInterface).m_getNumVerticesOfFace)
-            .expect("non-null function pointer")(pContext, f);
+    while f < pContext.get_num_faces() as c_int {
+        let verts: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if !(verts != 3 as c_int && verts != 4 as c_int) {
             (*pTriInfos.offset(iDstTriIndex as isize)).iOrgFaceNumber = f;
             (*pTriInfos.offset(iDstTriIndex as isize)).iTSpacesOffs = iTSpacesOffs;
@@ -1048,54 +885,36 @@ unsafe fn GenerateInitialVerticesIndexList(
     iTSpacesOffs
 }
 
-unsafe fn GetPosition(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetPosition<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
-    let mut pos: [c_float; 3] = [0.; 3];
     IndexToData(&mut iF, &mut iI, index);
-    ((*(*pContext).m_pInterface).m_getPosition).expect("non-null function pointer")(
-        pContext,
-        pos.as_mut_ptr(),
-        iF,
-        iI,
-    );
+    let pos = pContext.get_position(iF as usize, iI as usize);
     res.x = pos[0 as c_int as usize];
     res.y = pos[1 as c_int as usize];
     res.z = pos[2 as c_int as usize];
     res
 }
 
-unsafe fn GetNormal(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetNormal<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
-    let mut norm: [c_float; 3] = [0.; 3];
     IndexToData(&mut iF, &mut iI, index);
-    ((*(*pContext).m_pInterface).m_getNormal).expect("non-null function pointer")(
-        pContext,
-        norm.as_mut_ptr(),
-        iF,
-        iI,
-    );
+    let norm = pContext.get_normal(iF as usize, iI as usize);
     res.x = norm[0 as c_int as usize];
     res.y = norm[1 as c_int as usize];
     res.z = norm[2 as c_int as usize];
     res
 }
 
-unsafe fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> SVec3 {
+unsafe fn GetTexCoord<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 {
     let mut iF: c_int = 0;
     let mut iI: c_int = 0;
     let mut res: SVec3 = SVec3::ZERO;
-    let mut texc: [c_float; 2] = [0.; 2];
     IndexToData(&mut iF, &mut iI, index);
-    ((*(*pContext).m_pInterface).m_getTexCoord).expect("non-null function pointer")(
-        pContext,
-        texc.as_mut_ptr(),
-        iF,
-        iI,
-    );
+    let texc = pContext.get_tex_coord(iF as usize, iI as usize);
     res.x = texc[0 as c_int as usize];
     res.y = texc[1 as c_int as usize];
     res.z = 1.0f32;
@@ -1103,7 +922,7 @@ unsafe fn GetTexCoord(mut pContext: *const SMikkTSpaceContext, index: c_int) -> 
 }
 
 /// returns the texture area times 2
-unsafe fn CalcTexArea(mut pContext: *const SMikkTSpaceContext, mut indices: &[c_int]) -> c_float {
+unsafe fn CalcTexArea<I: MikkTSpaceInterface>(mut pContext: &I, mut indices: &[c_int]) -> c_float {
     let t1: SVec3 = GetTexCoord(pContext, indices[0]);
     let t2: SVec3 = GetTexCoord(pContext, indices[1]);
     let t3: SVec3 = GetTexCoord(pContext, indices[2]);
@@ -1121,10 +940,10 @@ unsafe fn CalcTexArea(mut pContext: *const SMikkTSpaceContext, mut indices: &[c_
     }
 }
 
-unsafe fn InitTriInfo(
+unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
     mut pTriInfos: *mut STriInfo,
     mut piTriListIn: *const c_int,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) {
     let mut f: c_int = 0 as c_int;
@@ -1480,14 +1299,14 @@ unsafe fn AssignRecur(
     true
 }
 
-unsafe fn GenerateTSpaces(
+unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     mut psTspace: *mut STSpace,
     mut pTriInfos: *const STriInfo,
     mut pGroups: *const SGroup,
     iNrActiveGroups: c_int,
     mut piTriListIn: *const c_int,
     fThresCos: c_float,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
 ) -> bool {
     let mut iMaxNrFaces: c_int = 0 as c_int;
     let mut g: c_int = 0 as c_int;
@@ -1653,11 +1472,11 @@ unsafe fn GenerateTSpaces(
     true
 }
 
-unsafe fn EvalTspace(
+unsafe fn EvalTspace<I: MikkTSpaceInterface>(
     mut face_indices: &[c_int],
     mut piTriListIn: *const c_int,
     mut pTriInfos: *const STriInfo,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iVertexRepresentitive: c_int,
 ) -> STSpace {
     let iFaces = face_indices.len() as c_int;
@@ -2157,11 +1976,11 @@ unsafe fn DegenPrologue(
     assert!(iNrTrianglesIn == t);
 }
 
-unsafe fn DegenEpilogue(
+unsafe fn DegenEpilogue<I: MikkTSpaceInterface>(
     mut psTspace: *mut STSpace,
     mut pTriInfos: *const STriInfo,
     mut piTriListIn: *const c_int,
-    mut pContext: *const SMikkTSpaceContext,
+    mut pContext: &I,
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
 ) {
