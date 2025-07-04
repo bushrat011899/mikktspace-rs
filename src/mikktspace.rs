@@ -18,7 +18,7 @@
  *  3. This notice may not be removed or altered from any source distribution.
  */
 
-#![expect(non_snake_case, non_upper_case_globals, unused_assignments)]
+#![expect(non_snake_case, non_upper_case_globals)]
 
 use alloc::{vec, vec::Vec};
 use core::{
@@ -213,21 +213,11 @@ pub fn genTangSpaceDefault<I: MikkTSpaceInterface>(pContext: &mut I) -> bool {
 
 pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold: c_float) -> bool {
     let mut iNrTrianglesIn: c_int = 0 as c_int;
-    let mut f: c_int = 0 as c_int;
-    let mut t: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    let mut iNrTSPaces: c_int = 0 as c_int;
-    let mut iTotTris: c_int = 0 as c_int;
-    let mut iDegenTriangles: c_int = 0 as c_int;
-    let mut iNrMaxGroups: c_int = 0 as c_int;
-    let mut iNrActiveGroups: c_int = 0 as c_int;
-    let mut index: c_int = 0 as c_int;
-    let mut bRes: bool = false;
     let fThresCos: c_float = cos(deg_to_rad(fAngularThreshold) as c_double) as c_float;
 
     // count triangles on supported faces
     let iNrFaces: c_int = pContext.get_num_faces() as c_int;
-    f = 0 as c_int;
+    let mut f = 0 as c_int;
     while f < iNrFaces {
         let verts: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if verts == 3 as c_int {
@@ -246,7 +236,7 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
     let mut pTriInfos: Vec<STriInfo> = vec![STriInfo::ZERO; iNrTrianglesIn as usize];
 
     // make an initial triangle --> face index list
-    iNrTSPaces = GenerateInitialVerticesIndexList(
+    let iNrTSPaces = GenerateInitialVerticesIndexList(
         &mut pTriInfos,
         &mut piTriListIn,
         pContext,
@@ -257,9 +247,9 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
     GenerateSharedVerticesIndexList(&mut piTriListIn, pContext, iNrTrianglesIn);
 
     // Mark all degenerate triangles
-    iTotTris = iNrTrianglesIn;
-    iDegenTriangles = 0 as c_int;
-    t = 0 as c_int;
+    let iTotTris = iNrTrianglesIn;
+    let mut iDegenTriangles = 0 as c_int;
+    let mut t = 0 as c_int;
     while t < iTotTris {
         let i0: c_int = piTriListIn[(t * 3 as c_int + 0 as c_int) as usize];
         let i1: c_int = piTriListIn[(t * 3 as c_int + 1 as c_int) as usize];
@@ -287,9 +277,10 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
     InitTriInfo(&mut pTriInfos, &piTriListIn, pContext, iNrTrianglesIn);
 
     // based on the 4 rules, identify groups based on connectivity
-    iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
+    let iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
     let mut pGroups: Vec<SGroup> = vec![SGroup::ZERO; iNrMaxGroups as usize];
-    iNrActiveGroups = Build4RuleGroups(&mut pTriInfos, &mut pGroups, &piTriListIn, iNrTrianglesIn);
+    let iNrActiveGroups =
+        Build4RuleGroups(&mut pTriInfos, &mut pGroups, &piTriListIn, iNrTrianglesIn);
 
     let mut psTspace: Vec<STSpace> = vec![STSpace::ZERO; iNrTSPaces as usize];
     t = 0 as c_int;
@@ -315,7 +306,7 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
     // make tspaces, each group is split up into subgroups if necessary
     // based on fAngularThreshold. Finally a tangent space is made for
     // every resulting subgroup
-    bRes = GenerateTSpaces(
+    let bRes = GenerateTSpaces(
         &mut psTspace,
         &pTriInfos,
         &pGroups,
@@ -341,7 +332,7 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
         iNrTrianglesIn,
         iTotTris,
     );
-    index = 0 as c_int;
+    let mut index = 0 as c_int;
     f = 0 as c_int;
     while f < iNrFaces {
         let verts_0: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
@@ -368,7 +359,7 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
             }*/
 
             // set data
-            i = 0 as c_int;
+            let mut i = 0 as c_int;
             while i < verts_0 {
                 let pTSpace = &psTspace[index as usize];
                 let tang: [c_float; 3] = [pTSpace.vOs.x, pTSpace.vOs.y, pTSpace.vOs.z];
@@ -418,17 +409,9 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     iNrTrianglesIn: c_int,
 ) {
     // Generate bounding box
-    let mut i: c_int = 0 as c_int;
-    let mut iChannel: c_int = 0 as c_int;
-    let mut k: c_int = 0 as c_int;
-    let mut e: c_int = 0 as c_int;
-    let mut iMaxCount: c_int = 0 as c_int;
     let mut vMin: SVec3 = GetPosition(pContext, 0 as c_int);
     let mut vMax: SVec3 = vMin;
-    let mut vDim: SVec3 = SVec3::ZERO;
-    let mut fMin: c_float = 0.;
-    let mut fMax: c_float = 0.;
-    i = 1 as c_int;
+    let mut i = 1 as c_int;
     while i < iNrTrianglesIn * 3 as c_int {
         let index: c_int = piTriList_in_and_out[i as usize];
         let vP: SVec3 = GetPosition(pContext, index);
@@ -449,10 +432,10 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
         }
         i += 1;
     }
-    vDim = vMax - vMin;
-    iChannel = 0 as c_int;
-    fMin = vMin.x;
-    fMax = vMax.x;
+    let vDim = vMax - vMin;
+    let mut iChannel = 0 as c_int;
+    let mut fMin = vMin.x;
+    let mut fMax = vMax.x;
     if vDim.y > vDim.x && vDim.y > vDim.z {
         iChannel = 1 as c_int;
         fMin = vMin.y;
@@ -494,7 +477,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
 
     // evaluate start index of each cell.
     piHashOffsets[0 as c_int as usize] = 0 as c_int;
-    k = 1 as c_int;
+    let mut k = 1 as c_int;
     while k < g_iCells {
         piHashOffsets[k as usize] =
             piHashOffsets[(k - 1 as c_int) as usize] + piHashCount[(k - 1 as c_int) as usize];
@@ -531,7 +514,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     }
 
     // find maximum amount of entries in any hash entry
-    iMaxCount = piHashCount[0 as c_int as usize];
+    let mut iMaxCount = piHashCount[0 as c_int as usize];
     k = 1 as c_int;
     while k < g_iCells {
         if iMaxCount < piHashCount[k as usize] {
@@ -554,7 +537,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
             //         iEntries,
             //     );
             // }
-            e = 0 as c_int;
+            let mut e = 0 as c_int;
             while e < iEntries {
                 let i_0: c_int = piHashTable[piHashOffsets[k as usize] as usize + e as usize];
                 let vP_2: SVec3 = GetPosition(pContext, piTriList_in_and_out[i_0 as usize]);
@@ -582,23 +565,16 @@ fn MergeVertsFast<I: MikkTSpaceInterface>(
     iR_in: c_int,
 ) {
     // make bbox
-    let mut c: c_int = 0 as c_int;
-    let mut l: c_int = 0 as c_int;
-    let mut channel: c_int = 0 as c_int;
     let mut fvMin: [c_float; 3] = [0.; 3];
     let mut fvMax: [c_float; 3] = [0.; 3];
-    let mut dx: c_float = 0 as c_int as c_float;
-    let mut dy: c_float = 0 as c_int as c_float;
-    let mut dz: c_float = 0 as c_int as c_float;
-    let mut fSep: c_float = 0 as c_int as c_float;
 
-    c = 0 as c_int;
+    let mut c = 0 as c_int;
     while c < 3 as c_int {
         fvMin[c as usize] = pTmpVert[iL_in as usize].vert[c as usize];
         fvMax[c as usize] = fvMin[c as usize];
         c += 1;
     }
-    l = iL_in + 1 as c_int;
+    let mut l = iL_in + 1 as c_int;
     while l <= iR_in {
         c = 0 as c_int;
         while c < 3 as c_int {
@@ -613,18 +589,18 @@ fn MergeVertsFast<I: MikkTSpaceInterface>(
         l += 1;
     }
 
-    dx = fvMax[0 as c_int as usize] - fvMin[0 as c_int as usize];
-    dy = fvMax[1 as c_int as usize] - fvMin[1 as c_int as usize];
-    dz = fvMax[2 as c_int as usize] - fvMin[2 as c_int as usize];
+    let dx = fvMax[0 as c_int as usize] - fvMin[0 as c_int as usize];
+    let dy = fvMax[1 as c_int as usize] - fvMin[1 as c_int as usize];
+    let dz = fvMax[2 as c_int as usize] - fvMin[2 as c_int as usize];
 
-    channel = 0 as c_int;
+    let mut channel = 0 as c_int;
     if dy > dx && dy > dz {
         channel = 1 as c_int;
     } else if dz > dx {
         channel = 2 as c_int;
     }
 
-    fSep = 0.5f32 * (fvMax[channel as usize] + fvMin[channel as usize]);
+    let fSep = 0.5f32 * (fvMax[channel as usize] + fvMin[channel as usize]);
 
     // stop if all vertices are NaNs
     if fSep.is_finite() as i32 == 0 {
@@ -745,10 +721,8 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
     iNrTrianglesIn: c_int,
 ) -> c_int {
     let mut iTSpacesOffs: c_int = 0 as c_int;
-    let mut f: c_int = 0 as c_int;
-    let mut t: c_int = 0 as c_int;
     let mut iDstTriIndex: c_int = 0 as c_int;
-    f = 0 as c_int;
+    let mut f = 0 as c_int;
     while f < pContext.get_num_faces() as c_int {
         let verts: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if !(verts != 3 as c_int && verts != 4 as c_int) {
@@ -783,11 +757,10 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
                 let T3: SVec3 = GetTexCoord(pContext, i3);
                 let distSQ_02: c_float = (T2 - T0).length_squared();
                 let distSQ_13: c_float = (T3 - T1).length_squared();
-                let mut bQuadDiagIs_02: bool = false;
-                if distSQ_02 < distSQ_13 {
-                    bQuadDiagIs_02 = true;
+                let bQuadDiagIs_02 = if distSQ_02 < distSQ_13 {
+                    true
                 } else if distSQ_13 < distSQ_02 {
-                    bQuadDiagIs_02 = false;
+                    false
                 } else {
                     let P0: SVec3 = GetPosition(pContext, i0);
                     let P1: SVec3 = GetPosition(pContext, i1);
@@ -795,8 +768,8 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
                     let P3: SVec3 = GetPosition(pContext, i3);
                     let distSQ_02_0: c_float = (P2 - P0).length_squared();
                     let distSQ_13_0: c_float = (P3 - P1).length_squared();
-                    bQuadDiagIs_02 = distSQ_13_0 >= distSQ_02_0;
-                }
+                    distSQ_13_0 >= distSQ_02_0
+                };
                 if bQuadDiagIs_02 {
                     let pVerts_A = &mut pTriInfos[iDstTriIndex as usize].vert_num;
                     pVerts_A[0] = 0 as c_int as c_uchar;
@@ -839,7 +812,7 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
         f += 1;
     }
 
-    t = 0 as c_int;
+    let mut t = 0 as c_int;
     while t < iNrTrianglesIn {
         pTriInfos[t as usize].iFlag = 0 as c_int;
         t += 1;
@@ -904,15 +877,13 @@ fn InitTriInfo<I: MikkTSpaceInterface>(
     pContext: &I,
     iNrTrianglesIn: c_int,
 ) {
-    let mut f: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
     let mut t: c_int = 0 as c_int;
     // pTriInfos[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
 
     // generate neighbor info list
-    f = 0 as c_int;
+    let mut f = 0 as c_int;
     while f < iNrTrianglesIn {
-        i = 0 as c_int;
+        let mut i = 0 as c_int;
         while i < 3 as c_int {
             pTriInfos[f as usize].FaceNeighbors[i as usize] = -(1 as c_int);
             let fresh2 = &mut pTriInfos[f as usize].AssignedGroup[i as usize];
@@ -1099,19 +1070,14 @@ fn Build4RuleGroups(
     let iNrMaxGroups: c_int = iNrTrianglesIn * 3 as c_int;
     let mut iNrActiveGroups: c_int = 0 as c_int;
 
-    let mut f: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    f = 0 as c_int;
+    let mut f = 0 as c_int;
     while f < iNrTrianglesIn {
-        i = 0 as c_int;
+        let mut i = 0 as c_int;
         while i < 3 as c_int {
             // if not assigned to a group
             if pTriInfos[f as usize].iFlag & GROUP_WITH_ANY == 0 as c_int
                 && pTriInfos[f as usize].AssignedGroup[i as usize].is_none()
             {
-                let mut bOrPre: bool = false;
-                let mut neigh_indexL: c_int = 0;
-                let mut neigh_indexR: c_int = 0;
                 let vert_index: c_int = piTriListIn[(f * 3 as c_int + i) as usize];
                 assert!(iNrActiveGroups < iNrMaxGroups);
                 pTriInfos[f as usize].AssignedGroup[i as usize] = Some(iNrActiveGroups as usize);
@@ -1124,9 +1090,9 @@ fn Build4RuleGroups(
                 iNrActiveGroups += 1;
 
                 AddTriToGroup(this_group, f);
-                bOrPre = pTriInfos[f as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
-                neigh_indexL = pTriInfos[f as usize].FaceNeighbors[i as usize];
-                neigh_indexR = pTriInfos[f as usize].FaceNeighbors[(if i > 0 as c_int {
+                let bOrPre = pTriInfos[f as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
+                let neigh_indexL = pTriInfos[f as usize].FaceNeighbors[i as usize];
+                let neigh_indexR = pTriInfos[f as usize].FaceNeighbors[(if i > 0 as c_int {
                     i - 1 as c_int
                 } else {
                     2 as c_int
@@ -1243,9 +1209,7 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
     pContext: &I,
 ) -> bool {
     let mut iMaxNrFaces: c_int = 0 as c_int;
-    let mut g: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    g = 0 as c_int;
+    let mut g = 0 as c_int;
     while g < iNrActiveGroups {
         if iMaxNrFaces < pGroups[g as usize].pFaceIndices.len() as c_int {
             iMaxNrFaces = pGroups[g as usize].pFaceIndices.len() as c_int;
@@ -1260,51 +1224,45 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
     // make initial allocations
     let mut pSubGroupTspace: Vec<STSpace> = vec![STSpace::ZERO; iMaxNrFaces as usize];
     let mut pUniSubGroups: Vec<SSubGroup> = vec![SSubGroup::ZERO; iMaxNrFaces as usize];
-    g = 0 as c_int;
+    let mut g = 0 as c_int;
     while g < iNrActiveGroups {
         let pGroup = &pGroups[g as usize];
         let mut iUniqueSubGroups: c_int = 0 as c_int;
 
         // triangles
-        i = 0 as c_int;
+        let mut i = 0 as c_int;
         while i < pGroup.pFaceIndices.len() as c_int {
             // triangle number
             let f: c_int = (pGroup.pFaceIndices)[i as usize];
-            let mut index: c_int = -(1 as c_int);
-            let mut iVertIndex: c_int = -(1 as c_int);
-            let mut iOF_1: c_int = -(1 as c_int);
-            let mut j: c_int = 0 as c_int;
-            let mut l: c_int = 0 as c_int;
             let mut tmp_group: SSubGroup = SSubGroup::ZERO;
-            let mut bFound: bool = false;
-            let mut n: SVec3 = SVec3::ZERO;
-            let mut vOs: SVec3 = SVec3::ZERO;
-            let mut vOt: SVec3 = SVec3::ZERO;
-            if pTriInfos[f as usize].AssignedGroup[0 as c_int as usize] == Some(g as usize) {
-                index = 0 as c_int;
+            let index = if pTriInfos[f as usize].AssignedGroup[0 as c_int as usize]
+                == Some(g as usize)
+            {
+                0 as c_int
             } else if pTriInfos[f as usize].AssignedGroup[1 as c_int as usize] == Some(g as usize) {
-                index = 1 as c_int;
+                1 as c_int
             } else if pTriInfos[f as usize].AssignedGroup[2 as c_int as usize] == Some(g as usize) {
-                index = 2 as c_int;
-            }
-            assert!(index >= 0 as c_int && index < 3 as c_int);
+                2 as c_int
+            } else {
+                panic!()
+            };
 
-            iVertIndex = piTriListIn[(f * 3 as c_int + index) as usize];
+            let iVertIndex = piTriListIn[(f * 3 as c_int + index) as usize];
             assert!(iVertIndex == pGroup.iVertexRepresentitive);
 
             // is normalized already
-            n = GetNormal(pContext, iVertIndex);
+            let n = GetNormal(pContext, iVertIndex);
 
             // project
-            vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
-            vOt = pTriInfos[f as usize].vOt - ((n.dot(pTriInfos[f as usize].vOt)) * n);
+            let mut vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
+            let mut vOt = pTriInfos[f as usize].vOt - ((n.dot(pTriInfos[f as usize].vOt)) * n);
             vOs.normalize_or_zero();
             vOt.normalize_or_zero();
 
             // original face number
-            iOF_1 = pTriInfos[f as usize].iOrgFaceNumber;
+            let iOF_1 = pTriInfos[f as usize].iOrgFaceNumber;
 
-            j = 0 as c_int;
+            let mut j = 0 as c_int;
             while j < pGroup.pFaceIndices.len() as c_int {
                 // triangle number
                 let t: c_int = (pGroup.pFaceIndices)[j as usize];
@@ -1339,8 +1297,8 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
             tmp_group.pTriMembers.sort();
 
             // look for an existing match
-            bFound = false;
-            l = 0 as c_int;
+            let mut bFound = false;
+            let mut l = 0 as c_int;
             while l < iUniqueSubGroups && !bFound {
                 bFound = tmp_group == pUniSubGroups[l as usize];
                 if !bFound {
@@ -1414,7 +1372,6 @@ fn EvalTspace<I: MikkTSpaceInterface>(
         bOrient: false,
     };
     let mut fAngleSum: c_float = 0 as c_int as c_float;
-    let mut face: c_int = 0 as c_int;
     res.vOs.x = 0.0f32;
     res.vOs.y = 0.0f32;
     res.vOs.z = 0.0f32;
@@ -1424,65 +1381,50 @@ fn EvalTspace<I: MikkTSpaceInterface>(
     res.fMagS = 0 as c_int as c_float;
     res.fMagT = 0 as c_int as c_float;
 
-    face = 0 as c_int;
+    let mut face = 0 as c_int;
     while face < iFaces {
         let f: c_int = face_indices[face as usize];
 
         // only valid triangles get to add their contribution
         if pTriInfos[f as usize].iFlag & GROUP_WITH_ANY == 0 as c_int {
-            let mut n: SVec3 = SVec3::ZERO;
-            let mut vOs: SVec3 = SVec3::ZERO;
-            let mut vOt: SVec3 = SVec3::ZERO;
-            let mut p0: SVec3 = SVec3::ZERO;
-            let mut p1: SVec3 = SVec3::ZERO;
-            let mut p2: SVec3 = SVec3::ZERO;
-            let mut v1: SVec3 = SVec3::ZERO;
-            let mut v2: SVec3 = SVec3::ZERO;
-            let mut fCos: c_float = 0.;
-            let mut fAngle: c_float = 0.;
-            let mut fMagS: c_float = 0.;
-            let mut fMagT: c_float = 0.;
-            let mut i: c_int = -(1 as c_int);
-            let mut index: c_int = -(1 as c_int);
-            let mut i0: c_int = -(1 as c_int);
-            let mut i1: c_int = -(1 as c_int);
-            let mut i2: c_int = -(1 as c_int);
-            if piTriListIn[(3 as c_int * f + 0 as c_int) as usize] == iVertexRepresentitive {
-                i = 0 as c_int;
+            let i = if piTriListIn[(3 as c_int * f + 0 as c_int) as usize] == iVertexRepresentitive
+            {
+                0 as c_int
             } else if piTriListIn[(3 as c_int * f + 1 as c_int) as usize] == iVertexRepresentitive {
-                i = 1 as c_int;
+                1 as c_int
             } else if piTriListIn[(3 as c_int * f + 2 as c_int) as usize] == iVertexRepresentitive {
-                i = 2 as c_int;
-            }
-            assert!(i >= 0 as c_int && i < 3 as c_int);
+                2 as c_int
+            } else {
+                panic!()
+            };
 
             // project
-            index = piTriListIn[(3 as c_int * f + i) as usize];
-            n = GetNormal(pContext, index);
-            vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
-            vOt = pTriInfos[f as usize].vOt - (n.dot(pTriInfos[f as usize].vOt) * n);
+            let index = piTriListIn[(3 as c_int * f + i) as usize];
+            let n = GetNormal(pContext, index);
+            let mut vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
+            let mut vOt = pTriInfos[f as usize].vOt - (n.dot(pTriInfos[f as usize].vOt) * n);
             vOs.normalize_or_zero();
             vOt.normalize_or_zero();
 
-            i2 = piTriListIn[(3 as c_int * f
+            let i2 = piTriListIn[(3 as c_int * f
                 + (if i < 2 as c_int {
                     i + 1 as c_int
                 } else {
                     0 as c_int
                 })) as usize];
-            i1 = piTriListIn[(3 as c_int * f + i) as usize];
-            i0 = piTriListIn[(3 as c_int * f
+            let i1 = piTriListIn[(3 as c_int * f + i) as usize];
+            let i0 = piTriListIn[(3 as c_int * f
                 + (if i > 0 as c_int {
                     i - 1 as c_int
                 } else {
                     2 as c_int
                 })) as usize];
 
-            p0 = GetPosition(pContext, i0);
-            p1 = GetPosition(pContext, i1);
-            p2 = GetPosition(pContext, i2);
-            v1 = p0 - p1;
-            v2 = p2 - p1;
+            let p0 = GetPosition(pContext, i0);
+            let p1 = GetPosition(pContext, i1);
+            let p2 = GetPosition(pContext, i2);
+            let mut v1 = p0 - p1;
+            let mut v2 = p2 - p1;
 
             // project
             v1 = v1 - ((n.dot(v1)) * n);
@@ -1492,7 +1434,7 @@ fn EvalTspace<I: MikkTSpaceInterface>(
 
             // weight contribution by the angle
             // between the two edge vectors
-            fCos = v1.dot(v2);
+            let mut fCos = v1.dot(v2);
             fCos = if fCos > 1 as c_int as c_float {
                 1 as c_int as c_float
             } else if fCos < -(1 as c_int) as c_float {
@@ -1500,9 +1442,9 @@ fn EvalTspace<I: MikkTSpaceInterface>(
             } else {
                 fCos
             };
-            fAngle = acos(fCos as c_double) as c_float;
-            fMagS = pTriInfos[f as usize].fMagS;
-            fMagT = pTriInfos[f as usize].fMagT;
+            let fAngle = acos(fCos as c_double) as c_float;
+            let fMagS = pTriInfos[f as usize].fMagS;
+            let fMagT = pTriInfos[f as usize].fMagT;
 
             res.vOs = res.vOs + (fAngle * vOs);
             res.vOt = res.vOt + (fAngle * vOt);
@@ -1532,13 +1474,9 @@ fn BuildNeighborsFast(
 ) {
     // build array of edges
     let uSeed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
-    let mut iEntries: c_int = 0 as c_int;
-    let mut iCurStartIndex: c_int = -(1 as c_int);
-    let mut f: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    f = 0 as c_int;
+    let mut f = 0 as c_int;
     while f < iNrTrianglesIn {
-        i = 0 as c_int;
+        let mut i = 0 as c_int;
         while i < 3 as c_int {
             let i0: c_int = piTriListIn[(f * 3 as c_int + i) as usize];
             let i1: c_int = piTriListIn[(f * 3 as c_int
@@ -1569,9 +1507,9 @@ fn BuildNeighborsFast(
         0 as c_int,
         uSeed,
     );
-    iEntries = iNrTrianglesIn * 3 as c_int;
-    iCurStartIndex = 0 as c_int;
-    i = 1 as c_int;
+    let iEntries = iNrTrianglesIn * 3 as c_int;
+    let mut iCurStartIndex = 0 as c_int;
+    let mut i = 1 as c_int;
     while i < iEntries {
         if pEdges[iCurStartIndex as usize].i0 != pEdges[i as usize].i0 {
             let iL: c_int = iCurStartIndex;
@@ -1582,7 +1520,7 @@ fn BuildNeighborsFast(
         i += 1;
     }
     iCurStartIndex = 0 as c_int;
-    i = 1 as c_int;
+    let mut i = 1 as c_int;
     while i < iEntries {
         if pEdges[iCurStartIndex as usize].i0 != pEdges[i as usize].i0
             || pEdges[iCurStartIndex as usize].i1 != pEdges[i as usize].i1
@@ -1596,20 +1534,16 @@ fn BuildNeighborsFast(
     }
 
     // pair up, adjacent triangles
-    i = 0 as c_int;
+    let mut i = 0 as c_int;
     while i < iEntries {
         let i0_0: c_int = pEdges[i as usize].i0;
         let i1_0: c_int = pEdges[i as usize].i1;
         let f_0: c_int = pEdges[i as usize].f;
-        let mut bUnassigned_A: bool = false;
 
-        let mut i0_A: c_int = 0;
-        let mut i1_A: c_int = 0;
-        let mut edgenum_A: c_int = 0;
         let mut edgenum_B: c_int = 0 as c_int;
 
         // resolve index ordering and edge_num
-        (edgenum_A, i0_A, i1_A) = get_edge(
+        let (edgenum_A, i0_A, i1_A) = get_edge(
             &piTriListIn[{
                 let a = (f_0 * 3 as c_int) as usize;
                 let b = a + 3;
@@ -1619,25 +1553,22 @@ fn BuildNeighborsFast(
             i1_0,
         )
         .unwrap();
-        bUnassigned_A = pTriInfos[f_0 as usize].FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
+        let bUnassigned_A =
+            pTriInfos[f_0 as usize].FaceNeighbors[edgenum_A as usize] == -(1 as c_int);
 
         if bUnassigned_A {
             // get true index ordering
             let mut j: c_int = i + 1 as c_int;
-            let mut t: c_int = 0;
             let mut bNotFound: bool = true;
             while j < iEntries
                 && i0_0 == pEdges[j as usize].i0
                 && i1_0 == pEdges[j as usize].i1
                 && bNotFound
             {
-                let mut bUnassigned_B: bool = false;
-                let mut i0_B: c_int = 0;
-                let mut i1_B: c_int = 0;
-                t = pEdges[j as usize].f;
+                let t = pEdges[j as usize].f;
                 // flip i0_B and i1_B
                 // resolve index ordering and edge_num
-                (edgenum_B, i1_B, i0_B) = get_edge(
+                let (edgenum, i1_B, i0_B) = get_edge(
                     &piTriListIn[{
                         let a = (t * 3 as c_int) as usize;
                         let b = a + 3;
@@ -1647,7 +1578,8 @@ fn BuildNeighborsFast(
                     pEdges[j as usize].i1,
                 )
                 .unwrap();
-                bUnassigned_B =
+                edgenum_B = edgenum;
+                let bUnassigned_B =
                     pTriInfos[t as usize].FaceNeighbors[edgenum_B as usize] == -(1 as c_int);
 
                 if i0_A == i0_B && i1_A == i1_B && bUnassigned_B {
@@ -1679,13 +1611,6 @@ fn QuickSortEdges(
     channel: c_int,
     mut uSeed: c_uint,
 ) {
-    let mut t: c_uint = 0;
-    let mut iL: c_int = 0;
-    let mut iR: c_int = 0;
-    let mut n: c_int = 0;
-    let mut index: c_int = 0;
-    let mut iMid: c_int = 0;
-    let mut sTmp: SEdge = SEdge { i0: 0, i1: 0, f: 0 };
     let iElems: c_int = iRight - iLeft + 1 as c_int;
     #[expect(clippy::comparison_chain)]
     if iElems < 2 as c_int {
@@ -1694,21 +1619,19 @@ fn QuickSortEdges(
         if pSortBuffer[iLeft as usize][channel as usize]
             > pSortBuffer[iRight as usize][channel as usize]
         {
-            sTmp = pSortBuffer[iLeft as usize];
-            pSortBuffer[iLeft as usize] = pSortBuffer[iRight as usize];
-            pSortBuffer[iRight as usize] = sTmp;
+            pSortBuffer.swap(iLeft as usize, iRight as usize);
         }
         return;
     }
-    t = uSeed & 31 as c_int as c_uint;
+    let mut t = uSeed & 31 as c_int as c_uint;
     t = uSeed.wrapping_shl(t) | uSeed.wrapping_shr((32 as c_int as c_uint).wrapping_sub(t));
     uSeed = uSeed.wrapping_add(t).wrapping_add(3 as c_int as c_uint);
-    iL = iLeft;
-    iR = iRight;
-    n = iR - iL + 1 as c_int;
+    let mut iL = iLeft;
+    let mut iR = iRight;
+    let n = iR - iL + 1 as c_int;
     assert!(n >= 0 as c_int);
-    index = uSeed.wrapping_rem(n as c_uint) as c_int;
-    iMid = pSortBuffer[(index + iL) as usize][channel as usize];
+    let index = uSeed.wrapping_rem(n as c_uint) as c_int;
+    let iMid = pSortBuffer[(index + iL) as usize][channel as usize];
     loop {
         while pSortBuffer[iL as usize][channel as usize] < iMid {
             iL += 1;
@@ -1717,9 +1640,7 @@ fn QuickSortEdges(
             iR -= 1;
         }
         if iL <= iR {
-            sTmp = pSortBuffer[iL as usize];
-            pSortBuffer[iL as usize] = pSortBuffer[iR as usize];
-            pSortBuffer[iR as usize] = sTmp;
+            pSortBuffer.swap(iL as usize, iR as usize);
             iL += 1;
             iR -= 1;
         }
@@ -1753,9 +1674,6 @@ fn DegenPrologue(
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
 ) {
-    let mut iNextGoodTriangleSearchIndex: c_int = -(1 as c_int);
-    let mut bStillFindingGoodOnes: bool = false;
-
     // locate quads with only one good triangle
     let mut t: c_int = 0 as c_int;
     while t < iTotTris - 1 as c_int {
@@ -1778,9 +1696,9 @@ fn DegenPrologue(
 
     // reorder list so all degen triangles are moved to the back
     // without reordering the good triangles
-    iNextGoodTriangleSearchIndex = 1 as c_int;
-    t = 0 as c_int;
-    bStillFindingGoodOnes = true;
+    let mut iNextGoodTriangleSearchIndex = 1 as c_int;
+    let mut t = 0 as c_int;
+    let mut bStillFindingGoodOnes = true;
     while t < iNrTrianglesIn && bStillFindingGoodOnes {
         let bIsGood: bool = pTriInfos[t as usize].iFlag & MARK_DEGENERATE == 0 as c_int;
         if bIsGood {
@@ -1788,8 +1706,6 @@ fn DegenPrologue(
                 iNextGoodTriangleSearchIndex = t + 2 as c_int;
             }
         } else {
-            let mut t0: c_int = 0;
-            let mut t1: c_int = 0;
             // search for the first good triangle.
             let mut bJustADegenerate: bool = true;
             while bJustADegenerate && iNextGoodTriangleSearchIndex < iTotTris {
@@ -1803,15 +1719,14 @@ fn DegenPrologue(
                 }
             }
 
-            t0 = t;
-            t1 = iNextGoodTriangleSearchIndex;
+            let t0 = t;
+            let t1 = iNextGoodTriangleSearchIndex;
             iNextGoodTriangleSearchIndex += 1;
             assert!(iNextGoodTriangleSearchIndex > t + 1 as c_int);
 
             // swap triangle t0 and t1
             if !bJustADegenerate {
-                let mut i: c_int = 0 as c_int;
-                i = 0 as c_int;
+                let mut i = 0 as c_int;
                 while i < 3 as c_int {
                     piTriList_out.swap(
                         (t0 * 3 as c_int + i) as usize,
@@ -1842,19 +1757,16 @@ fn DegenEpilogue<I: MikkTSpaceInterface>(
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
 ) {
-    let mut t: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-
     // deal with degenerate triangles
     // punishment for degenerate triangles is O(N^2)
-    t = iNrTrianglesIn;
+    let mut t = iNrTrianglesIn;
     while t < iTotTris {
         // degenerate triangles on a quad with one good triangle are skipped
         // here but processed in the next loop
         let bSkip: bool = pTriInfos[t as usize].iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int;
 
         if !bSkip {
-            i = 0 as c_int;
+            let mut i = 0 as c_int;
             while i < 3 as c_int {
                 let index1: c_int = piTriListIn[(t * 3 as c_int + i) as usize];
                 // search through the good triangles
@@ -1896,10 +1808,6 @@ fn DegenEpilogue<I: MikkTSpaceInterface>(
         // this triangle belongs to a quad where the
         // other triangle is degenerate
         if pTriInfos[t as usize].iFlag & QUAD_ONE_DEGEN_TRI != 0 as c_int {
-            let mut vDstP: SVec3 = SVec3::ZERO;
-            let mut iOrgF: c_int = -(1 as c_int);
-            let mut i_0: c_int = 0 as c_int;
-            let mut bNotFound_0: bool = false;
             let pV: [u8; 4] = pTriInfos[t as usize].vert_num;
             let iFlag: c_int = (1 as c_int) << pV[0] as c_int
                 | (1 as c_int) << pV[1] as c_int
@@ -1913,10 +1821,10 @@ fn DegenEpilogue<I: MikkTSpaceInterface>(
                 iMissingIndex = 3 as c_int;
             }
 
-            iOrgF = pTriInfos[t as usize].iOrgFaceNumber;
-            vDstP = GetPosition(pContext, MakeIndex(iOrgF, iMissingIndex));
-            bNotFound_0 = true;
-            i_0 = 0 as c_int;
+            let iOrgF = pTriInfos[t as usize].iOrgFaceNumber;
+            let vDstP = GetPosition(pContext, MakeIndex(iOrgF, iMissingIndex));
+            let mut bNotFound_0 = true;
+            let mut i_0 = 0 as c_int;
             while bNotFound_0 && i_0 < 3 as c_int {
                 let iVert_0: c_int = pV[i_0 as usize] as c_int;
                 let vSrcP: SVec3 = GetPosition(pContext, MakeIndex(iOrgF, iVert_0));
