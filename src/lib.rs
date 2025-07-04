@@ -80,7 +80,7 @@ extern crate alloc;
 mod math;
 mod mikktspace;
 
-use mikktspace::{genTangSpace, genTangSpaceDefault};
+use mikktspace::{generate_tangent_space, generate_tangent_space_default};
 
 /// Either (or both) of the two setTSpace callbacks can be set.
 /// The call-back set_tspace_basic() is sufficient for basic normal mapping.
@@ -143,12 +143,12 @@ pub fn gen_tang_space_default<I>(interface: &mut I) -> bool
 where
     I: MikkTSpaceInterface,
 {
-    genTangSpaceDefault(interface)
+    generate_tangent_space_default(interface)
 }
 
 pub fn gen_tang_space<I>(interface: &mut I, angular_threshold: f32) -> bool
 where
     I: MikkTSpaceInterface,
 {
-    genTangSpace(interface, angular_threshold)
+    generate_tangent_space(interface, angular_threshold)
 }
