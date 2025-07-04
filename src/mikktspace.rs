@@ -1,5 +1,6 @@
 #![expect(non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
 
+use alloc::{vec, vec::Vec};
 use core::ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong, c_void};
 
 use super::math::*;
@@ -290,9 +291,17 @@ pub unsafe extern "C" fn genTangSpace(
     t = 0 as c_int;
     while t < iNrTSPaces {
         *psTspace.offset(t as isize) = STSpace {
-            vOs: SVec3 { x: 1.0, y: 0.0, z: 0.0 },
+            vOs: SVec3 {
+                x: 1.0,
+                y: 0.0,
+                z: 0.0,
+            },
             fMagS: 1.0,
-            vOt: SVec3 { x: 0.0, y: 1.0, z: 0.0 },
+            vOt: SVec3 {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0,
+            },
             fMagT: 1.0,
             ..STSpace::ZERO
         };
@@ -390,7 +399,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     iNrTrianglesIn: c_int,
 ) {
     let mut piHashTable: *mut c_int = NULL as *mut c_int;
-    let mut piHashCount: *mut c_int = NULL as *mut c_int;
     let mut piHashOffsets: *mut c_int = NULL as *mut c_int;
     let mut piHashCount2: *mut c_int = NULL as *mut c_int;
     let mut pTmpVert: *mut STmpVert = NULL as *mut STmpVert;
@@ -443,25 +451,16 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             .wrapping_mul(iNrTrianglesIn as c_ulong)
             .wrapping_mul(3 as c_int as c_ulong),
     ) as *mut c_int;
-    piHashCount =
-        malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
-            as *mut c_int;
+    let mut piHashCount: Vec<c_int> = vec![0; g_iCells as usize];
     piHashOffsets =
         malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
             as *mut c_int;
     piHashCount2 =
         malloc((::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong))
             as *mut c_int;
-    if piHashTable.is_null()
-        || piHashCount.is_null()
-        || piHashOffsets.is_null()
-        || piHashCount2.is_null()
-    {
+    if piHashTable.is_null() || piHashOffsets.is_null() || piHashCount2.is_null() {
         if !piHashTable.is_null() {
             free(piHashTable as *mut c_void);
-        }
-        if !piHashCount.is_null() {
-            free(piHashCount as *mut c_void);
         }
         if !piHashOffsets.is_null() {
             free(piHashOffsets as *mut c_void);
@@ -472,11 +471,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, pContext, iNrTrianglesIn);
         return;
     }
-    memset(
-        piHashCount as *mut c_void,
-        0 as c_int,
-        (::core::mem::size_of::<c_int>() as c_ulong).wrapping_mul(g_iCells as c_ulong),
-    );
     memset(
         piHashCount2 as *mut c_void,
         0 as c_int,
@@ -494,7 +488,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
             vP_0.z
         };
         let iCell: c_int = FindGridCell(fMin, fMax, fVal);
-        let fresh0 = &mut (*piHashCount.offset(iCell as isize));
+        let fresh0 = &mut piHashCount[iCell as usize];
         *fresh0 += 1;
         i += 1;
     }
@@ -502,7 +496,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     k = 1 as c_int;
     while k < g_iCells {
         *piHashOffsets.offset(k as isize) = *piHashOffsets.offset((k - 1 as c_int) as isize)
-            + *piHashCount.offset((k - 1 as c_int) as isize);
+            + piHashCount[(k - 1 as c_int) as usize];
         k += 1;
     }
     i = 0 as c_int;
@@ -518,7 +512,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         };
         let iCell_0: c_int = FindGridCell(fMin, fMax, fVal_0);
         let mut pTable: *mut c_int = NULL as *mut c_int;
-        assert!(*piHashCount2.offset(iCell_0 as isize) < *piHashCount.offset(iCell_0 as isize));
+        assert!(*piHashCount2.offset(iCell_0 as isize) < piHashCount[iCell_0 as usize]);
         pTable = &mut *piHashTable.offset(*piHashOffsets.offset(iCell_0 as isize) as isize)
             as *mut c_int;
         *pTable.offset(*piHashCount2.offset(iCell_0 as isize) as isize) = i;
@@ -528,15 +522,15 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     }
     k = 0 as c_int;
     while k < g_iCells {
-        assert!(*piHashCount2.offset(k as isize) == *piHashCount.offset(k as isize));
+        assert!(*piHashCount2.offset(k as isize) == piHashCount[k as usize]);
         k += 1;
     }
     free(piHashCount2 as *mut c_void);
-    iMaxCount = *piHashCount.offset(0 as c_int as isize);
+    iMaxCount = piHashCount[0 as c_int as usize];
     k = 1 as c_int;
     while k < g_iCells {
-        if iMaxCount < *piHashCount.offset(k as isize) {
-            iMaxCount = *piHashCount.offset(k as isize);
+        if iMaxCount < piHashCount[k as usize] {
+            iMaxCount = piHashCount[k as usize];
         }
         k += 1;
     }
@@ -547,7 +541,7 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
     while k < g_iCells {
         let mut pTable_0: *mut c_int =
             &mut *piHashTable.offset(*piHashOffsets.offset(k as isize) as isize) as *mut c_int;
-        let iEntries: c_int = *piHashCount.offset(k as isize);
+        let iEntries: c_int = piHashCount[k as usize];
         if iEntries >= 2 as c_int {
             if !pTmpVert.is_null() {
                 e = 0 as c_int;
@@ -583,7 +577,6 @@ unsafe extern "C" fn GenerateSharedVerticesIndexList(
         free(pTmpVert as *mut c_void);
     }
     free(piHashTable as *mut c_void);
-    free(piHashCount as *mut c_void);
     free(piHashOffsets as *mut c_void);
 }
 unsafe extern "C" fn MergeVertsFast(
@@ -1439,9 +1432,7 @@ unsafe extern "C" fn GenerateTSpaces(
                 let fresh6 = &mut (*pUniSubGroups.offset(iUniqueSubGroups as isize)).pTriMembers;
                 *fresh6 = pIndices;
                 {
-                    let len = (iMembers as c_ulong)
-                        .wrapping_mul(::core::mem::size_of::<c_int>() as c_ulong)
-                        as usize;
+                    let len = (iMembers as c_ulong) as usize;
                     let mut dest = core::slice::from_raw_parts_mut::<c_int>(pIndices, len);
                     let mut src = core::slice::from_raw_parts::<c_int>(tmp_group.pTriMembers, len);
                     dest.copy_from_slice(src);
