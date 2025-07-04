@@ -19,6 +19,7 @@
  */
 
 #![expect(non_snake_case, non_upper_case_globals, unused_assignments, unused_mut)]
+#![warn(unsafe_code)]
 
 use alloc::{vec, vec::Vec};
 use core::{
@@ -250,8 +251,8 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
 
     // make an initial triangle --> face index list
     iNrTSPaces = GenerateInitialVerticesIndexList(
-        pTriInfos.as_mut_ptr(),
-        piTriListIn.as_mut_ptr(),
+        &mut pTriInfos,
+        &mut piTriListIn,
         pContext,
         iNrTrianglesIn,
     );
@@ -742,9 +743,9 @@ fn MergeVertsFast<I: MikkTSpaceInterface>(
     };
 }
 
-unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
-    mut pTriInfos: *mut STriInfo,
-    mut piTriList_out: *mut c_int,
+fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
+    mut pTriInfos: &mut [STriInfo],
+    mut piTriList_out: &mut [c_int],
     mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) -> c_int {
@@ -756,24 +757,24 @@ unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
     while f < pContext.get_num_faces() as c_int {
         let verts: c_int = pContext.get_num_vertices_of_face(f as usize) as c_int;
         if !(verts != 3 as c_int && verts != 4 as c_int) {
-            (*pTriInfos.offset(iDstTriIndex as isize)).iOrgFaceNumber = f;
-            (*pTriInfos.offset(iDstTriIndex as isize)).iTSpacesOffs = iTSpacesOffs;
+            pTriInfos[iDstTriIndex as usize].iOrgFaceNumber = f;
+            pTriInfos[iDstTriIndex as usize].iTSpacesOffs = iTSpacesOffs;
             if verts == 3 as c_int {
-                let mut pVerts: *mut c_uchar =
-                    ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
-                *pVerts.offset(0 as c_int as isize) = 0 as c_int as c_uchar;
-                *pVerts.offset(1 as c_int as isize) = 1 as c_int as c_uchar;
-                *pVerts.offset(2 as c_int as isize) = 2 as c_int as c_uchar;
-                *piTriList_out.offset((iDstTriIndex * 3 as c_int + 0 as c_int) as isize) =
+                let pVerts =
+                    &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                pVerts[0] = 0 as c_int as c_uchar;
+                pVerts[1] = 1 as c_int as c_uchar;
+                pVerts[2] = 2 as c_int as c_uchar;
+                piTriList_out[(iDstTriIndex * 3 as c_int + 0 as c_int) as usize] =
                     MakeIndex(f, 0 as c_int);
-                *piTriList_out.offset((iDstTriIndex * 3 as c_int + 1 as c_int) as isize) =
+                piTriList_out[(iDstTriIndex * 3 as c_int + 1 as c_int) as usize] =
                     MakeIndex(f, 1 as c_int);
-                *piTriList_out.offset((iDstTriIndex * 3 as c_int + 2 as c_int) as isize) =
+                piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] =
                     MakeIndex(f, 2 as c_int);
                 iDstTriIndex += 1;
             } else {
-                (*pTriInfos.offset((iDstTriIndex + 1 as c_int) as isize)).iOrgFaceNumber = f;
-                (*pTriInfos.offset((iDstTriIndex + 1 as c_int) as isize)).iTSpacesOffs =
+                pTriInfos[(iDstTriIndex + 1 as c_int) as usize].iOrgFaceNumber = f;
+                pTriInfos[(iDstTriIndex + 1 as c_int) as usize].iTSpacesOffs =
                     iTSpacesOffs;
 
                 // need an order independent way to evaluate
@@ -804,42 +805,39 @@ unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
                     bQuadDiagIs_02 = distSQ_13_0 >= distSQ_02_0;
                 }
                 if bQuadDiagIs_02 {
-                    let mut pVerts_A: *mut c_uchar =
-                        ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
-                    *pVerts_A.offset(0 as c_int as isize) = 0 as c_int as c_uchar;
-                    *pVerts_A.offset(1 as c_int as isize) = 1 as c_int as c_uchar;
-                    *pVerts_A.offset(2 as c_int as isize) = 2 as c_int as c_uchar;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 0 as c_int) as isize) = i0;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 1 as c_int) as isize) = i1;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 2 as c_int) as isize) = i2;
+                    let pVerts_A = &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                    pVerts_A[0] = 0 as c_int as c_uchar;
+                    pVerts_A[1] = 1 as c_int as c_uchar;
+                    pVerts_A[2] = 2 as c_int as c_uchar;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 0 as c_int) as usize] = i0;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 1 as c_int) as usize] = i1;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] = i2;
                     iDstTriIndex += 1;
-                    let mut pVerts_B: *mut c_uchar =
-                        ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
-                    *pVerts_B.offset(0 as c_int as isize) = 0 as c_int as c_uchar;
-                    *pVerts_B.offset(1 as c_int as isize) = 2 as c_int as c_uchar;
-                    *pVerts_B.offset(2 as c_int as isize) = 3 as c_int as c_uchar;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 0 as c_int) as isize) = i0;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 1 as c_int) as isize) = i2;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 2 as c_int) as isize) = i3;
+                    let pVerts_B = &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                    pVerts_B[0] = 0 as c_int as c_uchar;
+                    pVerts_B[1] = 2 as c_int as c_uchar;
+                    pVerts_B[2] = 3 as c_int as c_uchar;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 0 as c_int) as usize] = i0;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 1 as c_int) as usize] = i2;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] = i3;
                     iDstTriIndex += 1;
                 } else {
-                    let mut pVerts_A_0: *mut c_uchar =
-                        ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
-                    *pVerts_A_0.offset(0 as c_int as isize) = 0 as c_int as c_uchar;
-                    *pVerts_A_0.offset(1 as c_int as isize) = 1 as c_int as c_uchar;
-                    *pVerts_A_0.offset(2 as c_int as isize) = 3 as c_int as c_uchar;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 0 as c_int) as isize) = i0;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 1 as c_int) as isize) = i1;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 2 as c_int) as isize) = i3;
+                    let mut pVerts_A_0 =
+                        &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                    pVerts_A_0[0] = 0 as c_int as c_uchar;
+                    pVerts_A_0[1] = 1 as c_int as c_uchar;
+                    pVerts_A_0[2] = 3 as c_int as c_uchar;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 0 as c_int) as usize] = i0;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 1 as c_int) as usize] = i1;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] = i3;
                     iDstTriIndex += 1;
-                    let mut pVerts_B_0: *mut c_uchar =
-                        ((*pTriInfos.offset(iDstTriIndex as isize)).vert_num).as_mut_ptr();
-                    *pVerts_B_0.offset(0 as c_int as isize) = 1 as c_int as c_uchar;
-                    *pVerts_B_0.offset(1 as c_int as isize) = 2 as c_int as c_uchar;
-                    *pVerts_B_0.offset(2 as c_int as isize) = 3 as c_int as c_uchar;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 0 as c_int) as isize) = i1;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 1 as c_int) as isize) = i2;
-                    *piTriList_out.offset((iDstTriIndex * 3 as c_int + 2 as c_int) as isize) = i3;
+                    let mut pVerts_B_0 = &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                    pVerts_B_0[0] = 1 as c_int as c_uchar;
+                    pVerts_B_0[1] = 2 as c_int as c_uchar;
+                    pVerts_B_0[2] = 3 as c_int as c_uchar;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 0 as c_int) as usize] = i1;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 1 as c_int) as usize] = i2;
+                    piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] = i3;
                     iDstTriIndex += 1;
                 }
             }
@@ -851,7 +849,7 @@ unsafe fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
 
     t = 0 as c_int;
     while t < iNrTrianglesIn {
-        (*pTriInfos.offset(t as isize)).iFlag = 0 as c_int;
+        pTriInfos[t as usize].iFlag = 0 as c_int;
         t += 1;
     }
 
