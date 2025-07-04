@@ -23,14 +23,14 @@ use core::ops::{Add, Index, Mul, Sub};
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct SVec3 {
+pub struct Vec3 {
     pub x: c_float,
     pub y: c_float,
     pub z: c_float,
 }
 
-impl SVec3 {
-    pub const ZERO: SVec3 = SVec3 {
+impl Vec3 {
+    pub const ZERO: Vec3 = Vec3 {
         x: 0.,
         y: 0.,
         z: 0.,
@@ -56,7 +56,7 @@ impl SVec3 {
     }
 }
 
-impl Index<usize> for SVec3 {
+impl Index<usize> for Vec3 {
     type Output = c_float;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -69,11 +69,11 @@ impl Index<usize> for SVec3 {
     }
 }
 
-impl Add for SVec3 {
-    type Output = SVec3;
+impl Add for Vec3 {
+    type Output = Vec3;
 
     fn add(self, rhs: Self) -> Self::Output {
-        SVec3 {
+        Vec3 {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
@@ -81,11 +81,11 @@ impl Add for SVec3 {
     }
 }
 
-impl Sub for SVec3 {
-    type Output = SVec3;
+impl Sub for Vec3 {
+    type Output = Vec3;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        SVec3 {
+        Vec3 {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
@@ -93,11 +93,11 @@ impl Sub for SVec3 {
     }
 }
 
-impl Mul<f32> for SVec3 {
-    type Output = SVec3;
+impl Mul<f32> for Vec3 {
+    type Output = Vec3;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        SVec3 {
+        Vec3 {
             x: rhs * self.x,
             y: rhs * self.y,
             z: rhs * self.z,
@@ -105,15 +105,15 @@ impl Mul<f32> for SVec3 {
     }
 }
 
-impl Mul<SVec3> for f32 {
-    type Output = SVec3;
+impl Mul<Vec3> for f32 {
+    type Output = Vec3;
 
-    fn mul(self, rhs: SVec3) -> Self::Output {
+    fn mul(self, rhs: Vec3) -> Self::Output {
         rhs * self
     }
 }
 
-impl PartialEq for SVec3 {
+impl PartialEq for Vec3 {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
