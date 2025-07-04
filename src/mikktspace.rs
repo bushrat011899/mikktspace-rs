@@ -1532,8 +1532,9 @@ unsafe extern "C" fn BuildNeighborsFast(
         }
         f += 1;
     }
+    let pEdges2 = core::slice::from_raw_parts_mut(pEdges, (iNrTrianglesIn * 3 as c_int) as usize);
     QuickSortEdges(
-        pEdges,
+        pEdges2,
         0 as c_int,
         iNrTrianglesIn * 3 as c_int - 1 as c_int,
         0 as c_int,
@@ -1543,24 +1544,24 @@ unsafe extern "C" fn BuildNeighborsFast(
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if (*pEdges.offset(iCurStartIndex as isize)).i0 != (*pEdges.offset(i as isize)).i0 {
+        if pEdges2[iCurStartIndex as usize].i0 != pEdges2[i as usize].i0 {
             let iL: c_int = iCurStartIndex;
             let iR: c_int = i - 1 as c_int;
             iCurStartIndex = i;
-            QuickSortEdges(pEdges, iL, iR, 1 as c_int, uSeed);
+            QuickSortEdges(pEdges2, iL, iR, 1 as c_int, uSeed);
         }
         i += 1;
     }
     iCurStartIndex = 0 as c_int;
     i = 1 as c_int;
     while i < iEntries {
-        if (*pEdges.offset(iCurStartIndex as isize)).i0 != (*pEdges.offset(i as isize)).i0
-            || (*pEdges.offset(iCurStartIndex as isize)).i1 != (*pEdges.offset(i as isize)).i1
+        if pEdges2[iCurStartIndex as usize].i0 != pEdges2[i as usize].i0
+            || pEdges2[iCurStartIndex as usize].i1 != pEdges2[i as usize].i1
         {
             let iL_0: c_int = iCurStartIndex;
             let iR_0: c_int = i - 1 as c_int;
             iCurStartIndex = i;
-            QuickSortEdges(pEdges, iL_0, iR_0, 2 as c_int, uSeed);
+            QuickSortEdges(pEdges2, iL_0, iR_0, 2 as c_int, uSeed);
         }
         i += 1;
     }
@@ -1682,8 +1683,8 @@ unsafe extern "C" fn BuildNeighborsSlow(
         f += 1;
     }
 }
-unsafe extern "C" fn QuickSortEdges(
-    mut pSortBuffer: *mut SEdge,
+fn QuickSortEdges(
+    mut pSortBuffer: &mut [SEdge],
     mut iLeft: c_int,
     mut iRight: c_int,
     channel: c_int,
@@ -1701,35 +1702,35 @@ unsafe extern "C" fn QuickSortEdges(
     if iElems < 2 as c_int {
         return;
     } else if iElems == 2 as c_int {
-        if (&(*pSortBuffer.offset(iLeft as isize)))[channel as usize]
-            > (&(*pSortBuffer.offset(iRight as isize)))[channel as usize]
+        if pSortBuffer[iLeft as usize][channel as usize]
+            > pSortBuffer[iRight as usize][channel as usize]
         {
-            sTmp = *pSortBuffer.offset(iLeft as isize);
-            *pSortBuffer.offset(iLeft as isize) = *pSortBuffer.offset(iRight as isize);
-            *pSortBuffer.offset(iRight as isize) = sTmp;
+            sTmp = pSortBuffer[iLeft as usize];
+            pSortBuffer[iLeft as usize] = pSortBuffer[iRight as usize];
+            pSortBuffer[iRight as usize] = sTmp;
         }
         return;
     }
     t = uSeed & 31 as c_int as c_uint;
-    t = uSeed.wrapping_shl(t) | uSeed.wrapping_shr(((32 as c_int as c_uint).wrapping_sub(t)));
+    t = uSeed.wrapping_shl(t) | uSeed.wrapping_shr((32 as c_int as c_uint).wrapping_sub(t));
     uSeed = uSeed.wrapping_add(t).wrapping_add(3 as c_int as c_uint);
     iL = iLeft;
     iR = iRight;
     n = iR - iL + 1 as c_int;
     assert!(n >= 0 as c_int);
     index = uSeed.wrapping_rem(n as c_uint) as c_int;
-    iMid = (&(*pSortBuffer.offset((index + iL) as isize)))[channel as usize];
+    iMid = pSortBuffer[(index + iL) as usize][channel as usize];
     loop {
-        while (&(*pSortBuffer.offset(iL as isize)))[channel as usize] < iMid {
+        while pSortBuffer[iL as usize][channel as usize] < iMid {
             iL += 1;
         }
-        while (&(*pSortBuffer.offset(iR as isize)))[channel as usize] > iMid {
+        while pSortBuffer[iR as usize][channel as usize] > iMid {
             iR -= 1;
         }
         if iL <= iR {
-            sTmp = *pSortBuffer.offset(iL as isize);
-            *pSortBuffer.offset(iL as isize) = *pSortBuffer.offset(iR as isize);
-            *pSortBuffer.offset(iR as isize) = sTmp;
+            sTmp = pSortBuffer[iL as usize];
+            pSortBuffer[iL as usize] = pSortBuffer[iR as usize];
+            pSortBuffer[iR as usize] = sTmp;
             iL += 1;
             iR -= 1;
         }
