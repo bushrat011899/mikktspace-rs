@@ -675,11 +675,8 @@ fn merge_verts_fast<I: MikkTSpaceInterface>(
             let mut ready_right_swap: bool = false;
             while !ready_left_swap && i_left < i_right {
                 assert!(i_left >= i_left_in && i_left <= i_right_in);
-                #[expect(clippy::neg_cmp_op_on_partial_ord)]
-                {
-                    ready_left_swap =
-                        !(temporary_verticies[i_left as usize].vert[channel as usize] < sep);
-                }
+                ready_left_swap =
+                    temporary_verticies[i_left as usize].vert[channel as usize] >= sep;
                 if !ready_left_swap {
                     i_left += 1;
                 }
@@ -1057,26 +1054,24 @@ fn initialize_triangle_info<I: MikkTSpaceInterface>(
                 // if this happens the quad has extremely bad mapping!!
                 if orientation_preserving_a != orientation_preserving_b {
                     let mut choose_orientation_first_triangle: bool = false;
-                    #[expect(clippy::if_same_then_else)]
                     if triangle_info_list[(t + 1 as c_int) as usize].flags & GROUP_WITH_ANY
                         != 0 as c_int
+                        || calculate_texture_area(
+                            context,
+                            &triangle_vertex_list[{
+                                let a = (t * 3 as c_int + 0 as c_int) as usize;
+                                let b = a + 3;
+                                a..b
+                            }],
+                        ) >= calculate_texture_area(
+                            context,
+                            &triangle_vertex_list[{
+                                let a = ((t + 1 as c_int) * 3 as c_int + 0 as c_int) as usize;
+                                let b = a + 3;
+                                a..b
+                            }],
+                        )
                     {
-                        choose_orientation_first_triangle = true;
-                    } else if calculate_texture_area(
-                        context,
-                        &triangle_vertex_list[{
-                            let a = (t * 3 as c_int + 0 as c_int) as usize;
-                            let b = a + 3;
-                            a..b
-                        }],
-                    ) >= calculate_texture_area(
-                        context,
-                        &triangle_vertex_list[{
-                            let a = ((t + 1 as c_int) * 3 as c_int + 0 as c_int) as usize;
-                            let b = a + 3;
-                            a..b
-                        }],
-                    ) {
                         choose_orientation_first_triangle = true;
                     }
 
@@ -1718,7 +1713,6 @@ fn quick_sort_edges(
     mut seed: c_uint,
 ) {
     let elements: c_int = index_right_in - index_left_in + 1 as c_int;
-    #[expect(clippy::comparison_chain)]
     if elements < 2 as c_int {
         return;
     } else if elements == 2 as c_int {
