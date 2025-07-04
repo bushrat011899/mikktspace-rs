@@ -21,10 +21,6 @@
 use core::ffi::{c_double, c_float, c_int};
 use core::ops::{Add, Index, Mul, Sub};
 
-#[expect(clippy::approx_constant)]
-const M_PI: c_double = 3.141_592_653_589_793;
-const FLT_MIN: c_float = 1.175_494_4e-38;
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct SVec3 {
@@ -148,9 +144,9 @@ pub fn fabsf(x: c_float) -> c_float {
 
 pub fn not_zero(x: c_float) -> bool {
     // could possibly use FLT_EPSILON instead
-    fabsf(x) > FLT_MIN
+    fabsf(x) > f32::MIN_POSITIVE
 }
 
 pub fn deg_to_rad(x: c_float) -> c_float {
-    x * M_PI as c_float / 180.0f32
+    x * core::f32::consts::PI as c_float / 180.0f32
 }
