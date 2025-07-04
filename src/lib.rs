@@ -142,7 +142,7 @@ pub fn gen_tang_space_default<I>(interface: &mut I) -> bool
 where
     I: MikkTSpaceInterface,
 {
-    unsafe { genTangSpaceDefault(interface) }
+    genTangSpaceDefault(interface)
 }
 
 pub fn gen_tang_space<I>(interface: &mut I, angular_threshold: f32) -> bool

@@ -159,7 +159,6 @@ impl STmpVert {
     };
 }
 
-pub const NULL: c_int = 0 as c_int;
 pub const INTERNAL_RND_SORT_SEED: c_int = 39871946 as c_int;
 pub const MARK_DEGENERATE: c_int = 1 as c_int;
 pub const QUAD_ONE_DEGEN_TRI: c_int = 2 as c_int;
@@ -208,8 +207,8 @@ fn AvgTSpace(mut pTS0: STSpace, mut pTS1: STSpace) -> STSpace {
     ts_res
 }
 
-pub unsafe fn genTangSpaceDefault<I: MikkTSpaceInterface>(mut pContext: &mut I) -> bool {
-    genTangSpace(pContext, 180.0f32)
+pub fn genTangSpaceDefault<I: MikkTSpaceInterface>(mut pContext: &mut I) -> bool {
+    unsafe { genTangSpace(pContext, 180.0f32) }
 }
 
 pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
@@ -409,7 +408,7 @@ const g_iCells: c_int = 2048 as c_int;
 // inlining could potentially reorder instructions and generate different
 // results for the same effective input value fVal.
 #[inline(never)]
-unsafe fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
+fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
     let fIndex: c_float = g_iCells as c_float * ((fVal - fMin) / (fMax - fMin));
     let iIndex: c_int = fIndex as c_int;
     if iIndex < g_iCells {
@@ -423,7 +422,7 @@ unsafe fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
     }
 }
 
-unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
+fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     mut piTriList_in_and_out: &mut [c_int],
     mut pContext: &I,
     iNrTrianglesIn: c_int,
@@ -525,10 +524,10 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
             vP_1.z
         };
         let iCell_0: c_int = FindGridCell(fMin, fMax, fVal_0);
-        let mut pTable: *mut c_int = NULL as *mut c_int;
         assert!(piHashCount2[iCell_0 as usize] < piHashCount[iCell_0 as usize]);
-        pTable = &mut piHashTable[piHashOffsets[iCell_0 as usize] as usize] as *mut c_int;
-        *pTable.offset(piHashCount2[iCell_0 as usize] as isize) = i; // vertex i has been inserted.
+        let mut pTable = &mut piHashTable
+            [piHashOffsets[iCell_0 as usize] as usize + piHashCount2[iCell_0 as usize] as usize];
+        *pTable = i; // vertex i has been inserted.
         let fresh1 = &mut piHashCount2[iCell_0 as usize];
         *fresh1 += 1;
         i += 1;
@@ -555,9 +554,6 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     let mut pTmpVert: Vec<STmpVert> = vec![STmpVert::ZERO; iMaxCount as usize];
     k = 0 as c_int;
     while k < g_iCells {
-        // extract table of cell k and amount of entries in it
-        let mut pTable_0: *mut c_int =
-            &mut piHashTable[piHashOffsets[k as usize] as usize] as *mut c_int;
         let iEntries: c_int = piHashCount[k as usize];
         if iEntries >= 2 as c_int {
             // if /* couldn't allocate pTmpVert? */ {
@@ -570,7 +566,7 @@ unsafe fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
             // }
             e = 0 as c_int;
             while e < iEntries {
-                let mut i_0: c_int = *pTable_0.offset(e as isize);
+                let mut i_0: c_int = piHashTable[piHashOffsets[k as usize] as usize + e as usize];
                 let vP_2: SVec3 = GetPosition(pContext, piTriList_in_and_out[i_0 as usize]);
                 pTmpVert[e as usize].vert = vP_2;
                 pTmpVert[e as usize].index = i_0;
@@ -900,7 +896,7 @@ fn GetTexCoord<I: MikkTSpaceInterface>(mut pContext: &I, index: c_int) -> SVec3 
 }
 
 /// returns the texture area times 2
-unsafe fn CalcTexArea<I: MikkTSpaceInterface>(mut pContext: &I, mut indices: &[c_int]) -> c_float {
+fn CalcTexArea<I: MikkTSpaceInterface>(mut pContext: &I, mut indices: &[c_int]) -> c_float {
     let t1: SVec3 = GetTexCoord(pContext, indices[0]);
     let t2: SVec3 = GetTexCoord(pContext, indices[1]);
     let t3: SVec3 = GetTexCoord(pContext, indices[2]);
