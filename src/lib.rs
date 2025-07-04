@@ -149,5 +149,5 @@ pub fn gen_tang_space<I>(interface: &mut I, angular_threshold: f32) -> bool
 where
     I: MikkTSpaceInterface,
 {
-    unsafe { genTangSpace(interface, angular_threshold) }
+    genTangSpace(interface, angular_threshold)
 }

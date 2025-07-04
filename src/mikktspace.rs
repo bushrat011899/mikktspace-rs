@@ -209,10 +209,10 @@ fn AvgTSpace(mut pTS0: STSpace, mut pTS1: STSpace) -> STSpace {
 }
 
 pub fn genTangSpaceDefault<I: MikkTSpaceInterface>(mut pContext: &mut I) -> bool {
-    unsafe { genTangSpace(pContext, 180.0f32) }
+    genTangSpace(pContext, 180.0f32)
 }
 
-pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
+pub fn genTangSpace<I: MikkTSpaceInterface>(
     mut pContext: &mut I,
     fAngularThreshold: c_float,
 ) -> bool {
@@ -374,7 +374,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
             // set data
             i = 0 as c_int;
             while i < verts_0 {
-                let mut pTSpace: *const STSpace = &mut psTspace[index as usize] as *mut STSpace;
+                let mut pTSpace = &psTspace[index as usize];
                 let mut tang: [c_float; 3] = [(*pTSpace).vOs.x, (*pTSpace).vOs.y, (*pTSpace).vOs.z];
                 let mut bitang: [c_float; 3] =
                     [(*pTSpace).vOt.x, (*pTSpace).vOt.y, (*pTSpace).vOt.z];
@@ -760,8 +760,7 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
             pTriInfos[iDstTriIndex as usize].iOrgFaceNumber = f;
             pTriInfos[iDstTriIndex as usize].iTSpacesOffs = iTSpacesOffs;
             if verts == 3 as c_int {
-                let pVerts =
-                    &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                let pVerts = &mut pTriInfos[iDstTriIndex as usize].vert_num;
                 pVerts[0] = 0 as c_int as c_uchar;
                 pVerts[1] = 1 as c_int as c_uchar;
                 pVerts[2] = 2 as c_int as c_uchar;
@@ -774,8 +773,7 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
                 iDstTriIndex += 1;
             } else {
                 pTriInfos[(iDstTriIndex + 1 as c_int) as usize].iOrgFaceNumber = f;
-                pTriInfos[(iDstTriIndex + 1 as c_int) as usize].iTSpacesOffs =
-                    iTSpacesOffs;
+                pTriInfos[(iDstTriIndex + 1 as c_int) as usize].iTSpacesOffs = iTSpacesOffs;
 
                 // need an order independent way to evaluate
                 // tspace on quads. This is done by splitting
@@ -822,8 +820,7 @@ fn GenerateInitialVerticesIndexList<I: MikkTSpaceInterface>(
                     piTriList_out[(iDstTriIndex * 3 as c_int + 2 as c_int) as usize] = i3;
                     iDstTriIndex += 1;
                 } else {
-                    let mut pVerts_A_0 =
-                        &mut pTriInfos[iDstTriIndex as usize].vert_num;
+                    let mut pVerts_A_0 = &mut pTriInfos[iDstTriIndex as usize].vert_num;
                     pVerts_A_0[0] = 0 as c_int as c_uchar;
                     pVerts_A_0[1] = 1 as c_int as c_uchar;
                     pVerts_A_0[2] = 3 as c_int as c_uchar;
