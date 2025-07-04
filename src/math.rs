@@ -22,7 +22,7 @@ use core::ffi::{c_double, c_float, c_int};
 use core::ops::{Add, Index, Mul, Sub};
 
 #[expect(clippy::approx_constant)]
-const M_PI: c_double = 3.1415926535897932384626433832795;
+const M_PI: c_double = 3.141_592_653_589_793;
 const FLT_MIN: c_float = 1.175_494_4e-38;
 
 #[derive(Copy, Clone)]

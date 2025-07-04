@@ -374,16 +374,15 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(
             i = 0 as c_int;
             while i < verts_0 {
                 let mut pTSpace = &psTspace[index as usize];
-                let mut tang: [c_float; 3] = [(*pTSpace).vOs.x, (*pTSpace).vOs.y, (*pTSpace).vOs.z];
-                let mut bitang: [c_float; 3] =
-                    [(*pTSpace).vOt.x, (*pTSpace).vOt.y, (*pTSpace).vOt.z];
+                let mut tang: [c_float; 3] = [pTSpace.vOs.x, pTSpace.vOs.y, pTSpace.vOs.z];
+                let mut bitang: [c_float; 3] = [pTSpace.vOt.x, pTSpace.vOt.y, pTSpace.vOt.z];
 
                 pContext.set_tspace(
                     tang,
                     bitang,
-                    (*pTSpace).fMagS,
-                    (*pTSpace).fMagT,
-                    (*pTSpace).bOrient,
+                    pTSpace.fMagS,
+                    pTSpace.fMagT,
+                    pTSpace.bOrient,
                     f as usize,
                     i as usize,
                 );
@@ -1176,7 +1175,7 @@ fn AssignRecur(
     let mut pMyTriInfo = &mut psTriInfos[iMyTriIndex as usize];
 
     // track down vertex
-    let iVertRep: c_int = (*pGroup).iVertexRepresentitive;
+    let iVertRep: c_int = pGroup.iVertexRepresentitive;
     let pVerts = &piTriListIn[{
         let a = (3 as c_int * iMyTriIndex + 0 as c_int) as usize;
         let b = a + 3;
@@ -1193,36 +1192,36 @@ fn AssignRecur(
     assert!(i >= 0 as c_int && i < 3 as c_int);
 
     // early out
-    if (*pMyTriInfo).AssignedGroup[i as usize] == Some((*pGroup).id) {
+    if pMyTriInfo.AssignedGroup[i as usize] == Some(pGroup.id) {
         return true;
-    } else if !((*pMyTriInfo).AssignedGroup[i as usize]).is_none() {
+    } else if (pMyTriInfo.AssignedGroup[i as usize]).is_some() {
         return false;
     }
-    if (*pMyTriInfo).iFlag & GROUP_WITH_ANY != 0 as c_int
-        && ((*pMyTriInfo).AssignedGroup[0 as c_int as usize]).is_none()
-        && ((*pMyTriInfo).AssignedGroup[1 as c_int as usize]).is_none()
-        && ((*pMyTriInfo).AssignedGroup[2 as c_int as usize]).is_none()
+    if pMyTriInfo.iFlag & GROUP_WITH_ANY != 0 as c_int
+        && (pMyTriInfo.AssignedGroup[0 as c_int as usize]).is_none()
+        && (pMyTriInfo.AssignedGroup[1 as c_int as usize]).is_none()
+        && (pMyTriInfo.AssignedGroup[2 as c_int as usize]).is_none()
     {
         // first to group with a group-with-anything triangle
         // determines it's orientation.
         // This is the only existing order dependency in the code!!
-        (*pMyTriInfo).iFlag &= !ORIENT_PRESERVING;
-        (*pMyTriInfo).iFlag |= if (*pGroup).bOrientPreservering {
+        pMyTriInfo.iFlag &= !ORIENT_PRESERVING;
+        pMyTriInfo.iFlag |= if pGroup.bOrientPreservering {
             ORIENT_PRESERVING
         } else {
             0 as c_int
         };
     }
-    let bOrient: bool = (*pMyTriInfo).iFlag & ORIENT_PRESERVING != 0 as c_int;
-    if bOrient != (*pGroup).bOrientPreservering {
+    let bOrient: bool = pMyTriInfo.iFlag & ORIENT_PRESERVING != 0 as c_int;
+    if bOrient != pGroup.bOrientPreservering {
         return false;
     }
 
     AddTriToGroup(&mut *pGroup, iMyTriIndex);
-    (*pMyTriInfo).AssignedGroup[i as usize] = Some((*pGroup).id);
+    pMyTriInfo.AssignedGroup[i as usize] = Some(pGroup.id);
 
-    let neigh_indexL: c_int = (*pMyTriInfo).FaceNeighbors[i as usize];
-    let neigh_indexR: c_int = (*pMyTriInfo).FaceNeighbors[(if i > 0 as c_int {
+    let neigh_indexL: c_int = pMyTriInfo.FaceNeighbors[i as usize];
+    let neigh_indexR: c_int = pMyTriInfo.FaceNeighbors[(if i > 0 as c_int {
         i - 1 as c_int
     } else {
         2 as c_int
@@ -1271,9 +1270,9 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
 
         // triangles
         i = 0 as c_int;
-        while i < (*pGroup).pFaceIndices.len() as c_int {
+        while i < pGroup.pFaceIndices.len() as c_int {
             // triangle number
-            let f: c_int = ((*pGroup).pFaceIndices)[i as usize];
+            let f: c_int = (pGroup.pFaceIndices)[i as usize];
             let mut index: c_int = -(1 as c_int);
             let mut iVertIndex: c_int = -(1 as c_int);
             let mut iOF_1: c_int = -(1 as c_int);
@@ -1294,7 +1293,7 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
             assert!(index >= 0 as c_int && index < 3 as c_int);
 
             iVertIndex = piTriListIn[(f * 3 as c_int + index) as usize];
-            assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
+            assert!(iVertIndex == pGroup.iVertexRepresentitive);
 
             // is normalized already
             n = GetNormal(pContext, iVertIndex);
@@ -1309,9 +1308,9 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
             iOF_1 = pTriInfos[f as usize].iOrgFaceNumber;
 
             j = 0 as c_int;
-            while j < (*pGroup).pFaceIndices.len() as c_int {
+            while j < pGroup.pFaceIndices.len() as c_int {
                 // triangle number
-                let t: c_int = ((*pGroup).pFaceIndices)[j as usize];
+                let t: c_int = (pGroup.pFaceIndices)[j as usize];
                 let iOF_2: c_int = pTriInfos[t as usize].iOrgFaceNumber;
 
                 // project
@@ -1358,13 +1357,14 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
             // if no match was found we allocate a new subgroup
             if !bFound {
                 // insert new subgroup
-                pUniSubGroups[iUniqueSubGroups as usize].pTriMembers = tmp_group.pTriMembers.clone();
+                pUniSubGroups[iUniqueSubGroups as usize].pTriMembers =
+                    tmp_group.pTriMembers.clone();
                 pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
                     &tmp_group.pTriMembers,
                     piTriListIn,
                     pTriInfos,
                     pContext,
-                    (*pGroup).iVertexRepresentitive,
+                    pGroup.iVertexRepresentitive,
                 );
                 iUniqueSubGroups += 1;
             }
@@ -1373,22 +1373,22 @@ fn GenerateTSpaces<I: MikkTSpaceInterface>(
             let iOffs: c_int = pTriInfos[f as usize].iTSpacesOffs;
             let iVert: c_int = pTriInfos[f as usize].vert_num[index as usize] as c_int;
             let mut pTS_out = &mut psTspace[(iOffs + iVert) as usize];
-            assert!((*pTS_out).iCounter < 2 as c_int);
+            assert!(pTS_out.iCounter < 2 as c_int);
             assert!(
                 (pTriInfos[f as usize].iFlag & 8 as c_int != 0 as c_int)
-                    == (*pGroup).bOrientPreservering
+                    == pGroup.bOrientPreservering
             );
-            if (*pTS_out).iCounter == 1 as c_int {
+            if pTS_out.iCounter == 1 as c_int {
                 *pTS_out = AvgTSpace(*pTS_out, pSubGroupTspace[l as usize]);
                 // update counter
-                (*pTS_out).iCounter = 2 as c_int;
-                (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
+                pTS_out.iCounter = 2 as c_int;
+                pTS_out.bOrient = pGroup.bOrientPreservering;
             } else {
-                assert!((*pTS_out).iCounter == 0 as c_int);
+                assert!(pTS_out.iCounter == 0 as c_int);
                 *pTS_out = pSubGroupTspace[l as usize];
                 // update counter
-                (*pTS_out).iCounter = 1 as c_int;
-                (*pTS_out).bOrient = (*pGroup).bOrientPreservering;
+                pTS_out.iCounter = 1 as c_int;
+                pTS_out.bOrient = pGroup.bOrientPreservering;
             }
 
             i += 1;
@@ -1486,7 +1486,7 @@ fn EvalTspace<I: MikkTSpaceInterface>(
             p2 = GetPosition(pContext, i2);
             v1 = p0 - p1;
             v2 = p2 - p1;
-            
+
             // project
             v1 = v1 - ((n.dot(v1)) * n);
             v1.normalize_or_zero();
@@ -1816,15 +1816,13 @@ fn DegenPrologue(
                 let mut i: c_int = 0 as c_int;
                 i = 0 as c_int;
                 while i < 3 as c_int {
-                    let index: c_int = piTriList_out[(t0 * 3 as c_int + i) as usize];
-                    piTriList_out[(t0 * 3 as c_int + i) as usize] =
-                        piTriList_out[(t1 * 3 as c_int + i) as usize];
-                    piTriList_out[(t1 * 3 as c_int + i) as usize] = index;
+                    piTriList_out.swap(
+                        (t0 * 3 as c_int + i) as usize,
+                        (t1 * 3 as c_int + i) as usize,
+                    );
                     i += 1;
                 }
-                let tri_info: STriInfo = pTriInfos[t0 as usize];
-                pTriInfos[t0 as usize] = pTriInfos[t1 as usize];
-                pTriInfos[t1 as usize] = tri_info;
+                pTriInfos.swap(t0 as usize, t1 as usize);
             } else {
                 // this is not supposed to happen
                 bStillFindingGoodOnes = false;
