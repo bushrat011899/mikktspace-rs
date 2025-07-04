@@ -124,39 +124,23 @@ impl PartialEq for SVec3 {
 }
 
 pub fn acos(x: c_double) -> c_double {
-    unsafe {
-        extern "C" {
-            fn acos(_: c_double) -> c_double;
-        }
-        acos(x)
-    }
+    extern crate std;
+    x.acos()
 }
 
 pub fn cos(x: c_double) -> c_double {
-    unsafe {
-        extern "C" {
-            fn cos(_: c_double) -> c_double;
-        }
-        cos(x)
-    }
+    extern crate std;
+    x.cos()
 }
 
 fn sqrtf(x: c_float) -> c_float {
-    unsafe {
-        extern "C" {
-            fn sqrtf(_: c_float) -> c_float;
-        }
-        sqrtf(x)
-    }
+    extern crate std;
+    x.sqrt()
 }
 
 pub fn fabsf(x: c_float) -> c_float {
-    unsafe {
-        extern "C" {
-            fn fabsf(_: c_float) -> c_float;
-        }
-        fabsf(x)
-    }
+    extern crate std;
+    x.abs()
 }
 
 pub fn not_zero(x: c_float) -> bool {

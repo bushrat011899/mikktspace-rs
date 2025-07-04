@@ -72,6 +72,8 @@
 //! sampling/exporting or by using the order-independent choice of diagonal for splitting quads suggested earlier.
 //! However, this must be used both by the sampler and your tools/rendering pipeline.
 
+#![forbid(unsafe_code)]
+
 #![no_std]
 
 extern crate alloc;
