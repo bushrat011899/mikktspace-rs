@@ -18,6 +18,12 @@ impl SVec3 {
     pub fn dot(self, rhs: Self) -> c_float {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
+
+    pub fn normalize_or_zero(&mut self) {
+        if not_zero(self.x) != 0 || not_zero(self.y) != 0 || not_zero(self.z) != 0 {
+            *self = (1 as c_int as c_float / length(*self)) * *self;
+        }
+    }
 }
 
 impl Add for SVec3 {
@@ -118,14 +124,6 @@ pub fn length(v: SVec3) -> c_float {
     sqrtf(length_squared(v))
 }
 
-pub fn normalize(v: SVec3) -> SVec3 {
-    (1 as c_int as c_float / length(v)) * v
-}
-
 pub fn not_zero(x: c_float) -> c_int {
     (fabsf(x) > FLT_MIN) as c_int
-}
-
-pub fn v_not_zero(v: SVec3) -> c_int {
-    (not_zero(v.x) != 0 || not_zero(v.y) != 0 || not_zero(v.z) != 0) as c_int
 }

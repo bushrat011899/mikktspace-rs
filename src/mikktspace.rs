@@ -183,12 +183,8 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
         ts_res.fMagT = 0.5f32 * ((*pTS0).fMagT + (*pTS1).fMagT);
         ts_res.vOs = (*pTS0).vOs + (*pTS1).vOs;
         ts_res.vOt = (*pTS0).vOt + (*pTS1).vOt;
-        if v_not_zero(ts_res.vOs) != 0 {
-            ts_res.vOs = normalize(ts_res.vOs);
-        }
-        if v_not_zero(ts_res.vOt) != 0 {
-            ts_res.vOt = normalize(ts_res.vOt);
-        }
+        ts_res.vOs.normalize_or_zero();
+        ts_res.vOt.normalize_or_zero();
     }
     ts_res
 }
@@ -1549,12 +1545,8 @@ unsafe extern "C" fn GenerateTSpaces(
                 - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
                 - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
-            if v_not_zero(vOs) != 0 {
-                vOs = normalize(vOs);
-            }
-            if v_not_zero(vOt) != 0 {
-                vOt = normalize(vOt);
-            }
+            vOs.normalize_or_zero();
+            vOt.normalize_or_zero();
             iOF_1 = (*pTriInfos.offset(f as isize)).iOrgFaceNumber;
             iMembers = 0 as libc::c_int;
             j = 0 as libc::c_int;
@@ -1565,12 +1557,8 @@ unsafe extern "C" fn GenerateTSpaces(
                     - ((n.dot((*pTriInfos.offset(t as isize)).vOs)) * n);
                 let mut vOt2: SVec3 = (*pTriInfos.offset(t as isize)).vOt
                     - ((n.dot((*pTriInfos.offset(t as isize)).vOt)) * n);
-                if v_not_zero(vOs2) != 0 {
-                    vOs2 = normalize(vOs2);
-                }
-                if v_not_zero(vOt2) != 0 {
-                    vOt2 = normalize(vOt2);
-                }
+                vOs2.normalize_or_zero();
+                vOt2.normalize_or_zero();
                 let bAny: tbool = if ((*pTriInfos.offset(f as isize)).iFlag
                     | (*pTriInfos.offset(t as isize)).iFlag)
                     & GROUP_WITH_ANY
@@ -1791,12 +1779,8 @@ unsafe extern "C" fn EvalTspace(
                 - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
             vOt = (*pTriInfos.offset(f as isize)).vOt
                 - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
-            if v_not_zero(vOs) != 0 {
-                vOs = normalize(vOs);
-            }
-            if v_not_zero(vOt) != 0 {
-                vOt = normalize(vOt);
-            }
+            vOs.normalize_or_zero();
+            vOt.normalize_or_zero();
             i2 = *piTriListIn.offset(
                 (3 as libc::c_int * f
                     + (if i < 2 as libc::c_int {
@@ -1820,13 +1804,9 @@ unsafe extern "C" fn EvalTspace(
             v1 = p0 - p1;
             v2 = p2 - p1;
             v1 = v1 - ((n.dot(v1)) * n);
-            if v_not_zero(v1) != 0 {
-                v1 = normalize(v1);
-            }
+            v1.normalize_or_zero();
             v2 = v2 - ((n.dot(v2)) * n);
-            if v_not_zero(v2) != 0 {
-                v2 = normalize(v2);
-            }
+            v2.normalize_or_zero();
             fCos = v1.dot(v2);
             fCos = if fCos > 1 as libc::c_int as libc::c_float {
                 1 as libc::c_int as libc::c_float
@@ -1846,12 +1826,8 @@ unsafe extern "C" fn EvalTspace(
         }
         face += 1;
     }
-    if v_not_zero(res.vOs) != 0 {
-        res.vOs = normalize(res.vOs);
-    }
-    if v_not_zero(res.vOt) != 0 {
-        res.vOt = normalize(res.vOt);
-    }
+    res.vOs.normalize_or_zero();
+    res.vOt.normalize_or_zero();
     if fAngleSum > 0 as libc::c_int as libc::c_float {
         res.fMagS /= fAngleSum;
         res.fMagT /= fAngleSum;
