@@ -106,18 +106,6 @@ impl Group {
     };
 }
 
-#[derive(Clone, PartialEq)]
-#[repr(C)]
-pub struct SubGroup {
-    pub triangle_members: Vec<c_int>,
-}
-
-impl SubGroup {
-    pub const ZERO: SubGroup = SubGroup {
-        triangle_members: Vec::new(),
-    };
-}
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct Edge {
@@ -1323,7 +1311,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
     // make initial allocations
     let mut sub_group_tangent_spaces: Vec<TangentSpace> =
         vec![TangentSpace::ZERO; faces_max_count as usize];
-    let mut unified_sub_groups: Vec<SubGroup> = vec![SubGroup::ZERO; faces_max_count as usize];
+    let mut unified_sub_groups: Vec<Vec<c_int>> = vec![Vec::new(); faces_max_count as usize];
     let mut g = 0 as c_int;
     while g < groups_active_count {
         let group = &groups[g as usize];
@@ -1334,7 +1322,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
         while i < group.face_indices.len() as c_int {
             // triangle number
             let f: c_int = (group.face_indices)[i as usize];
-            let mut tmp_group: SubGroup = SubGroup::ZERO;
+            let mut tmp_group = Vec::<c_int>::new();
             let index = if triangle_info_list[f as usize].assigned_group[0 as c_int as usize]
                 == Some(g as usize)
             {
@@ -1395,14 +1383,14 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
 
                 assert!(f != t || same_original_face, "sanity check");
                 if any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos {
-                    tmp_group.triangle_members.push(t);
+                    tmp_group.push(t);
                 }
 
                 j += 1;
             }
 
             // sort pTmpMembers
-            tmp_group.triangle_members.sort();
+            tmp_group.sort();
 
             // look for an existing match
             let mut found = false;
@@ -1420,16 +1408,15 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
             // if no match was found we allocate a new subgroup
             if !found {
                 // insert new subgroup
-                unified_sub_groups[unified_sub_groups_count as usize].triangle_members =
-                    tmp_group.triangle_members.clone();
                 sub_group_tangent_spaces[unified_sub_groups_count as usize] =
                     evaluate_tangent_space(
-                        &tmp_group.triangle_members,
+                        &tmp_group,
                         triangle_vertex_list,
                         triangle_info_list,
                         context,
                         group.vertex_representative,
                     );
+                unified_sub_groups[unified_sub_groups_count as usize] = tmp_group;
                 unified_sub_groups_count += 1;
             }
 
