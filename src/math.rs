@@ -1,3 +1,5 @@
+use core::ops::Add;
+
 use crate::libc::{c_double, c_int, c_float};
 
 pub const M_PI: c_double = 3.141_592_653_589_793;
@@ -10,6 +12,18 @@ pub struct SVec3 {
     pub x: c_float,
     pub y: c_float,
     pub z: c_float,
+}
+
+impl Add for SVec3 {
+    type Output = SVec3;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        SVec3 {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
+    }
 }
 
 pub fn acos(x: c_double) -> c_double {
@@ -50,14 +64,6 @@ pub fn fabsf(x: c_float) -> c_float {
 
 pub fn veq(v1: SVec3, v2: SVec3) -> c_int {
     (v1.x == v2.x && v1.y == v2.y && v1.z == v2.z) as c_int
-}
-
-pub fn vadd(v1: SVec3, v2: SVec3) -> SVec3 {
-    SVec3 {
-        x: v1.x + v2.x,
-        y: v1.y + v2.y,
-        z: v1.z + v2.z,
-    }
 }
 
 pub fn vsub(v1: SVec3, v2: SVec3) -> SVec3 {

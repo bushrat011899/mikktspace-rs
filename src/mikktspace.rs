@@ -181,8 +181,8 @@ unsafe extern "C" fn AvgTSpace(mut pTS0: *const STSpace, mut pTS1: *const STSpac
     } else {
         ts_res.fMagS = 0.5f32 * ((*pTS0).fMagS + (*pTS1).fMagS);
         ts_res.fMagT = 0.5f32 * ((*pTS0).fMagT + (*pTS1).fMagT);
-        ts_res.vOs = vadd((*pTS0).vOs, (*pTS1).vOs);
-        ts_res.vOt = vadd((*pTS0).vOt, (*pTS1).vOt);
+        ts_res.vOs = (*pTS0).vOs + (*pTS1).vOs;
+        ts_res.vOt = (*pTS0).vOt + (*pTS1).vOt;
         if v_not_zero(ts_res.vOs) != 0 {
             ts_res.vOs = normalize(ts_res.vOs);
         }
@@ -1163,7 +1163,7 @@ unsafe extern "C" fn InitTriInfo(
         let d2: SVec3 = vsub(v3, v1);
         let fSignedAreaSTx2: libc::c_float = t21x * t31y - t21y * t31x;
         let mut vOs: SVec3 = vsub(vscale(t31y, d1), vscale(t21y, d2));
-        let mut vOt: SVec3 = vadd(vscale(-t31x, d1), vscale(t21x, d2));
+        let mut vOt: SVec3 = vscale(-t31x, d1) + vscale(t21x, d2);
         (*pTriInfos.offset(f as isize)).iFlag |=
             if fSignedAreaSTx2 > 0 as libc::c_int as libc::c_float {
                 ORIENT_PRESERVING
@@ -1844,8 +1844,8 @@ unsafe extern "C" fn EvalTspace(
             fAngle = acos(fCos as libc::c_double) as libc::c_float;
             fMagS = (*pTriInfos.offset(f as isize)).fMagS;
             fMagT = (*pTriInfos.offset(f as isize)).fMagT;
-            res.vOs = vadd(res.vOs, vscale(fAngle, vOs));
-            res.vOt = vadd(res.vOt, vscale(fAngle, vOt));
+            res.vOs = res.vOs + vscale(fAngle, vOs);
+            res.vOt = res.vOt + vscale(fAngle, vOt);
             res.fMagS += fAngle * fMagS;
             res.fMagT += fAngle * fMagT;
             fAngleSum += fAngle;
@@ -1900,7 +1900,7 @@ unsafe extern "C" fn QuickSort(
     let mut iMid: libc::c_int = 0;
     let mut iTmp: libc::c_int = 0;
     let mut t: libc::c_uint = uSeed & 31 as libc::c_int as libc::c_uint;
-    t = uSeed << t | uSeed >> (32 as libc::c_int as libc::c_uint).wrapping_sub(t);
+    t = uSeed.wrapping_shl(t) | uSeed.wrapping_shr((32 as libc::c_int as libc::c_uint).wrapping_sub(t));
     uSeed = uSeed
         .wrapping_add(t)
         .wrapping_add(3 as libc::c_int as libc::c_uint);
