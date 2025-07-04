@@ -285,12 +285,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     // Additionally, move all good triangles to the start of
     // pTriInfos[] and piTriListIn[] without changing order and
     // put the degenerate triangles last.
-    DegenPrologue(
-        pTriInfos.as_mut_ptr(),
-        piTriListIn.as_mut_ptr(),
-        iNrTrianglesIn,
-        iTotTris,
-    );
+    DegenPrologue(&mut pTriInfos, &mut piTriListIn, iNrTrianglesIn, iTotTris);
 
     // evaluate triangle level attributes and neighbor list
     InitTriInfo(
@@ -340,6 +335,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     bRes = GenerateTSpaces(
         psTspace.as_mut_ptr(),
         pTriInfos.as_ptr(),
+        pTriInfos.len(),
         pGroups.as_ptr(),
         iNrActiveGroups,
         piTriListIn.as_ptr(),
@@ -1292,6 +1288,7 @@ unsafe fn AssignRecur(
 unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     mut psTspace: *mut STSpace,
     mut pTriInfos: *const STriInfo,
+    pTriInfosLen: usize,
     mut pGroups: *const SGroup,
     iNrActiveGroups: c_int,
     mut piTriListIn: *const c_int,
@@ -1422,8 +1419,8 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
                 pUniSubGroups[iUniqueSubGroups as usize].pTriMembers = tmp_group.pTriMembers.clone();
                 pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
                     &tmp_group.pTriMembers,
-                    piTriListIn,
-                    pTriInfos,
+                    core::slice::from_raw_parts(piTriListIn, 3 * pTriInfosLen),
+                    core::slice::from_raw_parts(pTriInfos, pTriInfosLen),
                     pContext,
                     (*pGroup).iVertexRepresentitive,
                 );
@@ -1462,10 +1459,10 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     true
 }
 
-unsafe fn EvalTspace<I: MikkTSpaceInterface>(
+fn EvalTspace<I: MikkTSpaceInterface>(
     mut face_indices: &[c_int],
-    mut piTriListIn: *const c_int,
-    mut pTriInfos: *const STriInfo,
+    mut piTriListIn: &[c_int],
+    mut pTriInfos: &[STriInfo],
     mut pContext: &I,
     iVertexRepresentitive: c_int,
 ) -> STSpace {
@@ -1494,7 +1491,7 @@ unsafe fn EvalTspace<I: MikkTSpaceInterface>(
         let f: c_int = face_indices[face as usize];
 
         // only valid triangles get to add their contribution
-        if (*pTriInfos.offset(f as isize)).iFlag & GROUP_WITH_ANY == 0 as c_int {
+        if pTriInfos[f as usize].iFlag & GROUP_WITH_ANY == 0 as c_int {
             let mut n: SVec3 = SVec3::ZERO;
             let mut vOs: SVec3 = SVec3::ZERO;
             let mut vOt: SVec3 = SVec3::ZERO;
@@ -1512,47 +1509,36 @@ unsafe fn EvalTspace<I: MikkTSpaceInterface>(
             let mut i0: c_int = -(1 as c_int);
             let mut i1: c_int = -(1 as c_int);
             let mut i2: c_int = -(1 as c_int);
-            if *piTriListIn.offset((3 as c_int * f + 0 as c_int) as isize) == iVertexRepresentitive
-            {
+            if piTriListIn[(3 as c_int * f + 0 as c_int) as usize] == iVertexRepresentitive {
                 i = 0 as c_int;
-            } else if *piTriListIn.offset((3 as c_int * f + 1 as c_int) as isize)
-                == iVertexRepresentitive
-            {
+            } else if piTriListIn[(3 as c_int * f + 1 as c_int) as usize] == iVertexRepresentitive {
                 i = 1 as c_int;
-            } else if *piTriListIn.offset((3 as c_int * f + 2 as c_int) as isize)
-                == iVertexRepresentitive
-            {
+            } else if piTriListIn[(3 as c_int * f + 2 as c_int) as usize] == iVertexRepresentitive {
                 i = 2 as c_int;
             }
             assert!(i >= 0 as c_int && i < 3 as c_int);
 
             // project
-            index = *piTriListIn.offset((3 as c_int * f + i) as isize);
+            index = piTriListIn[(3 as c_int * f + i) as usize];
             n = GetNormal(pContext, index);
-            vOs = (*pTriInfos.offset(f as isize)).vOs
-                - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
-            vOt = (*pTriInfos.offset(f as isize)).vOt
-                - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
+            vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
+            vOt = pTriInfos[f as usize].vOt - (n.dot(pTriInfos[f as usize].vOt) * n);
             vOs.normalize_or_zero();
             vOt.normalize_or_zero();
 
-            i2 = *piTriListIn.offset(
-                (3 as c_int * f
-                    + (if i < 2 as c_int {
-                        i + 1 as c_int
-                    } else {
-                        0 as c_int
-                    })) as isize,
-            );
-            i1 = *piTriListIn.offset((3 as c_int * f + i) as isize);
-            i0 = *piTriListIn.offset(
-                (3 as c_int * f
-                    + (if i > 0 as c_int {
-                        i - 1 as c_int
-                    } else {
-                        2 as c_int
-                    })) as isize,
-            );
+            i2 = piTriListIn[(3 as c_int * f
+                + (if i < 2 as c_int {
+                    i + 1 as c_int
+                } else {
+                    0 as c_int
+                })) as usize];
+            i1 = piTriListIn[(3 as c_int * f + i) as usize];
+            i0 = piTriListIn[(3 as c_int * f
+                + (if i > 0 as c_int {
+                    i - 1 as c_int
+                } else {
+                    2 as c_int
+                })) as usize];
 
             p0 = GetPosition(pContext, i0);
             p1 = GetPosition(pContext, i1);
@@ -1577,8 +1563,8 @@ unsafe fn EvalTspace<I: MikkTSpaceInterface>(
                 fCos
             };
             fAngle = acos(fCos as c_double) as c_float;
-            fMagS = (*pTriInfos.offset(f as isize)).fMagS;
-            fMagT = (*pTriInfos.offset(f as isize)).fMagT;
+            fMagS = pTriInfos[f as usize].fMagS;
+            fMagT = pTriInfos[f as usize].fMagT;
 
             res.vOs = res.vOs + (fAngle * vOs);
             res.vOt = res.vOt + (fAngle * vOt);
@@ -1739,66 +1725,6 @@ unsafe fn BuildNeighborsFast(
         i += 1;
     }
 }
-
-#[expect(dead_code)]
-unsafe fn BuildNeighborsSlow(
-    mut pTriInfos: *mut STriInfo,
-    mut piTriListIn: *const c_int,
-    iNrTrianglesIn: c_int,
-) {
-    let mut f: c_int = 0 as c_int;
-    let mut i: c_int = 0 as c_int;
-    f = 0 as c_int;
-    while f < iNrTrianglesIn {
-        i = 0 as c_int;
-        while i < 3 as c_int {
-            if (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] == -(1 as c_int) {
-                let i0_A: c_int = *piTriListIn.offset((f * 3 as c_int + i) as isize);
-                let i1_A: c_int = *piTriListIn.offset(
-                    (f * 3 as c_int
-                        + (if i < 2 as c_int {
-                            i + 1 as c_int
-                        } else {
-                            0 as c_int
-                        })) as isize,
-                );
-                let mut bFound: bool = false;
-                let mut t: c_int = 0 as c_int;
-                let mut j: c_int = 0 as c_int;
-                while !bFound && t < iNrTrianglesIn {
-                    if t != f {
-                        j = 0 as c_int;
-                        while !bFound && j < 3 as c_int {
-                            let i1_B: c_int = *piTriListIn.offset((t * 3 as c_int + j) as isize);
-                            let i0_B: c_int = *piTriListIn.offset(
-                                (t * 3 as c_int
-                                    + (if j < 2 as c_int {
-                                        j + 1 as c_int
-                                    } else {
-                                        0 as c_int
-                                    })) as isize,
-                            );
-                            if i0_A == i0_B && i1_A == i1_B {
-                                bFound = true;
-                            } else {
-                                j += 1;
-                            }
-                        }
-                    }
-                    if !bFound {
-                        t += 1;
-                    }
-                }
-                if bFound {
-                    (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] = t;
-                    (*pTriInfos.offset(t as isize)).FaceNeighbors[j as usize] = f;
-                }
-            }
-            i += 1;
-        }
-        f += 1;
-    }
-}
 fn QuickSortEdges(
     mut pSortBuffer: &mut [SEdge],
     mut iLeft: c_int,
@@ -1874,9 +1800,9 @@ fn get_edge(indices: &[c_int], i0: c_int, i1: c_int) -> Option<(c_int, c_int, c_
         .map(|(edgenum, (a, b))| (edgenum as c_int, a as c_int, b as c_int))
 }
 
-unsafe fn DegenPrologue(
-    mut pTriInfos: *mut STriInfo,
-    mut piTriList_out: *mut c_int,
+fn DegenPrologue(
+    mut pTriInfos: &mut [STriInfo],
+    mut piTriList_out: &mut [c_int],
     iNrTrianglesIn: c_int,
     iTotTris: c_int,
 ) {
@@ -1886,18 +1812,16 @@ unsafe fn DegenPrologue(
     // locate quads with only one good triangle
     let mut t: c_int = 0 as c_int;
     while t < iTotTris - 1 as c_int {
-        let iFO_a: c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
-        let iFO_b: c_int = (*pTriInfos.offset((t + 1 as c_int) as isize)).iOrgFaceNumber;
+        let iFO_a: c_int = pTriInfos[t as usize].iOrgFaceNumber;
+        let iFO_b: c_int = pTriInfos[(t + 1 as c_int) as usize].iOrgFaceNumber;
         if iFO_a == iFO_b {
             // this is a quad
-            let bIsDeg_a: bool =
-                (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
-            let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE
-                != 0 as c_int;
+            let bIsDeg_a: bool = pTriInfos[t as usize].iFlag & MARK_DEGENERATE != 0 as c_int;
+            let bIsDeg_b: bool =
+                pTriInfos[(t + 1 as c_int) as usize].iFlag & MARK_DEGENERATE != 0 as c_int;
             if bIsDeg_a ^ bIsDeg_b {
-                (*pTriInfos.offset(t as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
-                (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag |= QUAD_ONE_DEGEN_TRI;
+                pTriInfos[t as usize].iFlag |= QUAD_ONE_DEGEN_TRI;
+                pTriInfos[(t + 1 as c_int) as usize].iFlag |= QUAD_ONE_DEGEN_TRI;
             }
             t += 2 as c_int;
         } else {
@@ -1911,7 +1835,7 @@ unsafe fn DegenPrologue(
     t = 0 as c_int;
     bStillFindingGoodOnes = true;
     while t < iNrTrianglesIn && bStillFindingGoodOnes {
-        let bIsGood: bool = (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE == 0 as c_int;
+        let bIsGood: bool = pTriInfos[t as usize].iFlag & MARK_DEGENERATE == 0 as c_int;
         if bIsGood {
             if iNextGoodTriangleSearchIndex < t + 2 as c_int {
                 iNextGoodTriangleSearchIndex = t + 2 as c_int;
@@ -1922,8 +1846,7 @@ unsafe fn DegenPrologue(
             // search for the first good triangle.
             let mut bJustADegenerate: bool = true;
             while bJustADegenerate && iNextGoodTriangleSearchIndex < iTotTris {
-                let bIsGood_0: bool = (*pTriInfos.offset(iNextGoodTriangleSearchIndex as isize))
-                    .iFlag
+                let bIsGood_0: bool = pTriInfos[iNextGoodTriangleSearchIndex as usize].iFlag
                     & MARK_DEGENERATE
                     == 0 as c_int;
                 if bIsGood_0 {
@@ -1943,15 +1866,15 @@ unsafe fn DegenPrologue(
                 let mut i: c_int = 0 as c_int;
                 i = 0 as c_int;
                 while i < 3 as c_int {
-                    let index: c_int = *piTriList_out.offset((t0 * 3 as c_int + i) as isize);
-                    *piTriList_out.offset((t0 * 3 as c_int + i) as isize) =
-                        *piTriList_out.offset((t1 * 3 as c_int + i) as isize);
-                    *piTriList_out.offset((t1 * 3 as c_int + i) as isize) = index;
+                    let index: c_int = piTriList_out[(t0 * 3 as c_int + i) as usize];
+                    piTriList_out[(t0 * 3 as c_int + i) as usize] =
+                        piTriList_out[(t1 * 3 as c_int + i) as usize];
+                    piTriList_out[(t1 * 3 as c_int + i) as usize] = index;
                     i += 1;
                 }
-                let tri_info: STriInfo = *pTriInfos.offset(t0 as isize);
-                *pTriInfos.offset(t0 as isize) = *pTriInfos.offset(t1 as isize);
-                *pTriInfos.offset(t1 as isize) = tri_info;
+                let tri_info: STriInfo = pTriInfos[t0 as usize];
+                pTriInfos[t0 as usize] = pTriInfos[t1 as usize];
+                pTriInfos[t1 as usize] = tri_info;
             } else {
                 // this is not supposed to happen
                 bStillFindingGoodOnes = false;
