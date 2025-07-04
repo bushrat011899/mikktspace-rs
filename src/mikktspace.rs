@@ -319,12 +319,11 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     // based on fAngularThreshold. Finally a tangent space is made for
     // every resulting subgroup
     bRes = GenerateTSpaces(
-        psTspace.as_mut_ptr(),
-        pTriInfos.as_ptr(),
-        pTriInfos.len(),
-        pGroups.as_ptr(),
+        &mut psTspace,
+        &pTriInfos,
+        &pGroups,
         iNrActiveGroups,
-        piTriListIn.as_ptr(),
+        &piTriListIn,
         fThresCos,
         pContext,
     );
@@ -1244,13 +1243,12 @@ fn AssignRecur(
     true
 }
 
-unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
-    mut psTspace: *mut STSpace,
-    mut pTriInfos: *const STriInfo,
-    pTriInfosLen: usize,
-    mut pGroups: *const SGroup,
+fn GenerateTSpaces<I: MikkTSpaceInterface>(
+    mut psTspace: &mut [STSpace],
+    mut pTriInfos: &[STriInfo],
+    mut pGroups: &[SGroup],
     iNrActiveGroups: c_int,
-    mut piTriListIn: *const c_int,
+    mut piTriListIn: &[c_int],
     fThresCos: c_float,
     mut pContext: &I,
 ) -> bool {
@@ -1259,8 +1257,8 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     let mut i: c_int = 0 as c_int;
     g = 0 as c_int;
     while g < iNrActiveGroups {
-        if iMaxNrFaces < (*pGroups.offset(g as isize)).pFaceIndices.len() as c_int {
-            iMaxNrFaces = (*pGroups.offset(g as isize)).pFaceIndices.len() as c_int;
+        if iMaxNrFaces < pGroups[g as usize].pFaceIndices.len() as c_int {
+            iMaxNrFaces = pGroups[g as usize].pFaceIndices.len() as c_int;
         }
         g += 1;
     }
@@ -1274,7 +1272,7 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
     let mut pUniSubGroups: Vec<SSubGroup> = vec![SSubGroup::ZERO; iMaxNrFaces as usize];
     g = 0 as c_int;
     while g < iNrActiveGroups {
-        let mut pGroup: *const SGroup = &*pGroups.offset(g as isize) as *const SGroup;
+        let mut pGroup = &pGroups[g as usize];
         let mut iUniqueSubGroups: c_int = 0 as c_int;
 
         // triangles
@@ -1292,54 +1290,45 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
             let mut n: SVec3 = SVec3::ZERO;
             let mut vOs: SVec3 = SVec3::ZERO;
             let mut vOt: SVec3 = SVec3::ZERO;
-            if (*pTriInfos.offset(f as isize)).AssignedGroup[0 as c_int as usize]
-                == Some(g as usize)
-            {
+            if pTriInfos[f as usize].AssignedGroup[0 as c_int as usize] == Some(g as usize) {
                 index = 0 as c_int;
-            } else if (*pTriInfos.offset(f as isize)).AssignedGroup[1 as c_int as usize]
-                == Some(g as usize)
-            {
+            } else if pTriInfos[f as usize].AssignedGroup[1 as c_int as usize] == Some(g as usize) {
                 index = 1 as c_int;
-            } else if (*pTriInfos.offset(f as isize)).AssignedGroup[2 as c_int as usize]
-                == Some(g as usize)
-            {
+            } else if pTriInfos[f as usize].AssignedGroup[2 as c_int as usize] == Some(g as usize) {
                 index = 2 as c_int;
             }
             assert!(index >= 0 as c_int && index < 3 as c_int);
 
-            iVertIndex = *piTriListIn.offset((f * 3 as c_int + index) as isize);
+            iVertIndex = piTriListIn[(f * 3 as c_int + index) as usize];
             assert!(iVertIndex == (*pGroup).iVertexRepresentitive);
 
             // is normalized already
             n = GetNormal(pContext, iVertIndex);
 
             // project
-            vOs = (*pTriInfos.offset(f as isize)).vOs
-                - ((n.dot((*pTriInfos.offset(f as isize)).vOs)) * n);
-            vOt = (*pTriInfos.offset(f as isize)).vOt
-                - ((n.dot((*pTriInfos.offset(f as isize)).vOt)) * n);
+            vOs = pTriInfos[f as usize].vOs - ((n.dot(pTriInfos[f as usize].vOs)) * n);
+            vOt = pTriInfos[f as usize].vOt - ((n.dot(pTriInfos[f as usize].vOt)) * n);
             vOs.normalize_or_zero();
             vOt.normalize_or_zero();
 
             // original face number
-            iOF_1 = (*pTriInfos.offset(f as isize)).iOrgFaceNumber;
+            iOF_1 = pTriInfos[f as usize].iOrgFaceNumber;
 
             j = 0 as c_int;
             while j < (*pGroup).pFaceIndices.len() as c_int {
                 // triangle number
                 let t: c_int = ((*pGroup).pFaceIndices)[j as usize];
-                let iOF_2: c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
+                let iOF_2: c_int = pTriInfos[t as usize].iOrgFaceNumber;
 
                 // project
-                let mut vOs2: SVec3 = (*pTriInfos.offset(t as isize)).vOs
-                    - ((n.dot((*pTriInfos.offset(t as isize)).vOs)) * n);
-                let mut vOt2: SVec3 = (*pTriInfos.offset(t as isize)).vOt
-                    - ((n.dot((*pTriInfos.offset(t as isize)).vOt)) * n);
+                let mut vOs2: SVec3 =
+                    pTriInfos[t as usize].vOs - ((n.dot(pTriInfos[t as usize].vOs)) * n);
+                let mut vOt2: SVec3 =
+                    pTriInfos[t as usize].vOt - ((n.dot(pTriInfos[t as usize].vOt)) * n);
                 vOs2.normalize_or_zero();
                 vOt2.normalize_or_zero();
 
-                let bAny: bool = ((*pTriInfos.offset(f as isize)).iFlag
-                    | (*pTriInfos.offset(t as isize)).iFlag)
+                let bAny: bool = (pTriInfos[f as usize].iFlag | pTriInfos[t as usize].iFlag)
                     & GROUP_WITH_ANY
                     != 0 as c_int;
                 // make sure triangles which belong to the same quad are joined.
@@ -1378,8 +1367,8 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
                 pUniSubGroups[iUniqueSubGroups as usize].pTriMembers = tmp_group.pTriMembers.clone();
                 pSubGroupTspace[iUniqueSubGroups as usize] = EvalTspace(
                     &tmp_group.pTriMembers,
-                    core::slice::from_raw_parts(piTriListIn, 3 * pTriInfosLen),
-                    core::slice::from_raw_parts(pTriInfos, pTriInfosLen),
+                    piTriListIn,
+                    pTriInfos,
                     pContext,
                     (*pGroup).iVertexRepresentitive,
                 );
@@ -1387,13 +1376,12 @@ unsafe fn GenerateTSpaces<I: MikkTSpaceInterface>(
             }
 
             // output tspace
-            let iOffs: c_int = (*pTriInfos.offset(f as isize)).iTSpacesOffs;
-            let iVert: c_int = (*pTriInfos.offset(f as isize)).vert_num[index as usize] as c_int;
-            let mut pTS_out: *mut STSpace =
-                &mut *psTspace.offset((iOffs + iVert) as isize) as *mut STSpace;
+            let iOffs: c_int = pTriInfos[f as usize].iTSpacesOffs;
+            let iVert: c_int = pTriInfos[f as usize].vert_num[index as usize] as c_int;
+            let mut pTS_out = &mut psTspace[(iOffs + iVert) as usize];
             assert!((*pTS_out).iCounter < 2 as c_int);
             assert!(
-                ((*pTriInfos.offset(f as isize)).iFlag & 8 as c_int != 0 as c_int)
+                (pTriInfos[f as usize].iFlag & 8 as c_int != 0 as c_int)
                     == (*pGroup).bOrientPreservering
             );
             if (*pTS_out).iCounter == 1 as c_int {
