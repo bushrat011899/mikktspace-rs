@@ -139,8 +139,11 @@ fn sqrtf(x: c_float) -> c_float {
 }
 
 pub fn fabsf(x: c_float) -> c_float {
-    extern crate std;
-    x.abs()
+    if x.is_sign_negative() {
+        -x
+    } else {
+        x
+    }
 }
 
 pub fn not_zero(x: c_float) -> bool {
