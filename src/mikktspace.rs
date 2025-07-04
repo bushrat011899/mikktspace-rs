@@ -1671,6 +1671,11 @@ fn BuildNeighborsFast(
         i += 1;
     }
 }
+/// Note that this method _should_ be able to be replaced with `[T]::sort` and an
+/// appropriate implementation of [`Ord`] for [`SEdge`].
+/// However, in initial testing this caused incorrect results, indicating this sort
+/// may not be implemented correctly.
+/// Further testing is required.
 fn QuickSortEdges(
     mut pSortBuffer: &mut [SEdge],
     mut iLeft: c_int,
