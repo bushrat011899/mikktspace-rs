@@ -298,12 +298,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     // based on the 4 rules, identify groups based on connectivity
     iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
     let mut pGroups: Vec<SGroup> = vec![SGroup::ZERO; iNrMaxGroups as usize];
-    iNrActiveGroups = Build4RuleGroups(
-        pTriInfos.as_mut_ptr(),
-        pGroups.as_mut_ptr(),
-        piTriListIn.as_ptr(),
-        iNrTrianglesIn,
-    );
+    iNrActiveGroups = Build4RuleGroups(&mut pTriInfos, &mut pGroups, &piTriListIn, iNrTrianglesIn);
 
     let mut psTspace: Vec<STSpace> = vec![STSpace::ZERO; iNrTSPaces as usize];
     t = 0 as c_int;
@@ -1123,10 +1118,10 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
     );
 }
 
-unsafe fn Build4RuleGroups(
-    mut pTriInfos: *mut STriInfo,
-    mut pGroups: *mut SGroup,
-    mut piTriListIn: *const c_int,
+fn Build4RuleGroups(
+    mut pTriInfos: &mut [STriInfo],
+    mut pGroups: &mut [SGroup],
+    mut piTriListIn: &[c_int],
     iNrTrianglesIn: c_int,
 ) -> c_int {
     let iNrMaxGroups: c_int = iNrTrianglesIn * 3 as c_int;
@@ -1139,59 +1134,47 @@ unsafe fn Build4RuleGroups(
         i = 0 as c_int;
         while i < 3 as c_int {
             // if not assigned to a group
-            if (*pTriInfos.offset(f as isize)).iFlag & GROUP_WITH_ANY == 0 as c_int
-                && ((*pTriInfos.offset(f as isize)).AssignedGroup[i as usize]).is_none()
+            if pTriInfos[f as usize].iFlag & GROUP_WITH_ANY == 0 as c_int
+                && pTriInfos[f as usize].AssignedGroup[i as usize].is_none()
             {
                 let mut bOrPre: bool = false;
                 let mut neigh_indexL: c_int = 0;
                 let mut neigh_indexR: c_int = 0;
-                let vert_index: c_int = *piTriListIn.offset((f * 3 as c_int + i) as isize);
+                let vert_index: c_int = piTriListIn[(f * 3 as c_int + i) as usize];
                 assert!(iNrActiveGroups < iNrMaxGroups);
-                (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize] =
-                    Some(iNrActiveGroups as usize);
-                let mut this_group = &mut *pGroups.offset(iNrActiveGroups as isize);
+                pTriInfos[f as usize].AssignedGroup[i as usize] = Some(iNrActiveGroups as usize);
+                let mut this_group = &mut pGroups[iNrActiveGroups as usize];
                 this_group.id = iNrActiveGroups as usize;
                 this_group.iVertexRepresentitive = vert_index;
                 this_group.bOrientPreservering =
-                    (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
+                    pTriInfos[f as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
                 this_group.pFaceIndices = Vec::new();
                 iNrActiveGroups += 1;
 
                 AddTriToGroup(this_group, f);
-                bOrPre = (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
-                neigh_indexL = (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize];
-                neigh_indexR = (*pTriInfos.offset(f as isize)).FaceNeighbors[(if i > 0 as c_int {
+                bOrPre = pTriInfos[f as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
+                neigh_indexL = pTriInfos[f as usize].FaceNeighbors[i as usize];
+                neigh_indexR = pTriInfos[f as usize].FaceNeighbors[(if i > 0 as c_int {
                     i - 1 as c_int
                 } else {
                     2 as c_int
-                })
-                    as usize];
+                }) as usize];
 
                 if neigh_indexL >= 0 as c_int {
                     // neighbor
-                    let bAnswer: bool = AssignRecur(
-                        core::slice::from_raw_parts(piTriListIn, iNrMaxGroups as usize),
-                        core::slice::from_raw_parts_mut(pTriInfos, iNrTrianglesIn as usize),
-                        neigh_indexL,
-                        this_group,
-                    );
-                    let bOrPre2: bool = (*pTriInfos.offset(neigh_indexL as isize)).iFlag
-                        & ORIENT_PRESERVING
-                        != 0 as c_int;
+                    let bAnswer: bool =
+                        AssignRecur(piTriListIn, pTriInfos, neigh_indexL, this_group);
+                    let bOrPre2: bool =
+                        pTriInfos[neigh_indexL as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
                     let bDiff: bool = bOrPre != bOrPre2;
                     assert!(bAnswer || bDiff);
                 }
                 if neigh_indexR >= 0 as c_int {
                     // neighbor
-                    let bAnswer_0: bool = AssignRecur(
-                        core::slice::from_raw_parts(piTriListIn, iNrMaxGroups as usize),
-                        core::slice::from_raw_parts_mut(pTriInfos, iNrTrianglesIn as usize),
-                        neigh_indexR,
-                        this_group,
-                    );
-                    let bOrPre2_0: bool = (*pTriInfos.offset(neigh_indexR as isize)).iFlag
-                        & ORIENT_PRESERVING
-                        != 0 as c_int;
+                    let bAnswer_0: bool =
+                        AssignRecur(piTriListIn, pTriInfos, neigh_indexR, this_group);
+                    let bOrPre2_0: bool =
+                        pTriInfos[neigh_indexR as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
                     let bDiff_0: bool = bOrPre != bOrPre2_0;
                     assert!(bAnswer_0 || bDiff_0);
                 }
