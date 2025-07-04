@@ -287,12 +287,7 @@ pub unsafe fn genTangSpace<I: MikkTSpaceInterface>(
     DegenPrologue(&mut pTriInfos, &mut piTriListIn, iNrTrianglesIn, iTotTris);
 
     // evaluate triangle level attributes and neighbor list
-    InitTriInfo(
-        pTriInfos.as_mut_ptr(),
-        piTriListIn.as_ptr(),
-        pContext,
-        iNrTrianglesIn,
-    );
+    InitTriInfo(&mut pTriInfos, &piTriListIn, pContext, iNrTrianglesIn);
 
     // based on the 4 rules, identify groups based on connectivity
     iNrMaxGroups = iNrTrianglesIn * 3 as c_int;
@@ -914,9 +909,9 @@ fn CalcTexArea<I: MikkTSpaceInterface>(mut pContext: &I, mut indices: &[c_int]) 
     }
 }
 
-unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
-    mut pTriInfos: *mut STriInfo,
-    mut piTriListIn: *const c_int,
+fn InitTriInfo<I: MikkTSpaceInterface>(
+    mut pTriInfos: &mut [STriInfo],
+    mut piTriListIn: &[c_int],
     mut pContext: &I,
     iNrTrianglesIn: c_int,
 ) {
@@ -930,20 +925,20 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
     while f < iNrTrianglesIn {
         i = 0 as c_int;
         while i < 3 as c_int {
-            (*pTriInfos.offset(f as isize)).FaceNeighbors[i as usize] = -(1 as c_int);
-            let fresh2 = &mut (*pTriInfos.offset(f as isize)).AssignedGroup[i as usize];
+            pTriInfos[f as usize].FaceNeighbors[i as usize] = -(1 as c_int);
+            let fresh2 = &mut pTriInfos[f as usize].AssignedGroup[i as usize];
             *fresh2 = None;
-            (*pTriInfos.offset(f as isize)).vOs.x = 0.0f32;
-            (*pTriInfos.offset(f as isize)).vOs.y = 0.0f32;
-            (*pTriInfos.offset(f as isize)).vOs.z = 0.0f32;
-            (*pTriInfos.offset(f as isize)).vOt.x = 0.0f32;
-            (*pTriInfos.offset(f as isize)).vOt.y = 0.0f32;
-            (*pTriInfos.offset(f as isize)).vOt.z = 0.0f32;
-            (*pTriInfos.offset(f as isize)).fMagS = 0 as c_int as c_float;
-            (*pTriInfos.offset(f as isize)).fMagT = 0 as c_int as c_float;
+            pTriInfos[f as usize].vOs.x = 0.0f32;
+            pTriInfos[f as usize].vOs.y = 0.0f32;
+            pTriInfos[f as usize].vOs.z = 0.0f32;
+            pTriInfos[f as usize].vOt.x = 0.0f32;
+            pTriInfos[f as usize].vOt.y = 0.0f32;
+            pTriInfos[f as usize].vOt.z = 0.0f32;
+            pTriInfos[f as usize].fMagS = 0 as c_int as c_float;
+            pTriInfos[f as usize].fMagT = 0 as c_int as c_float;
 
             // assumed bad
-            (*pTriInfos.offset(f as isize)).iFlag |= GROUP_WITH_ANY;
+            pTriInfos[f as usize].iFlag |= GROUP_WITH_ANY;
 
             i += 1;
         }
@@ -956,27 +951,27 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
         // initial values
         let v1: SVec3 = GetPosition(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 0 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 0 as c_int) as usize],
         );
         let v2: SVec3 = GetPosition(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 1 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 1 as c_int) as usize],
         );
         let v3: SVec3 = GetPosition(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 2 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 2 as c_int) as usize],
         );
         let t1: SVec3 = GetTexCoord(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 0 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 0 as c_int) as usize],
         );
         let t2: SVec3 = GetTexCoord(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 1 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 1 as c_int) as usize],
         );
         let t3: SVec3 = GetTexCoord(
             pContext,
-            *piTriListIn.offset((f * 3 as c_int + 2 as c_int) as isize),
+            piTriListIn[(f * 3 as c_int + 2 as c_int) as usize],
         );
 
         let t21x: c_float = t2.x - t1.x;
@@ -989,7 +984,7 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
         let mut vOs: SVec3 = (t31y * d1) - (t21y * d2); // eq 18
         let mut vOt: SVec3 = (-t31x * d1) + (t21x * d2); // eq 19
 
-        (*pTriInfos.offset(f as isize)).iFlag |= if fSignedAreaSTx2 > 0 as c_int as c_float {
+        pTriInfos[f as usize].iFlag |= if fSignedAreaSTx2 > 0 as c_int as c_float {
             ORIENT_PRESERVING
         } else {
             0 as c_int
@@ -999,28 +994,25 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
             let fAbsArea: c_float = fabsf(fSignedAreaSTx2);
             let fLenOs: c_float = vOs.length();
             let fLenOt: c_float = vOt.length();
-            let fS: c_float =
-                if (*pTriInfos.offset(f as isize)).iFlag & ORIENT_PRESERVING == 0 as c_int {
-                    -1.0f32
-                } else {
-                    1.0f32
-                };
+            let fS: c_float = if pTriInfos[f as usize].iFlag & ORIENT_PRESERVING == 0 as c_int {
+                -1.0f32
+            } else {
+                1.0f32
+            };
             if not_zero(fLenOs) {
-                (*pTriInfos.offset(f as isize)).vOs = (fS / fLenOs) * vOs;
+                pTriInfos[f as usize].vOs = (fS / fLenOs) * vOs;
             }
             if not_zero(fLenOt) {
-                (*pTriInfos.offset(f as isize)).vOt = (fS / fLenOt) * vOt;
+                pTriInfos[f as usize].vOt = (fS / fLenOt) * vOt;
             }
 
             // evaluate magnitudes prior to normalization of vOs and vOt
-            (*pTriInfos.offset(f as isize)).fMagS = fLenOs / fAbsArea;
-            (*pTriInfos.offset(f as isize)).fMagT = fLenOt / fAbsArea;
+            pTriInfos[f as usize].fMagS = fLenOs / fAbsArea;
+            pTriInfos[f as usize].fMagT = fLenOt / fAbsArea;
 
             // if this is a good triangle
-            if not_zero((*pTriInfos.offset(f as isize)).fMagS)
-                && not_zero((*pTriInfos.offset(f as isize)).fMagT)
-            {
-                (*pTriInfos.offset(f as isize)).iFlag &= !GROUP_WITH_ANY;
+            if not_zero(pTriInfos[f as usize].fMagS) && not_zero(pTriInfos[f as usize].fMagT) {
+                pTriInfos[f as usize].iFlag &= !GROUP_WITH_ANY;
             }
         }
         f += 1;
@@ -1028,46 +1020,41 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
 
     // force otherwise healthy quads to a fixed orientation
     while t < iNrTrianglesIn - 1 as c_int {
-        let iFO_a: c_int = (*pTriInfos.offset(t as isize)).iOrgFaceNumber;
-        let iFO_b: c_int = (*pTriInfos.offset((t + 1 as c_int) as isize)).iOrgFaceNumber;
+        let iFO_a: c_int = pTriInfos[t as usize].iOrgFaceNumber;
+        let iFO_b: c_int = pTriInfos[(t + 1 as c_int) as usize].iOrgFaceNumber;
         if iFO_a == iFO_b {
             // this is a quad
-            let bIsDeg_a: bool =
-                (*pTriInfos.offset(t as isize)).iFlag & MARK_DEGENERATE != 0 as c_int;
-            let bIsDeg_b: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                & MARK_DEGENERATE
-                != 0 as c_int;
+            let bIsDeg_a: bool = pTriInfos[t as usize].iFlag & MARK_DEGENERATE != 0 as c_int;
+            let bIsDeg_b: bool =
+                pTriInfos[(t + 1 as c_int) as usize].iFlag & MARK_DEGENERATE != 0 as c_int;
 
             // bad triangles should already have been removed by
             // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
             if !(bIsDeg_a || bIsDeg_b) {
-                let bOrientA: bool =
-                    (*pTriInfos.offset(t as isize)).iFlag & ORIENT_PRESERVING != 0 as c_int;
-                let bOrientB: bool = (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag
-                    & ORIENT_PRESERVING
-                    != 0 as c_int;
+                let bOrientA: bool = pTriInfos[t as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
+                let bOrientB: bool =
+                    pTriInfos[(t + 1 as c_int) as usize].iFlag & ORIENT_PRESERVING != 0 as c_int;
 
                 // if this happens the quad has extremely bad mapping!!
                 if bOrientA != bOrientB {
                     let mut bChooseOrientFirstTri: bool = false;
                     #[expect(clippy::if_same_then_else)]
-                    if (*pTriInfos.offset((t + 1 as c_int) as isize)).iFlag & GROUP_WITH_ANY
-                        != 0 as c_int
-                    {
+                    if pTriInfos[(t + 1 as c_int) as usize].iFlag & GROUP_WITH_ANY != 0 as c_int {
                         bChooseOrientFirstTri = true;
                     } else if CalcTexArea(
                         pContext,
-                        core::slice::from_raw_parts(
-                            piTriListIn.offset((t * 3 as c_int + 0 as c_int) as isize),
-                            3,
-                        ),
+                        &piTriListIn[{
+                            let a = (t * 3 as c_int + 0 as c_int) as usize;
+                            let b = a + 3;
+                            a..b
+                        }],
                     ) >= CalcTexArea(
                         pContext,
-                        core::slice::from_raw_parts(
-                            piTriListIn
-                                .offset(((t + 1 as c_int) * 3 as c_int + 0 as c_int) as isize),
-                            3,
-                        ),
+                        &piTriListIn[{
+                            let a = ((t + 1 as c_int) * 3 as c_int + 0 as c_int) as usize;
+                            let b = a + 3;
+                            a..b
+                        }],
                     ) {
                         bChooseOrientFirstTri = true;
                     }
@@ -1085,10 +1072,10 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
                     };
 
                     // clear first
-                    (*pTriInfos.offset(t1_0 as isize)).iFlag &= !ORIENT_PRESERVING;
+                    pTriInfos[t1_0 as usize].iFlag &= !ORIENT_PRESERVING;
                     // copy bit
-                    (*pTriInfos.offset(t1_0 as isize)).iFlag |=
-                        (*pTriInfos.offset(t0 as isize)).iFlag & ORIENT_PRESERVING;
+                    pTriInfos[t1_0 as usize].iFlag |=
+                        pTriInfos[t0 as usize].iFlag & ORIENT_PRESERVING;
                 }
             }
             t += 2 as c_int;
@@ -1107,9 +1094,9 @@ unsafe fn InitTriInfo<I: MikkTSpaceInterface>(
     let vert_count = pEdges.len();
     let face_count = vert_count / 3;
     BuildNeighborsFast(
-        core::slice::from_raw_parts_mut(pTriInfos, face_count),
+        &mut pTriInfos[..face_count],
         &mut pEdges,
-        core::slice::from_raw_parts(piTriListIn, vert_count),
+        &piTriListIn[..vert_count],
         iNrTrianglesIn,
     );
 }
