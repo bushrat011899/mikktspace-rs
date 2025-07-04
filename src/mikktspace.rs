@@ -18,7 +18,7 @@
  *  3. This notice may not be removed or altered from any source distribution.
  */
 
-#![expect(non_snake_case, non_upper_case_globals)]
+#![expect(non_snake_case)]
 
 use alloc::{vec, vec::Vec};
 use core::{
@@ -383,23 +383,23 @@ pub fn genTangSpace<I: MikkTSpaceInterface>(pContext: &mut I, fAngularThreshold:
     true
 }
 
-const g_iCells: c_int = 2048 as c_int;
+const CELLS: c_int = 2048 as c_int;
 
 // it is IMPORTANT that this function is called to evaluate the hash since
 // inlining could potentially reorder instructions and generate different
 // results for the same effective input value fVal.
 #[inline(never)]
 fn FindGridCell(fMin: c_float, fMax: c_float, fVal: c_float) -> c_int {
-    let fIndex: c_float = g_iCells as c_float * ((fVal - fMin) / (fMax - fMin));
+    let fIndex: c_float = CELLS as c_float * ((fVal - fMin) / (fMax - fMin));
     let iIndex: c_int = fIndex as c_int;
-    if iIndex < g_iCells {
+    if iIndex < CELLS {
         if iIndex >= 0 as c_int {
             iIndex
         } else {
             0 as c_int
         }
     } else {
-        g_iCells - 1 as c_int
+        CELLS - 1 as c_int
     }
 }
 
@@ -453,9 +453,9 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
 
     // make allocations
     let mut piHashTable: Vec<c_int> = vec![0; (iNrTrianglesIn as c_ulong).wrapping_mul(3) as usize];
-    let mut piHashCount: Vec<c_int> = vec![0; g_iCells as usize];
-    let mut piHashOffsets: Vec<c_int> = vec![0; g_iCells as usize];
-    let mut piHashCount2: Vec<c_int> = vec![0; g_iCells as usize];
+    let mut piHashCount: Vec<c_int> = vec![0; CELLS as usize];
+    let mut piHashOffsets: Vec<c_int> = vec![0; CELLS as usize];
+    let mut piHashCount2: Vec<c_int> = vec![0; CELLS as usize];
 
     // count amount of elements in each cell unit
     i = 0 as c_int;
@@ -478,7 +478,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     // evaluate start index of each cell.
     piHashOffsets[0 as c_int as usize] = 0 as c_int;
     let mut k = 1 as c_int;
-    while k < g_iCells {
+    while k < CELLS {
         piHashOffsets[k as usize] =
             piHashOffsets[(k - 1 as c_int) as usize] + piHashCount[(k - 1 as c_int) as usize];
         k += 1;
@@ -508,7 +508,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
 
     // verify the count
     k = 0 as c_int;
-    while k < g_iCells {
+    while k < CELLS {
         assert!(piHashCount2[k as usize] == piHashCount[k as usize]);
         k += 1;
     }
@@ -516,7 +516,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     // find maximum amount of entries in any hash entry
     let mut iMaxCount = piHashCount[0 as c_int as usize];
     k = 1 as c_int;
-    while k < g_iCells {
+    while k < CELLS {
         if iMaxCount < piHashCount[k as usize] {
             iMaxCount = piHashCount[k as usize];
         }
@@ -526,7 +526,7 @@ fn GenerateSharedVerticesIndexList<I: MikkTSpaceInterface>(
     // complete the merge
     let mut pTmpVert: Vec<STmpVert> = vec![STmpVert::ZERO; iMaxCount as usize];
     k = 0 as c_int;
-    while k < g_iCells {
+    while k < CELLS {
         let iEntries: c_int = piHashCount[k as usize];
         if iEntries >= 2 as c_int {
             // if /* couldn't allocate pTmpVert? */ {
