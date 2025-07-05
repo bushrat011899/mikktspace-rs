@@ -141,7 +141,7 @@ impl Group {
     };
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub(crate) struct Edge {
     pub(crate) i0: c_int,
     pub(crate) i1: c_int,
@@ -1578,32 +1578,48 @@ fn build_neighbors_fast<O: Ops>(
         f += 1;
     }
 
-    // sort over all edges by i0, this is the pricy one.
-    quick_sort_edges(edges, 0, triangle_count * 3 - 1, 0, seed);
     let entries = triangle_count * 3;
-    let mut current_start_index = 0;
-    let mut i = 1;
-    while i < entries {
-        if edges[current_start_index as usize].i0 != edges[i as usize].i0 {
-            let index_left: c_int = current_start_index;
-            let index_right: c_int = i - 1;
-            current_start_index = i;
-            quick_sort_edges(edges, index_left, index_right, 1, seed);
+
+    // Sort over all edges by i0, this is the pricy one.
+    // Note that the below **SHOULD** be identical to:
+    //
+    // ```
+    // edges[0..(entries as usize)].sort();
+    // ```
+    //
+    // However, there appears to be a bug in the original C implementation
+    // that causes it to mis-sort the third and second last rows under certain
+    // circumstances.
+    //
+    // For the sake of byte-accuracy with the original, we are leaving the
+    // "incorrect" sort as-is.
+
+    {
+        quick_sort_edges(edges, 0, triangle_count * 3 - 1, 0, seed);
+        let mut current_start_index = 0;
+        let mut i = 1;
+        while i < entries {
+            if edges[current_start_index as usize].i0 != edges[i as usize].i0 {
+                let index_left: c_int = current_start_index;
+                let index_right: c_int = i - 1;
+                current_start_index = i;
+                quick_sort_edges(edges, index_left, index_right, 1, seed);
+            }
+            i += 1;
         }
-        i += 1;
-    }
-    current_start_index = 0;
-    let mut i = 1;
-    while i < entries {
-        if edges[current_start_index as usize].i0 != edges[i as usize].i0
-            || edges[current_start_index as usize].i1 != edges[i as usize].i1
-        {
-            let index_left: c_int = current_start_index;
-            let index_right: c_int = i - 1;
-            current_start_index = i;
-            quick_sort_edges(edges, index_left, index_right, 2, seed);
+        current_start_index = 0;
+        let mut i = 1;
+        while i < entries {
+            if edges[current_start_index as usize].i0 != edges[i as usize].i0
+                || edges[current_start_index as usize].i1 != edges[i as usize].i1
+            {
+                let index_left: c_int = current_start_index;
+                let index_right: c_int = i - 1;
+                current_start_index = i;
+                quick_sort_edges(edges, index_left, index_right, 2, seed);
+            }
+            i += 1;
         }
-        i += 1;
     }
 
     // pair up, adjacent triangles
