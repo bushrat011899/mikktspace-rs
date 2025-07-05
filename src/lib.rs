@@ -104,16 +104,6 @@ pub trait MikkTSpaceInterface {
     /// iVert is in the range {0,1,2} for triangles and {0,1,2,3} for quads.
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2];
 
-    // /// This function is used to return the tangent and fSign to the application.
-    // /// fvTangent is a unit length vector.
-    // /// For normal maps it is sufficient to use the following simplified version of the bitangent which is generated at pixel/vertex level.
-    // /// bitangent = fSign * cross(vN, tangent);
-    // /// Note that the results are returned unindexed. It is possible to generate a new index list
-    // /// But averaging/overwriting tangent spaces by using an already existing index list WILL produce INCRORRECT results.
-    // /// DO NOT! use an already existing index list.
-    // #[expect(unused_variables)]
-    // fn set_tspace_basic(&mut self, tangent: [f32; 3], sign: f32, face: usize, vert: usize) {}
-
     /// This function is used to return tangent space results to the application.
     /// fvTangent and fvBiTangent are unit length vectors and fMagS and fMagT are their
     /// true magnitudes which can be used for relief mapping effects.
@@ -125,17 +115,47 @@ pub trait MikkTSpaceInterface {
     /// Note that the results are returned unindexed. It is possible to generate a new index list
     /// But averaging/overwriting tangent spaces by using an already existing index list WILL produce INCRORRECT results.
     /// DO NOT! use an already existing index list.
-    #[expect(clippy::too_many_arguments)]
-    fn set_tspace(
-        &mut self,
-        tangent: [f32; 3],
-        bi_tangent: [f32; 3],
-        mag_s: f32,
-        mag_t: f32,
-        is_orientation_preserving: bool,
-        face: usize,
-        vert: usize,
-    );
+    fn set_tangent_space(&mut self, tangent_space: TangentSpace, face: usize, vert: usize);
+}
+
+pub struct TangentSpace {
+    tangent: [f32; 3],
+    bi_tangent: [f32; 3],
+    mag_s: f32,
+    mag_t: f32,
+    is_orientation_preserving: bool,
+}
+
+impl TangentSpace {
+    #[inline]
+    pub const fn tangent(&self) -> [f32; 3] {
+        self.tangent
+    }
+
+    #[inline]
+    pub const fn bi_tangent(&self) -> [f32; 3] {
+        self.bi_tangent
+    }
+
+    #[inline]
+    pub const fn first_derivative_magnitude(&self) -> (f32, f32) {
+        (self.mag_s, self.mag_t)
+    }
+
+    #[inline]
+    pub const fn is_orientation_preserving(&self) -> bool {
+        self.is_orientation_preserving
+    }
+
+    #[inline]
+    pub const fn tangent_encoded(&self) -> [f32; 4] {
+        let sign = if self.is_orientation_preserving {
+            1.0
+        } else {
+            -1.0
+        };
+        [self.tangent[0], self.tangent[1], self.tangent[2], sign]
+    }
 }
 
 /// Default (recommended) fAngularThreshold is 180 degrees (which means threshold disabled)

@@ -38,6 +38,29 @@ pub struct TangentSpace {
     pub orientation_preserving: bool,
 }
 
+impl<'a> From<&'a TangentSpace> for crate::TangentSpace {
+    fn from(value: &'a TangentSpace) -> Self {
+        let tangent = [value.s.x as f32, value.s.y as f32, value.s.z as f32];
+        let bi_tangent = [value.t.x as f32, value.t.y as f32, value.t.z as f32];
+        let tangent_magnitude = value.s_magnitude;
+        let bi_tangent_magnitude = value.t_magnitude;
+
+        crate::TangentSpace {
+            tangent,
+            bi_tangent,
+            mag_s: tangent_magnitude,
+            mag_t: bi_tangent_magnitude,
+            is_orientation_preserving: value.orientation_preserving,
+        }
+    }
+}
+
+impl From<TangentSpace> for crate::TangentSpace {
+    fn from(value: TangentSpace) -> Self {
+        crate::TangentSpace::from(&value)
+    }
+}
+
 impl TangentSpace {
     pub const ZERO: TangentSpace = TangentSpace {
         s: Vec3::ZERO,
@@ -368,19 +391,8 @@ pub fn generate_tangent_space<I: MikkTSpaceInterface>(
             let mut i = 0;
             while i < verts_0 {
                 let tangent_space = &tangent_spaces[index as usize];
-                let tang: [c_float; 3] = [tangent_space.s.x, tangent_space.s.y, tangent_space.s.z];
-                let bitang: [c_float; 3] =
-                    [tangent_space.t.x, tangent_space.t.y, tangent_space.t.z];
 
-                context.set_tspace(
-                    tang,
-                    bitang,
-                    tangent_space.s_magnitude,
-                    tangent_space.t_magnitude,
-                    tangent_space.orientation_preserving,
-                    f as usize,
-                    i as usize,
-                );
+                context.set_tangent_space(tangent_space.into(), f as usize, i as usize);
                 index += 1;
                 i += 1;
             }
