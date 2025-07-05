@@ -27,7 +27,6 @@ use core::{
 
 use crate::{math::*, MikkTSpaceInterface};
 
-#[repr(C)]
 pub(crate) struct TangentSpace<O: Ops> {
     pub(crate) s: Vec3<O>,
     pub(crate) s_magnitude: f32,
@@ -80,7 +79,6 @@ impl<O: Ops> TangentSpace<O> {
     };
 }
 
-#[repr(C)]
 pub(crate) struct TriangleInfo<O: Ops> {
     pub(crate) face_neighbors: [c_int; 3],
     pub(crate) assigned_group: [Option<usize>; 3],
@@ -127,7 +125,6 @@ impl<O: Ops> TriangleInfo<O> {
 }
 
 #[derive(Clone)]
-#[repr(C)]
 pub(crate) struct Group {
     pub(crate) id: usize,
     pub(crate) face_indices: Vec<c_int>,
@@ -145,7 +142,6 @@ impl Group {
 }
 
 #[derive(Copy, Clone)]
-#[repr(C)]
 pub(crate) struct Edge {
     pub(crate) i0: c_int,
     pub(crate) i1: c_int,
@@ -169,7 +165,6 @@ impl Index<usize> for Edge {
     }
 }
 
-#[repr(C)]
 pub(crate) struct TemporaryVertex<O: Ops> {
     pub(crate) vert: Vec3<O>,
     pub(crate) index: c_int,
@@ -238,7 +233,9 @@ fn mean_tangent_space<O: Ops>(lhs: TangentSpace<O>, rhs: TangentSpace<O>) -> Tan
     ts_res
 }
 
-pub(crate) fn generate_tangent_space_default<I: MikkTSpaceInterface<O>, O: Ops>(context: &mut I) -> bool {
+pub(crate) fn generate_tangent_space_default<I: MikkTSpaceInterface<O>, O: Ops>(
+    context: &mut I,
+) -> bool {
     generate_tangent_space(context, 180.0f32)
 }
 

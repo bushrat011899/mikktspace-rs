@@ -43,7 +43,6 @@ pub trait Ops {
     fn acos(x: f64) -> f64;
 }
 
-#[repr(C)]
 pub(crate) struct Vec3<O: Ops> {
     pub(crate) x: f32,
     pub(crate) y: f32,
