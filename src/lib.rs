@@ -138,8 +138,13 @@ impl TangentSpace {
     }
 
     #[inline]
-    pub const fn first_derivative_magnitude(&self) -> (f32, f32) {
-        (self.mag_s, self.mag_t)
+    pub const fn tangent_magnitude(&self) -> f32 {
+        self.mag_s
+    }
+
+    #[inline]
+    pub const fn bi_tangent_magnitude(&self) -> f32 {
+        self.mag_t
     }
 
     #[inline]

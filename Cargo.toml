@@ -2,5 +2,10 @@
 name = "mikktspace-rs"
 version = "0.1.0"
 edition = "2018"
+exclude = ["/data", "/reference"]
 
 [dependencies]
+
+[dev-dependencies]
+mikktspace-sys = "0.1.1"
+wavefront_obj = "11.0.0"
