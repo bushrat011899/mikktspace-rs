@@ -1,0 +1,35 @@
+[package]
+name = "mikktspace-rs-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.mikktspace-rs]
+path = ".."
+
+[dependencies.mikktspace-sys]
+version = "0.1.1"
+
+[[bin]]
+name = "one_triangle"
+path = "fuzz_targets/one_triangle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "many_triangles"
+path = "fuzz_targets/many_triangles.rs"
+test = false
+doc = false
+bench = false
