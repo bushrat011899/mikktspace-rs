@@ -20,26 +20,34 @@
 
 use alloc::{vec, vec::Vec};
 use core::{
-    ffi::{c_double, c_float, c_int, c_uchar, c_uint, c_ulong},
+    ffi::{c_int, c_uchar, c_uint, c_ulong},
+    marker::PhantomData,
     ops::Index,
 };
 
 use crate::{math::*, MikkTSpaceInterface};
 
-#[derive(Copy, Clone)]
 #[repr(C)]
-pub struct TangentSpace {
-    pub s: Vec3,
-    pub s_magnitude: c_float,
-    pub t: Vec3,
-    pub t_magnitude: c_float,
+pub struct TangentSpace<O: Ops> {
+    pub s: Vec3<O>,
+    pub s_magnitude: f32,
+    pub t: Vec3<O>,
+    pub t_magnitude: f32,
     /// this is to average back into quads.
     pub counter: c_int,
     pub orientation_preserving: bool,
 }
 
-impl<'a> From<&'a TangentSpace> for crate::TangentSpace {
-    fn from(value: &'a TangentSpace) -> Self {
+impl<O: Ops> Copy for TangentSpace<O> {}
+
+impl<O: Ops> Clone for TangentSpace<O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, O: Ops> From<&'a TangentSpace<O>> for crate::TangentSpace {
+    fn from(value: &'a TangentSpace<O>) -> Self {
         let tangent = [value.s.x as f32, value.s.y as f32, value.s.z as f32];
         let bi_tangent = [value.t.x as f32, value.t.y as f32, value.t.z as f32];
         let tangent_magnitude = value.s_magnitude;
@@ -55,14 +63,14 @@ impl<'a> From<&'a TangentSpace> for crate::TangentSpace {
     }
 }
 
-impl From<TangentSpace> for crate::TangentSpace {
-    fn from(value: TangentSpace) -> Self {
+impl<O: Ops> From<TangentSpace<O>> for crate::TangentSpace {
+    fn from(value: TangentSpace<O>) -> Self {
         crate::TangentSpace::from(&value)
     }
 }
 
-impl TangentSpace {
-    pub const ZERO: TangentSpace = TangentSpace {
+impl<O: Ops> TangentSpace<O> {
+    pub const ZERO: TangentSpace<O> = TangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
@@ -72,21 +80,20 @@ impl TangentSpace {
     };
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
-pub struct TriangleInfo {
+pub struct TriangleInfo<O: Ops> {
     pub face_neighbors: [c_int; 3],
     pub assigned_group: [Option<usize>; 3],
 
     /// normalized first order face derivative
-    pub s: Vec3,
+    pub s: Vec3<O>,
     /// normalized first order face derivative
-    pub t: Vec3,
+    pub t: Vec3<O>,
 
     /// original magnitude of vOs
-    pub s_magnitude: c_float,
+    pub s_magnitude: f32,
     /// original magnitude of vOs
-    pub t_magnitude: c_float,
+    pub t_magnitude: f32,
 
     /// determines if the current and the next triangle are a quad.
     pub original_face_index: c_int,
@@ -96,8 +103,16 @@ pub struct TriangleInfo {
     pub vertex_indices: [c_uchar; 4],
 }
 
-impl TriangleInfo {
-    pub const ZERO: TriangleInfo = TriangleInfo {
+impl<O: Ops> Copy for TriangleInfo<O> {}
+
+impl<O: Ops> Clone for TriangleInfo<O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<O: Ops> TriangleInfo<O> {
+    pub const ZERO: TriangleInfo<O> = TriangleInfo {
         face_neighbors: [0; 3],
         assigned_group: [None; 3],
         s: Vec3::ZERO,
@@ -154,15 +169,22 @@ impl Index<usize> for Edge {
     }
 }
 
-#[derive(Copy, Clone)]
 #[repr(C)]
-pub struct TemporaryVertex {
-    pub vert: Vec3,
+pub struct TemporaryVertex<O: Ops> {
+    pub vert: Vec3<O>,
     pub index: c_int,
 }
 
-impl TemporaryVertex {
-    pub const ZERO: TemporaryVertex = TemporaryVertex {
+impl<O: Ops> Copy for TemporaryVertex<O> {}
+
+impl<O: Ops> Clone for TemporaryVertex<O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<O: Ops> TemporaryVertex<O> {
+    pub const ZERO: TemporaryVertex<O> = TemporaryVertex {
         vert: Vec3::ZERO,
         index: 0,
     };
@@ -183,8 +205,8 @@ fn from_index(index: c_int) -> (c_int, c_int) {
     (index >> 2, index & 0x3)
 }
 
-fn mean_tangent_space(lhs: TangentSpace, rhs: TangentSpace) -> TangentSpace {
-    let mut ts_res: TangentSpace = TangentSpace {
+fn mean_tangent_space<O: Ops>(lhs: TangentSpace<O>, rhs: TangentSpace<O>) -> TangentSpace<O> {
+    let mut ts_res: TangentSpace<O> = TangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
@@ -216,16 +238,16 @@ fn mean_tangent_space(lhs: TangentSpace, rhs: TangentSpace) -> TangentSpace {
     ts_res
 }
 
-pub fn generate_tangent_space_default<I: MikkTSpaceInterface>(context: &mut I) -> bool {
+pub fn generate_tangent_space_default<I: MikkTSpaceInterface<O>, O: Ops>(context: &mut I) -> bool {
     generate_tangent_space(context, 180.0f32)
 }
 
-pub fn generate_tangent_space<I: MikkTSpaceInterface>(
+pub fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
-    angular_threshold: c_float,
+    angular_threshold: f32,
 ) -> bool {
     let mut triangles_count: c_int = 0;
-    let threshold_cos: c_float = cos(deg_to_rad(angular_threshold) as c_double) as c_float;
+    let threshold_cos: f32 = O::cos(deg_to_rad(angular_threshold) as f64) as f32;
 
     // count triangles on supported faces
     let faces_total = context.get_num_faces();
@@ -246,7 +268,7 @@ pub fn generate_tangent_space<I: MikkTSpaceInterface>(
     // allocate memory for an index list
     let mut triangle_vertex_list: Vec<c_int> =
         vec![0; (triangles_count as c_ulong).wrapping_mul(3) as usize];
-    let mut triangle_info_list: Vec<TriangleInfo> =
+    let mut triangle_info_list: Vec<TriangleInfo<O>> =
         vec![TriangleInfo::ZERO; triangles_count as usize];
 
     // make an initial triangle --> face index list
@@ -268,9 +290,9 @@ pub fn generate_tangent_space<I: MikkTSpaceInterface>(
         let i0: c_int = triangle_vertex_list[(t * 3 + 0) as usize];
         let i1: c_int = triangle_vertex_list[(t * 3 + 1) as usize];
         let i2: c_int = triangle_vertex_list[(t * 3 + 2) as usize];
-        let p0: Vec3 = get_position_from_index(context, i0);
-        let p1: Vec3 = get_position_from_index(context, i1);
-        let p2: Vec3 = get_position_from_index(context, i2);
+        let p0: Vec3<O> = get_position_from_index(context, i0);
+        let p1: Vec3<O> = get_position_from_index(context, i1);
+        let p2: Vec3<O> = get_position_from_index(context, i2);
         if (p0 == p1) || (p0 == p2) || (p1 == p2) {
             // degenerate
             triangle_info_list[t as usize].flags |= MARK_DEGENERATE;
@@ -310,21 +332,23 @@ pub fn generate_tangent_space<I: MikkTSpaceInterface>(
         triangles_count,
     );
 
-    let mut tangent_spaces: Vec<TangentSpace> =
+    let mut tangent_spaces: Vec<TangentSpace<O>> =
         vec![TangentSpace::ZERO; tangent_spaces_total as usize];
     t = 0;
     while t < tangent_spaces_total {
         tangent_spaces[t as usize] = TangentSpace {
-            s: Vec3 {
+            s: Vec3::<O> {
                 x: 1.0,
                 y: 0.0,
                 z: 0.0,
+                _phantom: PhantomData,
             },
             s_magnitude: 1.0,
-            t: Vec3 {
+            t: Vec3::<O> {
                 x: 0.0,
                 y: 1.0,
                 z: 0.0,
+                _phantom: PhantomData,
             },
             t_magnitude: 1.0,
             ..TangentSpace::ZERO
@@ -408,8 +432,8 @@ const CELLS: c_int = 2048;
 // inlining could potentially reorder instructions and generate different
 // results for the same effective input value fVal.
 #[inline(never)]
-fn find_grid_cell(min: c_float, max: c_float, val: c_float) -> c_int {
-    let face: c_float = CELLS as c_float * ((val - min) / (max - min));
+fn find_grid_cell(min: f32, max: f32, val: f32) -> c_int {
+    let face: f32 = CELLS as f32 * ((val - min) / (max - min));
     let vertex: c_int = face as c_int;
     if vertex < CELLS {
         if vertex >= 0 {
@@ -422,18 +446,18 @@ fn find_grid_cell(min: c_float, max: c_float, val: c_float) -> c_int {
     }
 }
 
-fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
+fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_vertices: &mut [c_int],
     context: &I,
     triangle_count: c_int,
 ) {
     // Generate bounding box
-    let mut min: Vec3 = get_position_from_index(context, 0);
-    let mut max: Vec3 = min;
+    let mut min: Vec3<O> = get_position_from_index(context, 0);
+    let mut max: Vec3<O> = min;
     let mut i = 1;
     while i < triangle_count * 3 {
         let index: c_int = triangle_vertices[i as usize];
-        let position: Vec3 = get_position_from_index(context, index);
+        let position: Vec3<O> = get_position_from_index(context, index);
         if min.x > position.x {
             min.x = position.x;
         } else if max.x < position.x {
@@ -480,8 +504,8 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
     i = 0;
     while i < triangle_count * 3 {
         let index_0: c_int = triangle_vertices[i as usize];
-        let position: Vec3 = get_position_from_index(context, index_0);
-        let val: c_float = if channel == 0 {
+        let position: Vec3<O> = get_position_from_index(context, index_0);
+        let val: f32 = if channel == 0 {
             position.x
         } else if channel == 1 {
             position.y
@@ -506,8 +530,8 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
     i = 0;
     while i < triangle_count * 3 {
         let index_1: c_int = triangle_vertices[i as usize];
-        let position: Vec3 = get_position_from_index(context, index_1);
-        let val: c_float = if channel == 0 {
+        let position: Vec3<O> = get_position_from_index(context, index_1);
+        let val: f32 = if channel == 0 {
             position.x
         } else if channel == 1 {
             position.y
@@ -542,8 +566,8 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
     }
 
     // complete the merge
-    let mut temporary_vertices: Vec<TemporaryVertex> =
-        vec![TemporaryVertex::ZERO; max_count as usize];
+    let mut temporary_vertices: Vec<TemporaryVertex<O>> =
+        vec![TemporaryVertex::<O>::ZERO; max_count as usize];
     k = 0;
     while k < CELLS {
         let entries: c_int = hash_count[k as usize];
@@ -559,7 +583,7 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
             let mut e = 0;
             while e < entries {
                 let i_0: c_int = hash_table[hash_offsets[k as usize] as usize + e as usize];
-                let position: Vec3 =
+                let position: Vec3<O> =
                     get_position_from_index(context, triangle_vertices[i_0 as usize]);
                 temporary_vertices[e as usize].vert = position;
                 temporary_vertices[e as usize].index = i_0;
@@ -577,16 +601,16 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface>(
     }
 }
 
-fn merge_verts_fast<I: MikkTSpaceInterface>(
+fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_verticies: &mut [c_int],
-    temporary_verticies: &mut [TemporaryVertex],
+    temporary_verticies: &mut [TemporaryVertex<O>],
     context: &I,
     i_left_in: c_int,
     i_right_in: c_int,
 ) {
     // make bbox
-    let mut min: [c_float; 3] = [0.; 3];
-    let mut max: [c_float; 3] = [0.; 3];
+    let mut min: [f32; 3] = [0.; 3];
+    let mut max: [f32; 3] = [0.; 3];
 
     let mut c = 0;
     while c < 3 {
@@ -635,9 +659,9 @@ fn merge_verts_fast<I: MikkTSpaceInterface>(
         while l <= i_right_in {
             let i: c_int = temporary_verticies[l as usize].index;
             let index: c_int = triangle_verticies[i as usize];
-            let position: Vec3 = get_position_from_index(context, index);
-            let normal: Vec3 = get_normal_from_index(context, index);
-            let texture_position: Vec3 = get_texture_coordinate_from_index(context, index);
+            let position: Vec3<O> = get_position_from_index(context, index);
+            let normal: Vec3<O> = get_normal_from_index(context, index);
+            let texture_position: Vec3<O> = get_texture_coordinate_from_index(context, index);
 
             let mut not_found: bool = true;
             let mut l2: c_int = i_left_in;
@@ -645,9 +669,9 @@ fn merge_verts_fast<I: MikkTSpaceInterface>(
             while l2 < l && not_found {
                 let i2: c_int = temporary_verticies[l2 as usize].index;
                 let index2: c_int = triangle_verticies[i2 as usize];
-                let position_other: Vec3 = get_position_from_index(context, index2);
-                let normal_other: Vec3 = get_normal_from_index(context, index2);
-                let texture_position_other: Vec3 =
+                let position_other: Vec3<O> = get_position_from_index(context, index2);
+                let normal_other: Vec3<O> = get_normal_from_index(context, index2);
+                let texture_position_other: Vec3<O> =
                     get_texture_coordinate_from_index(context, index2);
                 i2rec = i2;
 
@@ -703,7 +727,7 @@ fn merge_verts_fast<I: MikkTSpaceInterface>(
             assert!(i_left < i_right || !(ready_left_swap && ready_right_swap));
 
             if ready_left_swap && ready_right_swap {
-                let temporary_vertex: TemporaryVertex = temporary_verticies[i_left as usize];
+                let temporary_vertex: TemporaryVertex<O> = temporary_verticies[i_left as usize];
                 assert!(i_left < i_right);
                 temporary_verticies[i_left as usize] = temporary_verticies[i_right as usize];
                 temporary_verticies[i_right as usize] = temporary_vertex;
@@ -747,8 +771,8 @@ fn merge_verts_fast<I: MikkTSpaceInterface>(
     };
 }
 
-fn generate_initial_vertices_index_list<I: MikkTSpaceInterface>(
-    triangle_info_list: &mut [TriangleInfo],
+fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     triangle_verticies: &mut [c_int],
     context: &I,
     triangle_count: c_int,
@@ -788,23 +812,23 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface>(
                 let i1: c_int = as_index(f, 1);
                 let i2: c_int = as_index(f, 2);
                 let i3: c_int = as_index(f, 3);
-                let tx0: Vec3 = get_texture_coordinate_from_index(context, i0);
-                let tx1: Vec3 = get_texture_coordinate_from_index(context, i1);
-                let tx2: Vec3 = get_texture_coordinate_from_index(context, i2);
-                let tx3: Vec3 = get_texture_coordinate_from_index(context, i3);
-                let distance_squared_20: c_float = (tx2 - tx0).length_squared();
-                let distance_squared_13: c_float = (tx3 - tx1).length_squared();
+                let tx0: Vec3<O> = get_texture_coordinate_from_index(context, i0);
+                let tx1: Vec3<O> = get_texture_coordinate_from_index(context, i1);
+                let tx2: Vec3<O> = get_texture_coordinate_from_index(context, i2);
+                let tx3: Vec3<O> = get_texture_coordinate_from_index(context, i3);
+                let distance_squared_20: f32 = (tx2 - tx0).length_squared();
+                let distance_squared_13: f32 = (tx3 - tx1).length_squared();
                 let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_13 {
                     true
                 } else if distance_squared_13 < distance_squared_20 {
                     false
                 } else {
-                    let p0: Vec3 = get_position_from_index(context, i0);
-                    let p1: Vec3 = get_position_from_index(context, i1);
-                    let p2: Vec3 = get_position_from_index(context, i2);
-                    let p3: Vec3 = get_position_from_index(context, i3);
-                    let distance_squared_20: c_float = (p2 - p0).length_squared();
-                    let distance_squared_13: c_float = (p3 - p1).length_squared();
+                    let p0: Vec3<O> = get_position_from_index(context, i0);
+                    let p1: Vec3<O> = get_position_from_index(context, i1);
+                    let p2: Vec3<O> = get_position_from_index(context, i2);
+                    let p3: Vec3<O> = get_position_from_index(context, i3);
+                    let distance_squared_20: f32 = (p2 - p0).length_squared();
+                    let distance_squared_13: f32 = (p3 - p1).length_squared();
                     distance_squared_13 >= distance_squared_20
                 };
                 if quad_diagonal_is_02 {
@@ -867,8 +891,11 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface>(
     tangent_space_offset
 }
 
-fn get_position_from_index<I: MikkTSpaceInterface>(context: &I, index: c_int) -> Vec3 {
-    let mut res: Vec3 = Vec3::ZERO;
+fn get_position_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
+    context: &I,
+    index: c_int,
+) -> Vec3<O> {
+    let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
     let pos = context.get_position(face as usize, vertex as usize);
     res.x = pos[0 as usize];
@@ -877,8 +904,8 @@ fn get_position_from_index<I: MikkTSpaceInterface>(context: &I, index: c_int) ->
     res
 }
 
-fn get_normal_from_index<I: MikkTSpaceInterface>(context: &I, index: c_int) -> Vec3 {
-    let mut res: Vec3 = Vec3::ZERO;
+fn get_normal_from_index<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, index: c_int) -> Vec3<O> {
+    let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
     let norm = context.get_normal(face as usize, vertex as usize);
     res.x = norm[0 as usize];
@@ -887,8 +914,11 @@ fn get_normal_from_index<I: MikkTSpaceInterface>(context: &I, index: c_int) -> V
     res
 }
 
-fn get_texture_coordinate_from_index<I: MikkTSpaceInterface>(context: &I, index: c_int) -> Vec3 {
-    let mut res: Vec3 = Vec3::ZERO;
+fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
+    context: &I,
+    index: c_int,
+) -> Vec3<O> {
+    let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
     let texc = context.get_tex_coord(face as usize, vertex as usize);
     res.x = texc[0 as usize];
@@ -898,26 +928,29 @@ fn get_texture_coordinate_from_index<I: MikkTSpaceInterface>(context: &I, index:
 }
 
 /// returns the texture area times 2
-fn calculate_texture_area<I: MikkTSpaceInterface>(context: &I, indices: &[c_int]) -> c_float {
-    let t1: Vec3 = get_texture_coordinate_from_index(context, indices[0]);
-    let t2: Vec3 = get_texture_coordinate_from_index(context, indices[1]);
-    let t3: Vec3 = get_texture_coordinate_from_index(context, indices[2]);
+fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
+    context: &I,
+    indices: &[c_int],
+) -> f32 {
+    let t1: Vec3<O> = get_texture_coordinate_from_index(context, indices[0]);
+    let t2: Vec3<O> = get_texture_coordinate_from_index(context, indices[1]);
+    let t3: Vec3<O> = get_texture_coordinate_from_index(context, indices[2]);
 
-    let t21x: c_float = t2.x - t1.x;
-    let t21y: c_float = t2.y - t1.y;
-    let t31x: c_float = t3.x - t1.x;
-    let t31y: c_float = t3.y - t1.y;
+    let t21x: f32 = t2.x - t1.x;
+    let t21y: f32 = t2.y - t1.y;
+    let t31x: f32 = t3.x - t1.x;
+    let t31y: f32 = t3.y - t1.y;
 
-    let signed_area_double: c_float = t21x * t31y - t21y * t31x;
-    if signed_area_double < 0 as c_float {
+    let signed_area_double: f32 = t21x * t31y - t21y * t31x;
+    if signed_area_double < 0 as f32 {
         -signed_area_double
     } else {
         signed_area_double
     }
 }
 
-fn initialize_triangle_info<I: MikkTSpaceInterface>(
-    triangle_info_list: &mut [TriangleInfo],
+fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertex_list: &[c_int],
     context: &I,
     triangle_count: c_int,
@@ -939,8 +972,8 @@ fn initialize_triangle_info<I: MikkTSpaceInterface>(
             triangle_info_list[f as usize].t.x = 0.0f32;
             triangle_info_list[f as usize].t.y = 0.0f32;
             triangle_info_list[f as usize].t.z = 0.0f32;
-            triangle_info_list[f as usize].s_magnitude = 0 as c_float;
-            triangle_info_list[f as usize].t_magnitude = 0 as c_float;
+            triangle_info_list[f as usize].s_magnitude = 0 as f32;
+            triangle_info_list[f as usize].t_magnitude = 0 as f32;
 
             // assumed bad
             triangle_info_list[f as usize].flags |= GROUP_WITH_ANY;
@@ -954,37 +987,40 @@ fn initialize_triangle_info<I: MikkTSpaceInterface>(
     f = 0;
     while f < triangle_count {
         // initial values
-        let v1: Vec3 = get_position_from_index(context, triangle_vertex_list[(f * 3 + 0) as usize]);
-        let v2: Vec3 = get_position_from_index(context, triangle_vertex_list[(f * 3 + 1) as usize]);
-        let v3: Vec3 = get_position_from_index(context, triangle_vertex_list[(f * 3 + 2) as usize]);
-        let t1: Vec3 =
+        let v1: Vec3<O> =
+            get_position_from_index(context, triangle_vertex_list[(f * 3 + 0) as usize]);
+        let v2: Vec3<O> =
+            get_position_from_index(context, triangle_vertex_list[(f * 3 + 1) as usize]);
+        let v3: Vec3<O> =
+            get_position_from_index(context, triangle_vertex_list[(f * 3 + 2) as usize]);
+        let t1: Vec3<O> =
             get_texture_coordinate_from_index(context, triangle_vertex_list[(f * 3 + 0) as usize]);
-        let t2: Vec3 =
+        let t2: Vec3<O> =
             get_texture_coordinate_from_index(context, triangle_vertex_list[(f * 3 + 1) as usize]);
-        let t3: Vec3 =
+        let t3: Vec3<O> =
             get_texture_coordinate_from_index(context, triangle_vertex_list[(f * 3 + 2) as usize]);
 
-        let t21x: c_float = t2.x - t1.x;
-        let t21y: c_float = t2.y - t1.y;
-        let t31x: c_float = t3.x - t1.x;
-        let t31y: c_float = t3.y - t1.y;
-        let d1: Vec3 = v2 - v1;
-        let d2: Vec3 = v3 - v1;
-        let signed_area_double: c_float = t21x * t31y - t21y * t31x;
-        let s: Vec3 = (t31y * d1) - (t21y * d2); // eq 18
-        let t: Vec3 = (-t31x * d1) + (t21x * d2); // eq 19
+        let t21x: f32 = t2.x - t1.x;
+        let t21y: f32 = t2.y - t1.y;
+        let t31x: f32 = t3.x - t1.x;
+        let t31y: f32 = t3.y - t1.y;
+        let d1: Vec3<O> = v2 - v1;
+        let d2: Vec3<O> = v3 - v1;
+        let signed_area_double: f32 = t21x * t31y - t21y * t31x;
+        let s: Vec3<O> = (t31y * d1) - (t21y * d2); // eq 18
+        let t: Vec3<O> = (-t31x * d1) + (t21x * d2); // eq 19
 
-        triangle_info_list[f as usize].flags |= if signed_area_double > 0 as c_float {
+        triangle_info_list[f as usize].flags |= if signed_area_double > 0 as f32 {
             ORIENT_PRESERVING
         } else {
             0
         };
 
         if not_zero(signed_area_double) {
-            let area_double: c_float = fabsf(signed_area_double);
-            let s_magnitude: c_float = s.length();
-            let t_magnitude: c_float = t.length();
-            let sign: c_float = if triangle_info_list[f as usize].flags & ORIENT_PRESERVING == 0 {
+            let area_double: f32 = fabsf(signed_area_double);
+            let s_magnitude: f32 = s.length();
+            let t_magnitude: f32 = t.length();
+            let sign: f32 = if triangle_info_list[f as usize].flags & ORIENT_PRESERVING == 0 {
                 -1.0f32
             } else {
                 1.0f32
@@ -1093,8 +1129,8 @@ fn initialize_triangle_info<I: MikkTSpaceInterface>(
     );
 }
 
-fn build_4_rule_groups(
-    triangle_info_list: &mut [TriangleInfo],
+fn build_4_rule_groups<O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     groups: &mut [Group],
     triangle_vertex_list: &[c_int],
     triangle_count: c_int,
@@ -1173,9 +1209,9 @@ fn add_triangle_to_group(group: &mut Group, triangle_index: c_int) {
     group.face_indices.push(triangle_index);
 }
 
-fn assign_to_group_recursive(
+fn assign_to_group_recursive<O: Ops>(
     triangle_vertex_list: &[c_int],
-    triangle_infos: &mut [TriangleInfo],
+    triangle_infos: &mut [TriangleInfo<O>],
     triangle_index: c_int,
     group: &mut Group,
 ) -> bool {
@@ -1250,13 +1286,13 @@ fn assign_to_group_recursive(
     true
 }
 
-fn generate_tangent_spaces<I: MikkTSpaceInterface>(
-    tangent_spaces: &mut [TangentSpace],
-    triangle_info_list: &[TriangleInfo],
+fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
+    tangent_spaces: &mut [TangentSpace<O>],
+    triangle_info_list: &[TriangleInfo<O>],
     groups: &[Group],
     groups_active_count: c_int,
     triangle_vertex_list: &[c_int],
-    threshold_cos: c_float,
+    threshold_cos: f32,
     context: &I,
 ) -> bool {
     let mut faces_max_count = 0;
@@ -1273,7 +1309,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
     }
 
     // make initial allocations
-    let mut sub_group_tangent_spaces: Vec<TangentSpace> =
+    let mut sub_group_tangent_spaces: Vec<TangentSpace<O>> =
         vec![TangentSpace::ZERO; faces_max_count as usize];
     let mut unified_sub_groups: Vec<Vec<c_int>> = vec![Vec::new(); faces_max_count as usize];
     let mut g = 0;
@@ -1326,9 +1362,9 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
                     triangle_info_list[t as usize].original_face_index;
 
                 // project
-                let mut s_t: Vec3 = triangle_info_list[t as usize].s
+                let mut s_t: Vec3<O> = triangle_info_list[t as usize].s
                     - ((n.dot(triangle_info_list[t as usize].s)) * n);
-                let mut t_t: Vec3 = triangle_info_list[t as usize].t
+                let mut t_t: Vec3<O> = triangle_info_list[t as usize].t
                     - ((n.dot(triangle_info_list[t as usize].t)) * n);
                 s_t.normalize_or_zero();
                 t_t.normalize_or_zero();
@@ -1340,8 +1376,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
                 // make sure triangles which belong to the same quad are joined.
                 let same_original_face: bool = original_face_index_f == original_face_index_t;
 
-                let s_cos: c_float = s_f.dot(s_t);
-                let t_cos: c_float = t_f.dot(t_t);
+                let s_cos: f32 = s_f.dot(s_t);
+                let t_cos: f32 = t_f.dot(t_t);
 
                 assert!(f != t || same_original_face, "sanity check");
                 if any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos {
@@ -1414,15 +1450,15 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface>(
     true
 }
 
-fn evaluate_tangent_space<I: MikkTSpaceInterface>(
+fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     face_indices: &[c_int],
     triangle_vertex_list: &[c_int],
-    triangle_info_list: &[TriangleInfo],
+    triangle_info_list: &[TriangleInfo<O>],
     context: &I,
     vertex_representative: c_int,
-) -> TangentSpace {
+) -> TangentSpace<O> {
     let face_indices_count = face_indices.len();
-    let mut res: TangentSpace = TangentSpace {
+    let mut res: TangentSpace<O> = TangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
@@ -1430,15 +1466,15 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface>(
         counter: 0,
         orientation_preserving: false,
     };
-    let mut angle_sum: c_float = 0 as c_float;
+    let mut angle_sum: f32 = 0 as f32;
     res.s.x = 0.0f32;
     res.s.y = 0.0f32;
     res.s.z = 0.0f32;
     res.t.x = 0.0f32;
     res.t.y = 0.0f32;
     res.t.z = 0.0f32;
-    res.s_magnitude = 0 as c_float;
-    res.t_magnitude = 0 as c_float;
+    res.s_magnitude = 0 as f32;
+    res.t_magnitude = 0 as f32;
 
     let mut face = 0;
     while face < face_indices_count {
@@ -1485,14 +1521,14 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface>(
             // weight contribution by the angle
             // between the two edge vectors
             let mut cos = v1.dot(v2);
-            cos = if cos > 1 as c_float {
-                1 as c_float
-            } else if cos < -(1) as c_float {
-                -(1) as c_float
+            cos = if cos > 1 as f32 {
+                1 as f32
+            } else if cos < -(1) as f32 {
+                -(1) as f32
             } else {
                 cos
             };
-            let angle = acos(cos as c_double) as c_float;
+            let angle = O::acos(cos as f64) as f32;
             let s_magnitude = triangle_info_list[f as usize].s_magnitude;
             let t_magnitude = triangle_info_list[f as usize].t_magnitude;
 
@@ -1508,7 +1544,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface>(
     // normalize
     res.s.normalize_or_zero();
     res.t.normalize_or_zero();
-    if angle_sum > 0 as c_float {
+    if angle_sum > 0 as f32 {
         res.s_magnitude /= angle_sum;
         res.t_magnitude /= angle_sum;
     }
@@ -1516,8 +1552,8 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface>(
     res
 }
 
-fn build_neighbors_fast(
-    triangle_info_list: &mut [TriangleInfo],
+fn build_neighbors_fast<O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     edges: &mut [Edge],
     triangle_vertex_list: &[c_int],
     triangle_count: c_int,
@@ -1707,8 +1743,8 @@ fn get_edge(indices: &[c_int], i0: c_int, i1: c_int) -> Option<(c_int, c_int, c_
         .map(|(edgenum, (a, b))| (edgenum as c_int, a as c_int, b as c_int))
 }
 
-fn degen_prologue(
-    triangle_info_list: &mut [TriangleInfo],
+fn degen_prologue<O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertices: &mut [c_int],
     triangle_count: c_int,
     triangle_count_total: c_int,
@@ -1787,9 +1823,9 @@ fn degen_prologue(
     assert!(triangle_count == t);
 }
 
-fn degen_epilogue<I: MikkTSpaceInterface>(
-    tangent_spaces: &mut [TangentSpace],
-    triangle_info_list: &[TriangleInfo],
+fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
+    tangent_spaces: &mut [TangentSpace<O>],
+    triangle_info_list: &[TriangleInfo<O>],
     triangle_vertex_list: &[c_int],
     context: &I,
     triangle_count: c_int,
@@ -1868,7 +1904,7 @@ fn degen_epilogue<I: MikkTSpaceInterface>(
             let mut i_0 = 0;
             while not_found && i_0 < 3 {
                 let vertex = vertices[i_0 as usize] as c_int;
-                let source_position: Vec3 =
+                let source_position: Vec3<O> =
                     get_position_from_index(context, as_index(original_face_index, vertex));
                 if source_position == missing_position {
                     let tangent_space_offset: c_int =

@@ -6,6 +6,10 @@ exclude = ["/data", "/reference"]
 
 [dependencies]
 
+[features]
+default = ["std"]
+std = []
+
 [dev-dependencies]
 mikktspace-sys = "0.1.1"
 wavefront_obj = "11.0.0"

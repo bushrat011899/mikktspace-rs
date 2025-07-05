@@ -82,9 +82,36 @@ mod mikktspace;
 
 use mikktspace::{generate_tangent_space, generate_tangent_space_default};
 
+#[cfg(feature = "std")]
+mod std {
+    extern crate std;
+
+    pub struct StdOps;
+
+    impl crate::Ops for StdOps {
+        fn sqrtf(x: f32) -> f32 {
+            x.sqrt()
+        }
+
+        fn cos(x: f64) -> f64 {
+            x.cos()
+        }
+
+        fn acos(x: f64) -> f64 {
+            x.acos()
+        }
+    }
+}
+
+pub use math::Ops;
+
 /// Either (or both) of the two setTSpace callbacks can be set.
 /// The call-back set_tspace_basic() is sufficient for basic normal mapping.
-pub trait MikkTSpaceInterface {
+pub trait MikkTSpaceInterface<
+    #[cfg(not(feature = "std"))] O: Ops,
+    #[cfg(feature = "std")] O: Ops = std::StdOps,
+>
+{
     /// Returns the number of faces (triangles/quads) on the mesh to be processed.
     fn get_num_faces(&self) -> usize;
 
@@ -164,16 +191,18 @@ impl TangentSpace {
 }
 
 /// Default (recommended) fAngularThreshold is 180 degrees (which means threshold disabled)
-pub fn gen_tang_space_default<I>(interface: &mut I) -> bool
+pub fn gen_tang_space_default<I, O>(interface: &mut I) -> bool
 where
-    I: MikkTSpaceInterface,
+    I: MikkTSpaceInterface<O>,
+    O: Ops,
 {
     generate_tangent_space_default(interface)
 }
 
-pub fn gen_tang_space<I>(interface: &mut I, angular_threshold: f32) -> bool
+pub fn gen_tang_space<I, O>(interface: &mut I, angular_threshold: f32) -> bool
 where
-    I: MikkTSpaceInterface,
+    I: MikkTSpaceInterface<O>,
+    O: Ops,
 {
     generate_tangent_space(interface, angular_threshold)
 }

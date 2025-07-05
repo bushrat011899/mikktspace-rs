@@ -18,46 +18,63 @@
  *  3. This notice may not be removed or altered from any source distribution.
  */
 
-use core::ffi::{c_double, c_float, c_int};
-use core::ops::{Add, Index, Mul, Sub};
+use core::{
+    marker::PhantomData,
+    ops::{Add, Index, Mul, Sub},
+};
 
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct Vec3 {
-    pub x: c_float,
-    pub y: c_float,
-    pub z: c_float,
+pub trait Ops {
+    fn sqrtf(x: f32) -> f32;
+    fn cos(x: f64) -> f64;
+    fn acos(x: f64) -> f64;
 }
 
-impl Vec3 {
-    pub const ZERO: Vec3 = Vec3 {
+#[repr(C)]
+pub struct Vec3<O: Ops> {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub _phantom: PhantomData<O>,
+}
+
+impl<O: Ops> Copy for Vec3<O> {}
+
+impl<O: Ops> Clone for Vec3<O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<O: Ops> Vec3<O> {
+    pub const ZERO: Vec3<O> = Vec3 {
         x: 0.,
         y: 0.,
         z: 0.,
+        _phantom: PhantomData,
     };
 
-    pub fn dot(self, rhs: Self) -> c_float {
+    pub fn dot(self, rhs: Self) -> f32 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
 
     pub fn normalize_or_zero(&mut self) {
         // might change this to an epsilon based test
         if not_zero(self.x) || not_zero(self.y) || not_zero(self.z) {
-            *self = (1 as c_int as c_float / self.length()) * *self
+            *self = (1f32 / self.length()) * *self
         }
     }
 
-    pub fn length_squared(self) -> c_float {
+    pub fn length_squared(self) -> f32 {
         self.dot(self)
     }
 
-    pub fn length(self) -> c_float {
-        sqrtf(self.length_squared())
+    pub fn length(self) -> f32 {
+        O::sqrtf(self.length_squared())
     }
 }
 
-impl Index<usize> for Vec3 {
-    type Output = c_float;
+impl<O: Ops> Index<usize> for Vec3<O> {
+    type Output = f32;
 
     fn index(&self, index: usize) -> &Self::Output {
         match index {
@@ -69,72 +86,60 @@ impl Index<usize> for Vec3 {
     }
 }
 
-impl Add for Vec3 {
-    type Output = Vec3;
+impl<O: Ops> Add for Vec3<O> {
+    type Output = Vec3<O>;
 
     fn add(self, rhs: Self) -> Self::Output {
         Vec3 {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
             z: self.z + rhs.z,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl Sub for Vec3 {
-    type Output = Vec3;
+impl<O: Ops> Sub for Vec3<O> {
+    type Output = Vec3<O>;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Vec3 {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl Mul<f32> for Vec3 {
-    type Output = Vec3;
+impl<O: Ops> Mul<f32> for Vec3<O> {
+    type Output = Vec3<O>;
 
     fn mul(self, rhs: f32) -> Self::Output {
         Vec3 {
             x: rhs * self.x,
             y: rhs * self.y,
             z: rhs * self.z,
+            _phantom: PhantomData,
         }
     }
 }
 
-impl Mul<Vec3> for f32 {
-    type Output = Vec3;
+impl<O: Ops> Mul<Vec3<O>> for f32 {
+    type Output = Vec3<O>;
 
-    fn mul(self, rhs: Vec3) -> Self::Output {
+    fn mul(self, rhs: Vec3<O>) -> Self::Output {
         rhs * self
     }
 }
 
-impl PartialEq for Vec3 {
+impl<O: Ops> PartialEq for Vec3<O> {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
     }
 }
 
-pub fn acos(x: c_double) -> c_double {
-    extern crate std;
-    x.acos()
-}
-
-pub fn cos(x: c_double) -> c_double {
-    extern crate std;
-    x.cos()
-}
-
-fn sqrtf(x: c_float) -> c_float {
-    extern crate std;
-    x.sqrt()
-}
-
-pub fn fabsf(x: c_float) -> c_float {
+pub fn fabsf(x: f32) -> f32 {
     if x.is_sign_negative() {
         -x
     } else {
@@ -142,11 +147,11 @@ pub fn fabsf(x: c_float) -> c_float {
     }
 }
 
-pub fn not_zero(x: c_float) -> bool {
+pub fn not_zero(x: f32) -> bool {
     // could possibly use FLT_EPSILON instead
     fabsf(x) > f32::MIN_POSITIVE
 }
 
-pub fn deg_to_rad(x: c_float) -> c_float {
-    x * core::f32::consts::PI as c_float / 180.0f32
+pub fn deg_to_rad(x: f32) -> f32 {
+    x * core::f32::consts::PI as f32 / 180.0f32
 }
