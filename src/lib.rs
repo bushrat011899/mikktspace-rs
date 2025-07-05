@@ -86,17 +86,24 @@ use mikktspace::{generate_tangent_space, generate_tangent_space_default};
 mod std {
     extern crate std;
 
+    /// Implements [`Ops`](crate::Ops) using the standard library.
+    /// This is the recommended default when the `std` feature is enabled, as it
+    /// it designed to identically match the results provided by the original
+    /// mikktspace C library.
     pub struct StdOps;
 
     impl crate::Ops for StdOps {
+        #[inline]
         fn sqrtf(x: f32) -> f32 {
             x.sqrt()
         }
 
+        #[inline]
         fn cos(x: f64) -> f64 {
             x.cos()
         }
 
+        #[inline]
         fn acos(x: f64) -> f64 {
             x.acos()
         }
@@ -105,8 +112,18 @@ mod std {
 
 pub use math::Ops;
 
-/// Either (or both) of the two setTSpace callbacks can be set.
-/// The call-back set_tspace_basic() is sufficient for basic normal mapping.
+#[cfg(feature = "std")]
+pub use std::StdOps;
+
+/// Provides an interface for reading vertex information from geometry, and writing
+/// back out the calculated tangent space information.
+///
+/// Without the `std` feature, there is no default implementation for [`Ops`]
+/// provided.
+/// Instead, you must also provide a type implementing [`Ops`] using an alternative
+/// math backend, such as [`libm`].
+///
+/// [libm]: https://docs.rs/libm
 pub trait MikkTSpaceInterface<
     #[cfg(not(feature = "std"))] O: Ops,
     #[cfg(feature = "std")] O: Ops = std::StdOps,
@@ -115,36 +132,34 @@ pub trait MikkTSpaceInterface<
     /// Returns the number of faces (triangles/quads) on the mesh to be processed.
     fn get_num_faces(&self) -> usize;
 
-    /// Returns the number of vertices on face number iFace
-    /// iFace is a number in the range {0, 1, ..., get_num_faces()-1}
+    /// Returns the number of vertices on face number `face`.
+    /// `face` is a number in the range `0..get_num_faces()`.
     fn get_num_vertices_of_face(&self, face: usize) -> usize;
 
-    /// Returns the position of the referenced face of vertex number iVert.
-    /// iVert is in the range {0,1,2} for triangles and {0,1,2,3} for quads.
+    /// Returns the position of the referenced `face` of vertex number `vert`.
+    /// `vert` is in the range `0..=2` for triangles and `0..=3` for quads.
     fn get_position(&self, face: usize, vert: usize) -> [f32; 3];
 
-    /// Returns the normal of the referenced face of vertex number iVert.
-    /// iVert is in the range {0,1,2} for triangles and {0,1,2,3} for quads.
+    /// Returns the normal of the referenced `face` of vertex number `vert`.
+    /// `vert` is in the range `0..=2` for triangles and `0..=3` for quads.
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3];
 
-    /// Returns the texcoord of the referenced face of vertex number iVert.
-    /// iVert is in the range {0,1,2} for triangles and {0,1,2,3} for quads.
+    /// Returns the texture coordinate of the referenced `face` of vertex number `vert`.
+    /// `vert` is in the range `0..=2` for triangles and `0..=3` for quads.
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2];
 
     /// This function is used to return tangent space results to the application.
-    /// fvTangent and fvBiTangent are unit length vectors and fMagS and fMagT are their
-    /// true magnitudes which can be used for relief mapping effects.
-    /// fvBiTangent is the "real" bitangent and thus may not be perpendicular to fvTangent.
-    /// However, both are perpendicular to the vertex normal.
-    /// For normal maps it is sufficient to use the following simplified version of the bitangent which is generated at pixel/vertex level.
-    /// fSign = bIsOrientationPreserving ? 1.0f : (-1.0f);
-    /// bitangent = fSign * cross(vN, tangent);
-    /// Note that the results are returned unindexed. It is possible to generate a new index list
-    /// But averaging/overwriting tangent spaces by using an already existing index list WILL produce INCRORRECT results.
-    /// DO NOT! use an already existing index list.
+    ///
+    /// Note that the results are returned unindexed.
+    /// It is possible to generate a new index list, but averaging/overwriting
+    /// tangent spaces by using an already existing index list **WILL** produce
+    /// **INCORRECT** results.
+    /// **DO NOT** use an already existing index list.
     fn set_tangent_space(&mut self, tangent_space: TangentSpace, face: usize, vert: usize);
 }
 
+/// Wraps the relevant results generated when calculating the tangent space for
+/// a particular vertex on a particular face.
 pub struct TangentSpace {
     tangent: [f32; 3],
     bi_tangent: [f32; 3],
@@ -154,31 +169,39 @@ pub struct TangentSpace {
 }
 
 impl TangentSpace {
+    /// Returns the normalized tangent as an `[x, y, z]` array.
     #[inline]
     pub const fn tangent(&self) -> [f32; 3] {
         self.tangent
     }
 
+    /// Returns the normalized bi-tangent as an `[x, y, z]` array.
     #[inline]
     pub const fn bi_tangent(&self) -> [f32; 3] {
         self.bi_tangent
     }
 
+    /// Returns the magnitude of the tangent.
     #[inline]
     pub const fn tangent_magnitude(&self) -> f32 {
         self.mag_s
     }
 
+    /// Returns the magnitude of the bi-tangent.
     #[inline]
     pub const fn bi_tangent_magnitude(&self) -> f32 {
         self.mag_t
     }
 
+    /// Indicates if this generated tangent preserves the original orientation of
+    /// the face.
     #[inline]
     pub const fn is_orientation_preserving(&self) -> bool {
         self.is_orientation_preserving
     }
 
+    /// Returns an encoded summary of the tangent and bi-tangent as an `[x, y, z, w]`
+    /// array.
     #[inline]
     pub const fn tangent_encoded(&self) -> [f32; 4] {
         let sign = if self.is_orientation_preserving {

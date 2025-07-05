@@ -28,14 +28,14 @@ use core::{
 use crate::{math::*, MikkTSpaceInterface};
 
 #[repr(C)]
-pub struct TangentSpace<O: Ops> {
-    pub s: Vec3<O>,
-    pub s_magnitude: f32,
-    pub t: Vec3<O>,
-    pub t_magnitude: f32,
+pub(crate) struct TangentSpace<O: Ops> {
+    pub(crate) s: Vec3<O>,
+    pub(crate) s_magnitude: f32,
+    pub(crate) t: Vec3<O>,
+    pub(crate) t_magnitude: f32,
     /// this is to average back into quads.
-    pub counter: c_int,
-    pub orientation_preserving: bool,
+    pub(crate) counter: c_int,
+    pub(crate) orientation_preserving: bool,
 }
 
 impl<O: Ops> Copy for TangentSpace<O> {}
@@ -70,7 +70,7 @@ impl<O: Ops> From<TangentSpace<O>> for crate::TangentSpace {
 }
 
 impl<O: Ops> TangentSpace<O> {
-    pub const ZERO: TangentSpace<O> = TangentSpace {
+    pub(crate) const ZERO: TangentSpace<O> = TangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
@@ -81,26 +81,26 @@ impl<O: Ops> TangentSpace<O> {
 }
 
 #[repr(C)]
-pub struct TriangleInfo<O: Ops> {
-    pub face_neighbors: [c_int; 3],
-    pub assigned_group: [Option<usize>; 3],
+pub(crate) struct TriangleInfo<O: Ops> {
+    pub(crate) face_neighbors: [c_int; 3],
+    pub(crate) assigned_group: [Option<usize>; 3],
 
     /// normalized first order face derivative
-    pub s: Vec3<O>,
+    pub(crate) s: Vec3<O>,
     /// normalized first order face derivative
-    pub t: Vec3<O>,
+    pub(crate) t: Vec3<O>,
 
     /// original magnitude of vOs
-    pub s_magnitude: f32,
+    pub(crate) s_magnitude: f32,
     /// original magnitude of vOs
-    pub t_magnitude: f32,
+    pub(crate) t_magnitude: f32,
 
     /// determines if the current and the next triangle are a quad.
-    pub original_face_index: c_int,
+    pub(crate) original_face_index: c_int,
 
-    pub flags: c_int,
-    pub tangent_spaces_offset: c_int,
-    pub vertex_indices: [c_uchar; 4],
+    pub(crate) flags: c_int,
+    pub(crate) tangent_spaces_offset: c_int,
+    pub(crate) vertex_indices: [c_uchar; 4],
 }
 
 impl<O: Ops> Copy for TriangleInfo<O> {}
@@ -112,7 +112,7 @@ impl<O: Ops> Clone for TriangleInfo<O> {
 }
 
 impl<O: Ops> TriangleInfo<O> {
-    pub const ZERO: TriangleInfo<O> = TriangleInfo {
+    pub(crate) const ZERO: TriangleInfo<O> = TriangleInfo {
         face_neighbors: [0; 3],
         assigned_group: [None; 3],
         s: Vec3::ZERO,
@@ -128,15 +128,15 @@ impl<O: Ops> TriangleInfo<O> {
 
 #[derive(Clone)]
 #[repr(C)]
-pub struct Group {
-    pub id: usize,
-    pub face_indices: Vec<c_int>,
-    pub vertex_representative: c_int,
-    pub orientation_preserving: bool,
+pub(crate) struct Group {
+    pub(crate) id: usize,
+    pub(crate) face_indices: Vec<c_int>,
+    pub(crate) vertex_representative: c_int,
+    pub(crate) orientation_preserving: bool,
 }
 
 impl Group {
-    pub const ZERO: Group = Group {
+    pub(crate) const ZERO: Group = Group {
         id: 0,
         face_indices: Vec::new(),
         vertex_representative: 0,
@@ -146,14 +146,14 @@ impl Group {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct Edge {
-    pub i0: c_int,
-    pub i1: c_int,
-    pub f: c_int,
+pub(crate) struct Edge {
+    pub(crate) i0: c_int,
+    pub(crate) i1: c_int,
+    pub(crate) f: c_int,
 }
 
 impl Edge {
-    pub const ZERO: Edge = Edge { i0: 0, i1: 0, f: 0 };
+    pub(crate) const ZERO: Edge = Edge { i0: 0, i1: 0, f: 0 };
 }
 
 impl Index<usize> for Edge {
@@ -170,9 +170,9 @@ impl Index<usize> for Edge {
 }
 
 #[repr(C)]
-pub struct TemporaryVertex<O: Ops> {
-    pub vert: Vec3<O>,
-    pub index: c_int,
+pub(crate) struct TemporaryVertex<O: Ops> {
+    pub(crate) vert: Vec3<O>,
+    pub(crate) index: c_int,
 }
 
 impl<O: Ops> Copy for TemporaryVertex<O> {}
@@ -184,17 +184,17 @@ impl<O: Ops> Clone for TemporaryVertex<O> {
 }
 
 impl<O: Ops> TemporaryVertex<O> {
-    pub const ZERO: TemporaryVertex<O> = TemporaryVertex {
+    pub(crate) const ZERO: TemporaryVertex<O> = TemporaryVertex {
         vert: Vec3::ZERO,
         index: 0,
     };
 }
 
-pub const INTERNAL_RND_SORT_SEED: c_int = 39871946;
-pub const MARK_DEGENERATE: c_int = 1;
-pub const QUAD_ONE_DEGEN_TRI: c_int = 2;
-pub const GROUP_WITH_ANY: c_int = 4;
-pub const ORIENT_PRESERVING: c_int = 8;
+pub(crate) const INTERNAL_RND_SORT_SEED: c_int = 39871946;
+pub(crate) const MARK_DEGENERATE: c_int = 1;
+pub(crate) const QUAD_ONE_DEGEN_TRI: c_int = 2;
+pub(crate) const GROUP_WITH_ANY: c_int = 4;
+pub(crate) const ORIENT_PRESERVING: c_int = 8;
 
 fn as_index(face: c_int, vertex: c_int) -> c_int {
     assert!(vertex >= 0 && vertex < 4 && face >= 0);
@@ -238,11 +238,11 @@ fn mean_tangent_space<O: Ops>(lhs: TangentSpace<O>, rhs: TangentSpace<O>) -> Tan
     ts_res
 }
 
-pub fn generate_tangent_space_default<I: MikkTSpaceInterface<O>, O: Ops>(context: &mut I) -> bool {
+pub(crate) fn generate_tangent_space_default<I: MikkTSpaceInterface<O>, O: Ops>(context: &mut I) -> bool {
     generate_tangent_space(context, 180.0f32)
 }
 
-pub fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
+pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
     angular_threshold: f32,
 ) -> bool {

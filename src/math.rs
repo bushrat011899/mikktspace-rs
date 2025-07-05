@@ -23,18 +23,32 @@ use core::{
     ops::{Add, Index, Mul, Sub},
 };
 
+/// Provides the math operations required by the tangent space algorithm but which
+/// aren't included in Rust's [`core`] crate.
+/// With the `std` feature enabled, a (default) implementation is provided.
 pub trait Ops {
+    /// Provides a [`sqrt`] implementation for [`f32`].
+    ///
+    /// [`sqrt`]: https://doc.rust-lang.org/stable/std/primitive.f32.html#method.sqrt
     fn sqrtf(x: f32) -> f32;
+
+    /// Provides a [`cos`] implementation for [`f64`].
+    ///
+    /// [`cos`]: https://doc.rust-lang.org/stable/std/primitive.f64.html#method.cos
     fn cos(x: f64) -> f64;
+
+    /// Provides a [`acos`] implementation for [`f64`].
+    ///
+    /// [`acos`]: https://doc.rust-lang.org/stable/std/primitive.f64.html#method.acos
     fn acos(x: f64) -> f64;
 }
 
 #[repr(C)]
-pub struct Vec3<O: Ops> {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub _phantom: PhantomData<O>,
+pub(crate) struct Vec3<O: Ops> {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) z: f32,
+    pub(crate) _phantom: PhantomData<O>,
 }
 
 impl<O: Ops> Copy for Vec3<O> {}
@@ -46,29 +60,29 @@ impl<O: Ops> Clone for Vec3<O> {
 }
 
 impl<O: Ops> Vec3<O> {
-    pub const ZERO: Vec3<O> = Vec3 {
+    pub(crate) const ZERO: Vec3<O> = Vec3 {
         x: 0.,
         y: 0.,
         z: 0.,
         _phantom: PhantomData,
     };
 
-    pub fn dot(self, rhs: Self) -> f32 {
+    pub(crate) fn dot(self, rhs: Self) -> f32 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
 
-    pub fn normalize_or_zero(&mut self) {
+    pub(crate) fn normalize_or_zero(&mut self) {
         // might change this to an epsilon based test
         if not_zero(self.x) || not_zero(self.y) || not_zero(self.z) {
             *self = (1f32 / self.length()) * *self
         }
     }
 
-    pub fn length_squared(self) -> f32 {
+    pub(crate) fn length_squared(self) -> f32 {
         self.dot(self)
     }
 
-    pub fn length(self) -> f32 {
+    pub(crate) fn length(self) -> f32 {
         O::sqrtf(self.length_squared())
     }
 }
@@ -139,7 +153,7 @@ impl<O: Ops> PartialEq for Vec3<O> {
     }
 }
 
-pub fn fabsf(x: f32) -> f32 {
+pub(crate) fn fabsf(x: f32) -> f32 {
     if x.is_sign_negative() {
         -x
     } else {
@@ -147,11 +161,11 @@ pub fn fabsf(x: f32) -> f32 {
     }
 }
 
-pub fn not_zero(x: f32) -> bool {
+pub(crate) fn not_zero(x: f32) -> bool {
     // could possibly use FLT_EPSILON instead
     fabsf(x) > f32::MIN_POSITIVE
 }
 
-pub fn deg_to_rad(x: f32) -> f32 {
+pub(crate) fn deg_to_rad(x: f32) -> f32 {
     x * core::f32::consts::PI as f32 / 180.0f32
 }
