@@ -10,6 +10,10 @@ exclude = ["/data", "/reference", "/fuzz"]
 default = ["std"]
 std = []
 
+# Corrects a sorting bug in the original C implementation.
+# See https://github.com/mmikk/MikkTSpace/issues/5 for details
+corrected-edge-sorting = []
+
 [dev-dependencies]
 mikktspace-sys = "0.1.1"
 wavefront_obj = "11.0.0"

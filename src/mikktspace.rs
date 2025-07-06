@@ -1581,20 +1581,23 @@ fn build_neighbors_fast<O: Ops>(
     let entries = triangle_count * 3;
 
     // Sort over all edges by i0, this is the pricy one.
-    // Note that the below **SHOULD** be identical to:
-    //
-    // ```
-    // edges[0..(entries as usize)].sort();
-    // ```
-    //
-    // However, there appears to be a bug in the original C implementation
-    // that causes it to mis-sort the third and second last rows under certain
-    // circumstances.
-    //
-    // For the sake of byte-accuracy with the original, we are leaving the
-    // "incorrect" sort as-is.
-
+    #[cfg(feature = "corrected-edge-sorting")]
     {
+        // Sorts using the `Ord` implementation from `Edge` and `[Edge]::sort`.
+        // This is a correct and typical sort, but differs from the original C
+        // library.
+
+        edges[..(entries as usize)].sort();
+    }
+
+    #[cfg(not(feature = "corrected-edge-sorting"))]
+    {
+        // Sorts using the original quicksort implementation from the C library.
+        // Note that this includes an off-by-one error which can cause the last
+        // step in sorting to fail.
+        // This is typically observed as the verticies in the last face being
+        // out of order.
+
         quick_sort_edges(edges, 0, triangle_count * 3 - 1, 0, seed);
         let mut current_start_index = 0;
         let mut i = 1;
