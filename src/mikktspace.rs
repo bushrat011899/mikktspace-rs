@@ -493,12 +493,7 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     }
 
     // find maximum amount of entries in any hash entry
-    let mut max_count = hash_count[0_usize];
-    for k in 1..CELLS {
-        if max_count < hash_count[k] {
-            max_count = hash_count[k];
-        }
-    }
+    let max_count = *hash_count.iter().max().unwrap();
 
     // complete the merge
     let mut temporary_vertices: Vec<TemporaryVertex<O>> =
@@ -544,23 +539,27 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut max: [f32; 3] = [0.; 3];
 
     for c in 0..3 {
-        min[c as usize] = temporary_verticies[i_left_in].vert[c as usize];
-        max[c as usize] = min[c as usize];
+        min[c] = temporary_verticies[i_left_in].vert[c];
+        max[c] = min[c];
     }
-    for l in (i_left_in + 1)..=i_right_in {
+    for t in temporary_verticies
+        .iter()
+        .take(i_right_in + 1)
+        .skip(i_left_in + 1)
+    {
         for c in 0..3 {
-            if min[c as usize] > temporary_verticies[l].vert[c as usize] {
-                min[c as usize] = temporary_verticies[l].vert[c as usize];
+            if min[c] > t.vert[c] {
+                min[c] = t.vert[c];
             }
-            if max[c as usize] < temporary_verticies[l].vert[c as usize] {
-                max[c as usize] = temporary_verticies[l].vert[c as usize];
+            if max[c] < t.vert[c] {
+                max[c] = t.vert[c];
             }
         }
     }
 
-    let dx = max[0_usize] - min[0_usize];
-    let dy = max[1_usize] - min[1_usize];
-    let dz = max[2_usize] - min[2_usize];
+    let dx = max[0] - min[0];
+    let dy = max[1] - min[1];
+    let dz = max[2] - min[2];
 
     let mut channel = 0;
     if dy > dx && dy > dz {
@@ -589,8 +588,12 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 
             let mut not_found: bool = true;
             let mut i2rec = None;
-            for l2 in i_left_in..l {
-                let i2: usize = temporary_verticies[l2].index;
+            for i2 in temporary_verticies
+                .iter()
+                .take(l)
+                .skip(i_left_in)
+                .map(|t| t.index)
+            {
                 let index2: usize = triangle_verticies[i2];
                 let position_other: Vec3<O> = get_position_from_index(context, index2);
                 let normal_other: Vec3<O> = get_normal_from_index(context, index2);
@@ -1258,13 +1261,10 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             tmp_group.sort();
 
             // look for an existing match
-            let mut found = None;
-            for l in 0..unified_sub_groups_count {
-                if tmp_group == unified_sub_groups[l] {
-                    found = Some(l);
-                    break;
-                }
-            }
+            let found = unified_sub_groups
+                .iter()
+                .take(unified_sub_groups_count)
+                .position(|g| g == &tmp_group);
 
             let l = match found {
                 Some(l) => l,
