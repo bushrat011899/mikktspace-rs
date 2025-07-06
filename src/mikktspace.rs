@@ -19,11 +19,7 @@
  */
 
 use alloc::{vec, vec::Vec};
-use core::{
-    ffi::{c_int, c_uchar, c_uint, c_ulong},
-    marker::PhantomData,
-    ops::Index,
-};
+use core::{marker::PhantomData, ops::Index};
 
 use crate::{math::*, MikkTSpaceInterface};
 
@@ -33,7 +29,7 @@ pub(crate) struct TangentSpace<O: Ops> {
     pub(crate) t: Vec3<O>,
     pub(crate) t_magnitude: f32,
     /// this is to average back into quads.
-    pub(crate) counter: c_int,
+    pub(crate) counter: i32,
     pub(crate) orientation_preserving: bool,
 }
 
@@ -80,7 +76,7 @@ impl<O: Ops> TangentSpace<O> {
 }
 
 pub(crate) struct TriangleInfo<O: Ops> {
-    pub(crate) face_neighbors: [c_int; 3],
+    pub(crate) face_neighbors: [i32; 3],
     pub(crate) assigned_group: [Option<usize>; 3],
 
     /// normalized first order face derivative
@@ -94,11 +90,11 @@ pub(crate) struct TriangleInfo<O: Ops> {
     pub(crate) t_magnitude: f32,
 
     /// determines if the current and the next triangle are a quad.
-    pub(crate) original_face_index: c_int,
+    pub(crate) original_face_index: i32,
 
-    pub(crate) flags: c_int,
-    pub(crate) tangent_spaces_offset: c_int,
-    pub(crate) vertex_indices: [c_uchar; 4],
+    pub(crate) flags: i32,
+    pub(crate) tangent_spaces_offset: i32,
+    pub(crate) vertex_indices: [u8; 4],
 }
 
 impl<O: Ops> Copy for TriangleInfo<O> {}
@@ -127,8 +123,8 @@ impl<O: Ops> TriangleInfo<O> {
 #[derive(Clone)]
 pub(crate) struct Group {
     pub(crate) id: usize,
-    pub(crate) face_indices: Vec<c_int>,
-    pub(crate) vertex_representative: c_int,
+    pub(crate) face_indices: Vec<i32>,
+    pub(crate) vertex_representative: i32,
     pub(crate) orientation_preserving: bool,
 }
 
@@ -143,9 +139,9 @@ impl Group {
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub(crate) struct Edge {
-    pub(crate) i0: c_int,
-    pub(crate) i1: c_int,
-    pub(crate) f: c_int,
+    pub(crate) i0: i32,
+    pub(crate) i1: i32,
+    pub(crate) f: i32,
 }
 
 impl Edge {
@@ -153,7 +149,7 @@ impl Edge {
 }
 
 impl Index<usize> for Edge {
-    type Output = c_int;
+    type Output = i32;
 
     fn index(&self, index: usize) -> &Self::Output {
         match index {
@@ -167,7 +163,7 @@ impl Index<usize> for Edge {
 
 pub(crate) struct TemporaryVertex<O: Ops> {
     pub(crate) vert: Vec3<O>,
-    pub(crate) index: c_int,
+    pub(crate) index: i32,
 }
 
 impl<O: Ops> Copy for TemporaryVertex<O> {}
@@ -185,18 +181,18 @@ impl<O: Ops> TemporaryVertex<O> {
     };
 }
 
-pub(crate) const INTERNAL_RND_SORT_SEED: c_int = 39871946;
-pub(crate) const MARK_DEGENERATE: c_int = 1;
-pub(crate) const QUAD_ONE_DEGEN_TRI: c_int = 2;
-pub(crate) const GROUP_WITH_ANY: c_int = 4;
-pub(crate) const ORIENT_PRESERVING: c_int = 8;
+pub(crate) const INTERNAL_RND_SORT_SEED: i32 = 39871946;
+pub(crate) const MARK_DEGENERATE: i32 = 1;
+pub(crate) const QUAD_ONE_DEGEN_TRI: i32 = 2;
+pub(crate) const GROUP_WITH_ANY: i32 = 4;
+pub(crate) const ORIENT_PRESERVING: i32 = 8;
 
-fn as_index(face: c_int, vertex: c_int) -> c_int {
+fn as_index(face: i32, vertex: i32) -> i32 {
     assert!(vertex >= 0 && vertex < 4 && face >= 0);
     face << 2 | vertex & 0x3
 }
 
-fn from_index(index: c_int) -> (c_int, c_int) {
+fn from_index(index: i32) -> (i32, i32) {
     (index >> 2, index & 0x3)
 }
 
@@ -243,7 +239,7 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
     angular_threshold: f32,
 ) -> bool {
-    let mut triangles_count: c_int = 0;
+    let mut triangles_count: i32 = 0;
     let threshold_cos: f32 = O::cos(deg_to_rad(angular_threshold) as f64) as f32;
 
     // count triangles on supported faces
@@ -263,8 +259,8 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     }
 
     // allocate memory for an index list
-    let mut triangle_vertex_list: Vec<c_int> =
-        vec![0; (triangles_count as c_ulong).wrapping_mul(3) as usize];
+    let mut triangle_vertex_list: Vec<i32> =
+        vec![0; (triangles_count as u64).wrapping_mul(3) as usize];
     let mut triangle_info_list: Vec<TriangleInfo<O>> =
         vec![TriangleInfo::ZERO; triangles_count as usize];
 
@@ -284,9 +280,9 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut triangles_degenerate_total = 0;
     let mut t = 0;
     while t < triangles_count {
-        let i0: c_int = triangle_vertex_list[(t * 3 + 0) as usize];
-        let i1: c_int = triangle_vertex_list[(t * 3 + 1) as usize];
-        let i2: c_int = triangle_vertex_list[(t * 3 + 2) as usize];
+        let i0: i32 = triangle_vertex_list[(t * 3 + 0) as usize];
+        let i1: i32 = triangle_vertex_list[(t * 3 + 1) as usize];
+        let i2: i32 = triangle_vertex_list[(t * 3 + 2) as usize];
         let p0: Vec3<O> = get_position_from_index(context, i0);
         let p1: Vec3<O> = get_position_from_index(context, i1);
         let p2: Vec3<O> = get_position_from_index(context, i2);
@@ -385,7 +381,7 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut index = 0;
     f = 0;
     while f < faces_total {
-        let verts_0: c_int = context.get_num_vertices_of_face(f as usize) as c_int;
+        let verts_0: i32 = context.get_num_vertices_of_face(f as usize) as i32;
         if !(verts_0 != 3 && verts_0 != 4) {
             // I've decided to let degenerate triangles and group-with-anythings
             // vary between left/right hand coordinate systems at the vertices.
@@ -423,15 +419,15 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     true
 }
 
-const CELLS: c_int = 2048;
+const CELLS: i32 = 2048;
 
 // it is IMPORTANT that this function is called to evaluate the hash since
 // inlining could potentially reorder instructions and generate different
 // results for the same effective input value fVal.
 #[inline(never)]
-fn find_grid_cell(min: f32, max: f32, val: f32) -> c_int {
+fn find_grid_cell(min: f32, max: f32, val: f32) -> i32 {
     let face: f32 = CELLS as f32 * ((val - min) / (max - min));
-    let vertex: c_int = face as c_int;
+    let vertex: i32 = face as i32;
     if vertex < CELLS {
         if vertex >= 0 {
             vertex
@@ -444,16 +440,16 @@ fn find_grid_cell(min: f32, max: f32, val: f32) -> c_int {
 }
 
 fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_vertices: &mut [c_int],
+    triangle_vertices: &mut [i32],
     context: &I,
-    triangle_count: c_int,
+    triangle_count: i32,
 ) {
     // Generate bounding box
     let mut min: Vec3<O> = get_position_from_index(context, 0);
     let mut max: Vec3<O> = min;
     let mut i = 1;
     while i < triangle_count * 3 {
-        let index: c_int = triangle_vertices[i as usize];
+        let index: i32 = triangle_vertices[i as usize];
         let position: Vec3<O> = get_position_from_index(context, index);
         if min.x > position.x {
             min.x = position.x;
@@ -492,15 +488,15 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     // }
 
     // make allocations
-    let mut hash_table: Vec<c_int> = vec![0; (triangle_count as c_ulong).wrapping_mul(3) as usize];
-    let mut hash_count: Vec<c_int> = vec![0; CELLS as usize];
-    let mut hash_offsets: Vec<c_int> = vec![0; CELLS as usize];
-    let mut hash_count_2: Vec<c_int> = vec![0; CELLS as usize];
+    let mut hash_table: Vec<i32> = vec![0; (triangle_count as u64).wrapping_mul(3) as usize];
+    let mut hash_count: Vec<i32> = vec![0; CELLS as usize];
+    let mut hash_offsets: Vec<i32> = vec![0; CELLS as usize];
+    let mut hash_count_2: Vec<i32> = vec![0; CELLS as usize];
 
     // count amount of elements in each cell unit
     i = 0;
     while i < triangle_count * 3 {
-        let index_0: c_int = triangle_vertices[i as usize];
+        let index_0: i32 = triangle_vertices[i as usize];
         let position: Vec3<O> = get_position_from_index(context, index_0);
         let val: f32 = if channel == 0 {
             position.x
@@ -509,7 +505,7 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
         } else {
             position.z
         };
-        let cell: c_int = find_grid_cell(min_channel, max_channel, val);
+        let cell: i32 = find_grid_cell(min_channel, max_channel, val);
         let fresh0 = &mut hash_count[cell as usize];
         *fresh0 += 1;
         i += 1;
@@ -526,7 +522,7 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     // insert vertices
     i = 0;
     while i < triangle_count * 3 {
-        let index_1: c_int = triangle_vertices[i as usize];
+        let index_1: i32 = triangle_vertices[i as usize];
         let position: Vec3<O> = get_position_from_index(context, index_1);
         let val: f32 = if channel == 0 {
             position.x
@@ -535,7 +531,7 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
         } else {
             position.z
         };
-        let cell: c_int = find_grid_cell(min_channel, max_channel, val);
+        let cell: i32 = find_grid_cell(min_channel, max_channel, val);
         assert!(hash_count_2[cell as usize] < hash_count[cell as usize]);
         let entry = &mut hash_table
             [hash_offsets[cell as usize] as usize + hash_count_2[cell as usize] as usize];
@@ -567,19 +563,19 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
         vec![TemporaryVertex::<O>::ZERO; max_count as usize];
     k = 0;
     while k < CELLS {
-        let entries: c_int = hash_count[k as usize];
+        let entries: i32 = hash_count[k as usize];
         if entries >= 2 {
             // if /* couldn't allocate pTmpVert? */ {
             //     MergeVertsSlow(
             //         piTriList_in_and_out,
             //         context,
-            //         pTable_0 as *const c_int,
+            //         pTable_0 as *const i32,
             //         iEntries,
             //     );
             // }
             let mut e = 0;
             while e < entries {
-                let i_0: c_int = hash_table[hash_offsets[k as usize] as usize + e as usize];
+                let i_0: i32 = hash_table[hash_offsets[k as usize] as usize + e as usize];
                 let position: Vec3<O> =
                     get_position_from_index(context, triangle_vertices[i_0 as usize]);
                 temporary_vertices[e as usize].vert = position;
@@ -599,11 +595,11 @@ fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_verticies: &mut [c_int],
+    triangle_verticies: &mut [i32],
     temporary_verticies: &mut [TemporaryVertex<O>],
     context: &I,
-    i_left_in: c_int,
-    i_right_in: c_int,
+    i_left_in: i32,
+    i_right_in: i32,
 ) {
     // make bbox
     let mut min: [f32; 3] = [0.; 3];
@@ -654,18 +650,18 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
         // complete the weld
         l = i_left_in;
         while l <= i_right_in {
-            let i: c_int = temporary_verticies[l as usize].index;
-            let index: c_int = triangle_verticies[i as usize];
+            let i: i32 = temporary_verticies[l as usize].index;
+            let index: i32 = triangle_verticies[i as usize];
             let position: Vec3<O> = get_position_from_index(context, index);
             let normal: Vec3<O> = get_normal_from_index(context, index);
             let texture_position: Vec3<O> = get_texture_coordinate_from_index(context, index);
 
             let mut not_found: bool = true;
-            let mut l2: c_int = i_left_in;
-            let mut i2rec: c_int = -(1);
+            let mut l2: i32 = i_left_in;
+            let mut i2rec: i32 = -(1);
             while l2 < l && not_found {
-                let i2: c_int = temporary_verticies[l2 as usize].index;
-                let index2: c_int = triangle_verticies[i2 as usize];
+                let i2: i32 = temporary_verticies[l2 as usize].index;
+                let index2: i32 = triangle_verticies[i2 as usize];
                 let position_other: Vec3<O> = get_position_from_index(context, index2);
                 let normal_other: Vec3<O> = get_normal_from_index(context, index2);
                 let texture_position_other: Vec3<O> =
@@ -697,8 +693,8 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
             l += 1;
         }
     } else {
-        let mut i_left: c_int = i_left_in;
-        let mut i_right: c_int = i_right_in;
+        let mut i_left: i32 = i_left_in;
+        let mut i_right: i32 = i_right_in;
         assert!(i_right_in - i_left_in > 0, "at least 2 entries");
 
         // separate (by fSep) all points between iL_in and iR_in in pTmpVert[]
@@ -770,14 +766,14 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 
 fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
-    triangle_verticies: &mut [c_int],
+    triangle_verticies: &mut [i32],
     context: &I,
-    triangle_count: c_int,
-) -> c_int {
+    triangle_count: i32,
+) -> i32 {
     let mut tangent_space_offset = 0;
-    let mut destination_triangle_info_index: c_int = 0;
+    let mut destination_triangle_info_index: i32 = 0;
     let mut f = 0;
-    while f < context.get_num_faces() as c_int {
+    while f < context.get_num_faces() as i32 {
         let verts = context.get_num_vertices_of_face(f as usize);
         if !(verts != 3 && verts != 4) {
             triangle_info_list[destination_triangle_info_index as usize].original_face_index = f;
@@ -786,9 +782,9 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
             if verts == 3 {
                 let verticies = &mut triangle_info_list[destination_triangle_info_index as usize]
                     .vertex_indices;
-                verticies[0] = 0 as c_uchar;
-                verticies[1] = 1 as c_uchar;
-                verticies[2] = 2 as c_uchar;
+                verticies[0] = 0 as u8;
+                verticies[1] = 1 as u8;
+                verticies[2] = 2 as u8;
                 triangle_verticies[(destination_triangle_info_index * 3 + 0) as usize] =
                     as_index(f, 0);
                 triangle_verticies[(destination_triangle_info_index * 3 + 1) as usize] =
@@ -805,10 +801,10 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 // need an order independent way to evaluate
                 // tspace on quads. This is done by splitting
                 // along the shortest diagonal.
-                let i0: c_int = as_index(f, 0);
-                let i1: c_int = as_index(f, 1);
-                let i2: c_int = as_index(f, 2);
-                let i3: c_int = as_index(f, 3);
+                let i0: i32 = as_index(f, 0);
+                let i1: i32 = as_index(f, 1);
+                let i2: i32 = as_index(f, 2);
+                let i3: i32 = as_index(f, 3);
                 let tx0: Vec3<O> = get_texture_coordinate_from_index(context, i0);
                 let tx1: Vec3<O> = get_texture_coordinate_from_index(context, i1);
                 let tx2: Vec3<O> = get_texture_coordinate_from_index(context, i2);
@@ -832,9 +828,9 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
                     let verticies_a = &mut triangle_info_list
                         [destination_triangle_info_index as usize]
                         .vertex_indices;
-                    verticies_a[0] = 0 as c_uchar;
-                    verticies_a[1] = 1 as c_uchar;
-                    verticies_a[2] = 2 as c_uchar;
+                    verticies_a[0] = 0 as u8;
+                    verticies_a[1] = 1 as u8;
+                    verticies_a[2] = 2 as u8;
                     triangle_verticies[(destination_triangle_info_index * 3 + 0) as usize] = i0;
                     triangle_verticies[(destination_triangle_info_index * 3 + 1) as usize] = i1;
                     triangle_verticies[(destination_triangle_info_index * 3 + 2) as usize] = i2;
@@ -842,9 +838,9 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
                     let verticies_b = &mut triangle_info_list
                         [destination_triangle_info_index as usize]
                         .vertex_indices;
-                    verticies_b[0] = 0 as c_uchar;
-                    verticies_b[1] = 2 as c_uchar;
-                    verticies_b[2] = 3 as c_uchar;
+                    verticies_b[0] = 0 as u8;
+                    verticies_b[1] = 2 as u8;
+                    verticies_b[2] = 3 as u8;
                     triangle_verticies[(destination_triangle_info_index * 3 + 0) as usize] = i0;
                     triangle_verticies[(destination_triangle_info_index * 3 + 1) as usize] = i2;
                     triangle_verticies[(destination_triangle_info_index * 3 + 2) as usize] = i3;
@@ -853,9 +849,9 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
                     let verticies_a = &mut triangle_info_list
                         [destination_triangle_info_index as usize]
                         .vertex_indices;
-                    verticies_a[0] = 0 as c_uchar;
-                    verticies_a[1] = 1 as c_uchar;
-                    verticies_a[2] = 3 as c_uchar;
+                    verticies_a[0] = 0 as u8;
+                    verticies_a[1] = 1 as u8;
+                    verticies_a[2] = 3 as u8;
                     triangle_verticies[(destination_triangle_info_index * 3 + 0) as usize] = i0;
                     triangle_verticies[(destination_triangle_info_index * 3 + 1) as usize] = i1;
                     triangle_verticies[(destination_triangle_info_index * 3 + 2) as usize] = i3;
@@ -863,16 +859,16 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
                     let verticies_b = &mut triangle_info_list
                         [destination_triangle_info_index as usize]
                         .vertex_indices;
-                    verticies_b[0] = 1 as c_uchar;
-                    verticies_b[1] = 2 as c_uchar;
-                    verticies_b[2] = 3 as c_uchar;
+                    verticies_b[0] = 1 as u8;
+                    verticies_b[1] = 2 as u8;
+                    verticies_b[2] = 3 as u8;
                     triangle_verticies[(destination_triangle_info_index * 3 + 0) as usize] = i1;
                     triangle_verticies[(destination_triangle_info_index * 3 + 1) as usize] = i2;
                     triangle_verticies[(destination_triangle_info_index * 3 + 2) as usize] = i3;
                     destination_triangle_info_index += 1;
                 }
             }
-            tangent_space_offset += verts as c_int;
+            tangent_space_offset += verts as i32;
             assert!(destination_triangle_info_index <= triangle_count);
         }
         f += 1;
@@ -888,10 +884,7 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     tangent_space_offset
 }
 
-fn get_position_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
-    context: &I,
-    index: c_int,
-) -> Vec3<O> {
+fn get_position_from_index<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, index: i32) -> Vec3<O> {
     let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
     let pos = context.get_position(face as usize, vertex as usize);
@@ -901,7 +894,7 @@ fn get_position_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
     res
 }
 
-fn get_normal_from_index<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, index: c_int) -> Vec3<O> {
+fn get_normal_from_index<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, index: i32) -> Vec3<O> {
     let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
     let norm = context.get_normal(face as usize, vertex as usize);
@@ -913,7 +906,7 @@ fn get_normal_from_index<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, index: 
 
 fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
-    index: c_int,
+    index: i32,
 ) -> Vec3<O> {
     let mut res: Vec3<O> = Vec3::ZERO;
     let (face, vertex) = from_index(index);
@@ -925,10 +918,7 @@ fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 /// returns the texture area times 2
-fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
-    context: &I,
-    indices: &[c_int],
-) -> f32 {
+fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(context: &I, indices: &[i32]) -> f32 {
     let t1: Vec3<O> = get_texture_coordinate_from_index(context, indices[0]);
     let t2: Vec3<O> = get_texture_coordinate_from_index(context, indices[1]);
     let t3: Vec3<O> = get_texture_coordinate_from_index(context, indices[2]);
@@ -948,11 +938,11 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
 
 fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
-    triangle_vertex_list: &[c_int],
+    triangle_vertex_list: &[i32],
     context: &I,
-    triangle_count: c_int,
+    triangle_count: i32,
 ) {
-    let mut t: c_int = 0;
+    let mut t: i32 = 0;
     // triangle_info_list[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
 
     // generate neighbor info list
@@ -1045,8 +1035,8 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
 
     // force otherwise healthy quads to a fixed orientation
     while t < triangle_count - 1 {
-        let original_face_index_a: c_int = triangle_info_list[t as usize].original_face_index;
-        let original_face_index_b: c_int = triangle_info_list[(t + 1) as usize].original_face_index;
+        let original_face_index_a: i32 = triangle_info_list[t as usize].original_face_index;
+        let original_face_index_b: i32 = triangle_info_list[(t + 1) as usize].original_face_index;
         if original_face_index_a == original_face_index_b {
             // this is a quad
             let is_degenerate_a: bool = triangle_info_list[t as usize].flags & MARK_DEGENERATE != 0;
@@ -1085,12 +1075,12 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
                     }
 
                     // force match
-                    let t0: c_int = if choose_orientation_first_triangle {
+                    let t0: i32 = if choose_orientation_first_triangle {
                         t
                     } else {
                         t + 1
                     };
-                    let t1_0: c_int = if choose_orientation_first_triangle {
+                    let t1_0: i32 = if choose_orientation_first_triangle {
                         t + 1
                     } else {
                         t
@@ -1114,8 +1104,7 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     // }
 
     // match up edge pairs
-    let mut edges: Vec<Edge> =
-        vec![Edge::ZERO; (triangle_count as c_ulong).wrapping_mul(3) as usize];
+    let mut edges: Vec<Edge> = vec![Edge::ZERO; (triangle_count as u64).wrapping_mul(3) as usize];
     let vert_count = edges.len();
     let face_count = vert_count / 3;
     build_neighbors_fast(
@@ -1129,11 +1118,11 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
 fn build_4_rule_groups<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     groups: &mut [Group],
-    triangle_vertex_list: &[c_int],
-    triangle_count: c_int,
-) -> c_int {
-    let groups_max_count: c_int = triangle_count * 3;
-    let mut groups_active_count: c_int = 0;
+    triangle_vertex_list: &[i32],
+    triangle_count: i32,
+) -> i32 {
+    let groups_max_count: i32 = triangle_count * 3;
+    let mut groups_active_count: i32 = 0;
 
     let mut f = 0;
     while f < triangle_count {
@@ -1143,7 +1132,7 @@ fn build_4_rule_groups<O: Ops>(
             if triangle_info_list[f as usize].flags & GROUP_WITH_ANY == 0
                 && triangle_info_list[f as usize].assigned_group[i as usize].is_none()
             {
-                let vert_index: c_int = triangle_vertex_list[(f * 3 + i) as usize];
+                let vert_index: i32 = triangle_vertex_list[(f * 3 + i) as usize];
                 assert!(groups_active_count < groups_max_count);
                 triangle_info_list[f as usize].assigned_group[i as usize] =
                     Some(groups_active_count as usize);
@@ -1202,26 +1191,26 @@ fn build_4_rule_groups<O: Ops>(
     groups_active_count
 }
 
-fn add_triangle_to_group(group: &mut Group, triangle_index: c_int) {
+fn add_triangle_to_group(group: &mut Group, triangle_index: i32) {
     group.face_indices.push(triangle_index);
 }
 
 fn assign_to_group_recursive<O: Ops>(
-    triangle_vertex_list: &[c_int],
+    triangle_vertex_list: &[i32],
     triangle_infos: &mut [TriangleInfo<O>],
-    triangle_index: c_int,
+    triangle_index: i32,
     group: &mut Group,
 ) -> bool {
     let triangle_info = &mut triangle_infos[triangle_index as usize];
 
     // track down vertex
-    let vertex_representative: c_int = group.vertex_representative;
+    let vertex_representative: i32 = group.vertex_representative;
     let vertices = &triangle_vertex_list[{
         let a = (3 * triangle_index + 0) as usize;
         let b = a + 3;
         a..b
     }];
-    let mut i: c_int = -(1);
+    let mut i: i32 = -(1);
     if vertices[0] == vertex_representative {
         i = 0;
     } else if vertices[1] == vertex_representative {
@@ -1260,8 +1249,8 @@ fn assign_to_group_recursive<O: Ops>(
     add_triangle_to_group(&mut *group, triangle_index);
     triangle_info.assigned_group[i as usize] = Some(group.id);
 
-    let face_neighbor_index_left: c_int = triangle_info.face_neighbors[i as usize];
-    let face_neighbor_index_right: c_int =
+    let face_neighbor_index_left: i32 = triangle_info.face_neighbors[i as usize];
+    let face_neighbor_index_right: i32 =
         triangle_info.face_neighbors[(if i > 0 { i - 1 } else { 2 }) as usize];
     if face_neighbor_index_left >= 0 {
         assign_to_group_recursive(
@@ -1287,8 +1276,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     tangent_spaces: &mut [TangentSpace<O>],
     triangle_info_list: &[TriangleInfo<O>],
     groups: &[Group],
-    groups_active_count: c_int,
-    triangle_vertex_list: &[c_int],
+    groups_active_count: i32,
+    triangle_vertex_list: &[i32],
     threshold_cos: f32,
     context: &I,
 ) -> bool {
@@ -1308,18 +1297,18 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     // make initial allocations
     let mut sub_group_tangent_spaces: Vec<TangentSpace<O>> =
         vec![TangentSpace::ZERO; faces_max_count as usize];
-    let mut unified_sub_groups: Vec<Vec<c_int>> = vec![Vec::new(); faces_max_count as usize];
+    let mut unified_sub_groups: Vec<Vec<i32>> = vec![Vec::new(); faces_max_count as usize];
     let mut g = 0;
     while g < groups_active_count {
         let group = &groups[g as usize];
-        let mut unified_sub_groups_count: c_int = 0;
+        let mut unified_sub_groups_count: i32 = 0;
 
         // triangles
         let mut i = 0;
         while i < group.face_indices.len() {
             // triangle number
-            let f: c_int = (group.face_indices)[i as usize];
-            let mut tmp_group = Vec::<c_int>::new();
+            let f: i32 = (group.face_indices)[i as usize];
+            let mut tmp_group = Vec::<i32>::new();
             let index = if triangle_info_list[f as usize].assigned_group[0 as usize]
                 == Some(g as usize)
             {
@@ -1354,9 +1343,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let mut j = 0;
             while j < group.face_indices.len() {
                 // triangle number
-                let t: c_int = (group.face_indices)[j as usize];
-                let original_face_index_t: c_int =
-                    triangle_info_list[t as usize].original_face_index;
+                let t: i32 = (group.face_indices)[j as usize];
+                let original_face_index_t: i32 = triangle_info_list[t as usize].original_face_index;
 
                 // project
                 let mut s_t: Vec3<O> = triangle_info_list[t as usize].s
@@ -1448,11 +1436,11 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
-    face_indices: &[c_int],
-    triangle_vertex_list: &[c_int],
+    face_indices: &[i32],
+    triangle_vertex_list: &[i32],
     triangle_info_list: &[TriangleInfo<O>],
     context: &I,
-    vertex_representative: c_int,
+    vertex_representative: i32,
 ) -> TangentSpace<O> {
     let face_indices_count = face_indices.len();
     let mut res: TangentSpace<O> = TangentSpace {
@@ -1475,7 +1463,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 
     let mut face = 0;
     while face < face_indices_count {
-        let f: c_int = face_indices[face as usize];
+        let f: i32 = face_indices[face as usize];
 
         // only valid triangles get to add their contribution
         if triangle_info_list[f as usize].flags & GROUP_WITH_ANY == 0 {
@@ -1552,18 +1540,17 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 fn build_neighbors_fast<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     edges: &mut [Edge],
-    triangle_vertex_list: &[c_int],
-    triangle_count: c_int,
+    triangle_vertex_list: &[i32],
+    triangle_count: i32,
 ) {
     // build array of edges
-    let seed: c_uint = INTERNAL_RND_SORT_SEED as c_uint;
+    let seed: u32 = INTERNAL_RND_SORT_SEED as u32;
     let mut f = 0;
     while f < triangle_count {
         let mut i = 0;
         while i < 3 {
-            let i0: c_int = triangle_vertex_list[(f * 3 + i) as usize];
-            let i1: c_int =
-                triangle_vertex_list[(f * 3 + (if i < 2 { i + 1 } else { 0 })) as usize];
+            let i0: i32 = triangle_vertex_list[(f * 3 + i) as usize];
+            let i1: i32 = triangle_vertex_list[(f * 3 + (if i < 2 { i + 1 } else { 0 })) as usize];
 
             // put minimum index in i0
             edges[(f * 3 + i) as usize].i0 = i0.min(i1);
@@ -1603,8 +1590,8 @@ fn build_neighbors_fast<O: Ops>(
         let mut i = 1;
         while i < entries {
             if edges[current_start_index as usize].i0 != edges[i as usize].i0 {
-                let index_left: c_int = current_start_index;
-                let index_right: c_int = i - 1;
+                let index_left: i32 = current_start_index;
+                let index_right: i32 = i - 1;
                 current_start_index = i;
                 quick_sort_edges(edges, index_left, index_right, 1, seed);
             }
@@ -1616,8 +1603,8 @@ fn build_neighbors_fast<O: Ops>(
             if edges[current_start_index as usize].i0 != edges[i as usize].i0
                 || edges[current_start_index as usize].i1 != edges[i as usize].i1
             {
-                let index_left: c_int = current_start_index;
-                let index_right: c_int = i - 1;
+                let index_left: i32 = current_start_index;
+                let index_right: i32 = i - 1;
                 current_start_index = i;
                 quick_sort_edges(edges, index_left, index_right, 2, seed);
             }
@@ -1628,11 +1615,11 @@ fn build_neighbors_fast<O: Ops>(
     // pair up, adjacent triangles
     let mut i = 0;
     while i < entries {
-        let i0_0: c_int = edges[i as usize].i0;
-        let i1_0: c_int = edges[i as usize].i1;
-        let f_0: c_int = edges[i as usize].f;
+        let i0_0: i32 = edges[i as usize].i0;
+        let i1_0: i32 = edges[i as usize].i1;
+        let f_0: i32 = edges[i as usize].f;
 
-        let mut edgenum_b: c_int = 0;
+        let mut edgenum_b: i32 = 0;
 
         // resolve index ordering and edge_num
         let (edgenum_a, i0_a, i1_a) = get_edge(
@@ -1650,7 +1637,7 @@ fn build_neighbors_fast<O: Ops>(
 
         if unassigned_a {
             // get true index ordering
-            let mut j: c_int = i + 1;
+            let mut j: i32 = i + 1;
             let mut not_found: bool = true;
             while j < entries
                 && i0_0 == edges[j as usize].i0
@@ -1682,7 +1669,7 @@ fn build_neighbors_fast<O: Ops>(
             }
 
             if !not_found {
-                let t_0: c_int = edges[j as usize].f;
+                let t_0: i32 = edges[j as usize].f;
                 triangle_info_list[f_0 as usize].face_neighbors[edgenum_a as usize] = t_0;
                 triangle_info_list[t_0 as usize].face_neighbors[edgenum_b as usize] = f_0;
             }
@@ -1698,12 +1685,12 @@ fn build_neighbors_fast<O: Ops>(
 /// Further testing is required.
 fn quick_sort_edges(
     sort_buffer: &mut [Edge],
-    index_left_in: c_int,
-    index_right_in: c_int,
-    channel: c_int,
-    mut seed: c_uint,
+    index_left_in: i32,
+    index_right_in: i32,
+    channel: i32,
+    mut seed: u32,
 ) {
-    let elements: c_int = index_right_in - index_left_in + 1;
+    let elements: i32 = index_right_in - index_left_in + 1;
     if elements < 2 {
         return;
     } else if elements == 2 {
@@ -1714,15 +1701,15 @@ fn quick_sort_edges(
         }
         return;
     }
-    let mut t = seed & 31 as c_uint;
-    t = seed.wrapping_shl(t) | seed.wrapping_shr((32 as c_uint).wrapping_sub(t));
-    seed = seed.wrapping_add(t).wrapping_add(3 as c_uint);
+    let mut t = seed & 31 as u32;
+    t = seed.wrapping_shl(t) | seed.wrapping_shr((32 as u32).wrapping_sub(t));
+    seed = seed.wrapping_add(t).wrapping_add(3 as u32);
     let mut index_left = index_left_in;
     let mut index_right = index_right_in;
     let n = index_right - index_left + 1;
     assert!(n >= 0);
-    let index = seed.wrapping_rem(n as c_uint);
-    let index_mid = sort_buffer[(index + (index_left as c_uint)) as usize][channel as usize];
+    let index = seed.wrapping_rem(n as u32);
+    let index_mid = sort_buffer[(index + (index_left as u32)) as usize][channel as usize];
     loop {
         while sort_buffer[index_left as usize][channel as usize] < index_mid {
             index_left += 1;
@@ -1749,27 +1736,27 @@ fn quick_sort_edges(
 
 /// Finds the index of the edge `(i0_in, i1_in)` within `indices`, additionally
 /// returning `i0_in` and `i1_in` in the same order as they are stored within `indices`.
-fn get_edge(indices: &[c_int], i0: c_int, i1: c_int) -> Option<(c_int, c_int, c_int)> {
+fn get_edge(indices: &[i32], i0: i32, i1: i32) -> Option<(i32, i32, i32)> {
     indices
         .iter()
         .copied()
         .zip(indices.iter().copied().cycle().skip(1))
         .enumerate()
         .find(|&(_, (a, b))| (a.min(b), a.max(b)) == (i0.min(i1), i0.max(i1)))
-        .map(|(edgenum, (a, b))| (edgenum as c_int, a as c_int, b as c_int))
+        .map(|(edgenum, (a, b))| (edgenum as i32, a as i32, b as i32))
 }
 
 fn degen_prologue<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
-    triangle_vertices: &mut [c_int],
-    triangle_count: c_int,
-    triangle_count_total: c_int,
+    triangle_vertices: &mut [i32],
+    triangle_count: i32,
+    triangle_count_total: i32,
 ) {
     // locate quads with only one good triangle
-    let mut t: c_int = 0;
+    let mut t: i32 = 0;
     while t < triangle_count_total - 1 {
-        let original_face_index_a: c_int = triangle_info_list[t as usize].original_face_index;
-        let original_face_index_b: c_int = triangle_info_list[(t + 1) as usize].original_face_index;
+        let original_face_index_a: i32 = triangle_info_list[t as usize].original_face_index;
+        let original_face_index_b: i32 = triangle_info_list[(t + 1) as usize].original_face_index;
         if original_face_index_a == original_face_index_b {
             // this is a quad
             let is_degenerate_a: bool = triangle_info_list[t as usize].flags & MARK_DEGENERATE != 0;
@@ -1842,10 +1829,10 @@ fn degen_prologue<O: Ops>(
 fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
     tangent_spaces: &mut [TangentSpace<O>],
     triangle_info_list: &[TriangleInfo<O>],
-    triangle_vertex_list: &[c_int],
+    triangle_vertex_list: &[i32],
     context: &I,
-    triangle_count: c_int,
-    triangle_total_count: c_int,
+    triangle_count: i32,
+    triangle_total_count: i32,
 ) {
     // deal with degenerate triangles
     // punishment for degenerate triangles is O(N^2)
@@ -1858,12 +1845,12 @@ fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
         if !skip {
             let mut i = 0;
             while i < 3 {
-                let index1: c_int = triangle_vertex_list[(t * 3 + i) as usize];
+                let index1: i32 = triangle_vertex_list[(t * 3 + i) as usize];
                 // search through the good triangles
                 let mut not_found: bool = true;
-                let mut j: c_int = 0;
+                let mut j: i32 = 0;
                 while not_found && j < 3 * triangle_count {
-                    let index2: c_int = triangle_vertex_list[j as usize];
+                    let index2: i32 = triangle_vertex_list[j as usize];
                     if index1 == index2 {
                         not_found = false;
                     } else {
@@ -1872,8 +1859,8 @@ fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
                 }
 
                 if !not_found {
-                    let face: c_int = j / 3;
-                    let vertex: c_int = j % 3;
+                    let face: i32 = j / 3;
+                    let vertex: i32 = j % 3;
                     let source_vertex =
                         triangle_info_list[face as usize].vertex_indices[vertex as usize] as usize;
                     let source_tangent_space_offset =
@@ -1903,8 +1890,8 @@ fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
         // other triangle is degenerate
         if triangle_info_list[t as usize].flags & QUAD_ONE_DEGEN_TRI != 0 {
             let vertices: [u8; 4] = triangle_info_list[t as usize].vertex_indices;
-            let flag: c_int = (1) << vertices[0] | (1) << vertices[1] | (1) << vertices[2];
-            let mut missing_index: c_int = 0;
+            let flag: i32 = (1) << vertices[0] | (1) << vertices[1] | (1) << vertices[2];
+            let mut missing_index: i32 = 0;
             if flag & 2 == 0 {
                 missing_index = 1;
             } else if flag & 4 == 0 {
@@ -1919,11 +1906,11 @@ fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
             let mut not_found = true;
             let mut i_0 = 0;
             while not_found && i_0 < 3 {
-                let vertex = vertices[i_0 as usize] as c_int;
+                let vertex = vertices[i_0 as usize] as i32;
                 let source_position: Vec3<O> =
                     get_position_from_index(context, as_index(original_face_index, vertex));
                 if source_position == missing_position {
-                    let tangent_space_offset: c_int =
+                    let tangent_space_offset: i32 =
                         triangle_info_list[t as usize].tangent_spaces_offset;
                     tangent_spaces[(tangent_space_offset + missing_index) as usize] =
                         tangent_spaces[(tangent_space_offset + vertex) as usize];
