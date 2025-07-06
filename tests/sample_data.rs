@@ -61,7 +61,7 @@ impl mikktspace_rs::MikkTSpaceInterface for WavefrontObject<'_> {
 
         let vertex = self.object.vertices[index];
 
-        [vertex.x as f32, vertex.y as f32, vertex.z as f32].into()
+        [vertex.x as f32, vertex.y as f32, vertex.z as f32]
     }
 
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3] {
@@ -88,7 +88,7 @@ impl mikktspace_rs::MikkTSpaceInterface for WavefrontObject<'_> {
 
         let normal = self.object.normals[index];
 
-        [normal.x as f32, normal.y as f32, normal.z as f32].into()
+        [normal.x as f32, normal.y as f32, normal.z as f32]
     }
 
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
@@ -139,23 +139,23 @@ impl mikktspace_rs::MikkTSpaceInterface for WavefrontObject<'_> {
 
 impl mikktspace_sys::MikkTSpaceInterface for WavefrontObject<'_> {
     fn get_num_faces(&self) -> usize {
-        <Self as mikktspace_rs::MikkTSpaceInterface>::get_num_faces(&self)
+        <Self as mikktspace_rs::MikkTSpaceInterface>::get_num_faces(self)
     }
 
     fn get_num_vertices_of_face(&self, face: usize) -> usize {
-        <Self as mikktspace_rs::MikkTSpaceInterface>::get_num_vertices_of_face(&self, face)
+        <Self as mikktspace_rs::MikkTSpaceInterface>::get_num_vertices_of_face(self, face)
     }
 
     fn get_position(&self, face: usize, vert: usize) -> [f32; 3] {
-        <Self as mikktspace_rs::MikkTSpaceInterface>::get_position(&self, face, vert)
+        <Self as mikktspace_rs::MikkTSpaceInterface>::get_position(self, face, vert)
     }
 
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3] {
-        <Self as mikktspace_rs::MikkTSpaceInterface>::get_normal(&self, face, vert)
+        <Self as mikktspace_rs::MikkTSpaceInterface>::get_normal(self, face, vert)
     }
 
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
-        <Self as mikktspace_rs::MikkTSpaceInterface>::get_tex_coord(&self, face, vert)
+        <Self as mikktspace_rs::MikkTSpaceInterface>::get_tex_coord(self, face, vert)
     }
 
     fn set_tspace(
@@ -175,7 +175,7 @@ impl mikktspace_sys::MikkTSpaceInterface for WavefrontObject<'_> {
                 bi_tangent,
                 tangent_magnitude: mag_s,
                 bi_tangent_magnitude: mag_t,
-                is_orientation_preserving: is_orientation_preserving,
+                is_orientation_preserving,
             },
         );
     }

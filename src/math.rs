@@ -166,5 +166,5 @@ pub(crate) fn not_zero(x: f32) -> bool {
 }
 
 pub(crate) fn deg_to_rad(x: f32) -> f32 {
-    x * core::f32::consts::PI as f32 / 180.0f32
+    x * core::f32::consts::PI / 180.0f32
 }
