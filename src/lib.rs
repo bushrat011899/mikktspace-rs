@@ -80,7 +80,7 @@ extern crate alloc;
 mod math;
 mod mikktspace;
 
-use mikktspace::{generate_tangent_space, generate_tangent_space_default};
+use mikktspace::generate_tangent_space;
 
 #[cfg(feature = "std")]
 mod std {
@@ -219,7 +219,7 @@ where
     I: MikkTSpaceInterface<O>,
     O: Ops,
 {
-    generate_tangent_space_default(interface)
+    generate_tangent_space(interface, 180.0f32).is_ok()
 }
 
 pub fn gen_tang_space<I, O>(interface: &mut I, angular_threshold: f32) -> bool
@@ -227,5 +227,5 @@ where
     I: MikkTSpaceInterface<O>,
     O: Ops,
 {
-    generate_tangent_space(interface, angular_threshold)
+    generate_tangent_space(interface, angular_threshold).is_ok()
 }
