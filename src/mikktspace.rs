@@ -1144,7 +1144,7 @@ fn build_4_rule_groups<O: Ops>(
                 this_group.face_indices = Vec::new();
                 groups_active_count += 1;
 
-                add_triangle_to_group(this_group, f);
+                this_group.face_indices.push(f);
                 let orientation_preserving_f =
                     triangle_info_list[f as usize].flags & ORIENT_PRESERVING != 0;
                 let face_neighbor_index_left =
@@ -1189,10 +1189,6 @@ fn build_4_rule_groups<O: Ops>(
     }
 
     groups_active_count
-}
-
-fn add_triangle_to_group(group: &mut Group, triangle_index: i32) {
-    group.face_indices.push(triangle_index);
 }
 
 fn assign_to_group_recursive<O: Ops>(
@@ -1246,7 +1242,7 @@ fn assign_to_group_recursive<O: Ops>(
         return false;
     }
 
-    add_triangle_to_group(&mut *group, triangle_index);
+    group.face_indices.push(triangle_index);
     triangle_info.assigned_group[i as usize] = Some(group.id);
 
     let face_neighbor_index_left: i32 = triangle_info.face_neighbors[i as usize];
