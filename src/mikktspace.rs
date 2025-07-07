@@ -958,13 +958,7 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     // }
 
     // match up edge pairs
-    let face_count = triangle_count;
-    let vert_count = triangle_count * 3;
-    build_neighbors_fast(
-        &mut triangle_info_list[..face_count],
-        &triangle_vertex_list[..vert_count],
-        triangle_count,
-    );
+    build_neighbors_fast(triangle_info_list, triangle_vertex_list);
 }
 
 fn build_4_rule_groups<O: Ops>(
@@ -1341,57 +1335,40 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     res
 }
 
-fn build_neighbors_fast<O: Ops>(
-    triangle_info_list: &mut [TriangleInfo<O>],
-    triangle_vertex_list: &[usize],
-    triangle_count: usize,
-) {
+fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[usize]) {
     // build array of edges
-    let mut edges = (0..triangle_count)
-        .flat_map(|f| {
-            (0..3)
-                .zip((0..3).cycle().skip(1))
+    let mut edges = vertices
+        .chunks_exact(3)
+        .take(triangles.len())
+        .enumerate()
+        .flat_map(|(f, chunk)| {
+            chunk
+                .iter()
+                .zip(chunk.iter().cycle().skip(1))
                 .take(3)
-                .map(move |(a, b)| (f, a, b))
+                .map(move |(a, b)| (f, a.min(b), a.max(b)))
         })
-        .map(|(f, a, b)| {
-            let i0 = triangle_vertex_list[f * 3 + a];
-            let i1 = triangle_vertex_list[f * 3 + b];
-            Edge {
-                // put minimum index in i0
-                i0: i0.min(i1),
-                // put maximum index in i1
-                i1: i0.max(i1),
-                // record face number
-                f,
-            }
-        })
+        .map(|(f, &i0, &i1)| Edge { i0, i1, f })
         .collect::<Vec<_>>();
 
-    let entries = triangle_count * 3;
-
     // Sort over all edges by i0, this is the pricy one.
+    // Sorts using the `Ord` implementation from `Edge` and `[Edge]::sort`.
+    // This is a correct and typical sort, but differs from the original C
+    // library.
     #[cfg(feature = "corrected-edge-sorting")]
-    {
-        // Sorts using the `Ord` implementation from `Edge` and `[Edge]::sort`.
-        // This is a correct and typical sort, but differs from the original C
-        // library.
+    edges.sort();
 
-        edges[..entries].sort();
-    }
-
+    // Sorts using the original quicksort implementation from the C library.
+    // Note that this includes an off-by-one error which can cause the last
+    // step in sorting to fail.
+    // This is typically observed as the verticies in the last face being
+    // out of order.
     #[cfg(not(feature = "corrected-edge-sorting"))]
     {
-        // Sorts using the original quicksort implementation from the C library.
-        // Note that this includes an off-by-one error which can cause the last
-        // step in sorting to fail.
-        // This is typically observed as the verticies in the last face being
-        // out of order.
-
         quick_sort_edges(&mut edges, 0, INTERNAL_RND_SORT_SEED);
 
         let mut s = 0;
-        for i in 1..entries {
+        for i in 1..edges.len() {
             if edges[s].i0 == edges[i].i0 {
                 continue;
             }
@@ -1401,7 +1378,7 @@ fn build_neighbors_fast<O: Ops>(
         }
 
         let mut s = 0;
-        for i in 1..entries {
+        for i in 1..edges.len() {
             if edges[s].i0 == edges[i].i0 && edges[s].i1 == edges[i].i1 {
                 continue;
             }
@@ -1412,60 +1389,34 @@ fn build_neighbors_fast<O: Ops>(
     }
 
     // pair up, adjacent triangles
-    for i in 0..entries {
-        let i0_0 = edges[i].i0;
-        let i1_0 = edges[i].i1;
-        let f_0 = edges[i].f;
-
-        let mut edgenum_b = 0;
-
+    let mut iter = edges.iter();
+    while let Some(a) = iter.next() {
         // resolve index ordering and edge_num
-        let (edgenum_a, i0_a, i1_a) = get_edge(
-            &triangle_vertex_list[{
-                let a = f_0 * 3;
-                let b = a + 3;
-                a..b
-            }],
-            i0_0,
-            i1_0,
-        )
-        .unwrap();
-        let unassigned_a = triangle_info_list[f_0].face_neighbors[edgenum_a].is_none();
+        let (n_a, i0_a, i1_a) = get_edge(&vertices[a.f * 3..][..3], a.i0, a.i1).unwrap();
 
-        if unassigned_a {
-            // get true index ordering
-            let mut j = i + 1;
-            let mut not_found = true;
-            while j < entries && i0_0 == edges[j].i0 && i1_0 == edges[j].i1 && not_found {
-                let t = edges[j].f;
+        if triangles[a.f].face_neighbors[n_a].is_some() {
+            continue;
+        }
+
+        // get true index ordering
+        let found = iter
+            .clone()
+            .take_while(|b| (a.i0, a.i1) == (b.i0, b.i1))
+            .find_map(|b| {
                 // flip i0_B and i1_B
                 // resolve index ordering and edge_num
-                let (edgenum, i1_b, i0_b) = get_edge(
-                    &triangle_vertex_list[{
-                        let a = t * 3;
-                        let b = a + 3;
-                        a..b
-                    }],
-                    edges[j].i0,
-                    edges[j].i1,
-                )
-                .unwrap();
-                edgenum_b = edgenum;
-                let unassigned_b = triangle_info_list[t].face_neighbors[edgenum_b].is_none();
+                let (n_b, i1_b, i0_b) = get_edge(&vertices[b.f * 3..][..3], b.i0, b.i1).unwrap();
+                let unassigned_b = triangles[b.f].face_neighbors[n_b].is_none();
 
-                if i0_a == i0_b && i1_a == i1_b && unassigned_b {
-                    not_found = false;
-                } else {
-                    j += 1;
-                }
-            }
+                ((i0_a, i1_a) == (i0_b, i1_b) && unassigned_b).then_some((b, n_b))
+            });
 
-            if !not_found {
-                let t_0 = edges[j].f;
-                triangle_info_list[f_0].face_neighbors[edgenum_a] = Some(t_0);
-                triangle_info_list[t_0].face_neighbors[edgenum_b] = Some(f_0);
-            }
-        }
+        let Some((b, n_b)) = found else {
+            continue;
+        };
+
+        triangles[a.f].face_neighbors[n_a] = Some(b.f);
+        triangles[b.f].face_neighbors[n_b] = Some(a.f);
     }
 }
 /// Note that this method _should_ be able to be replaced with `[T]::sort` and an
