@@ -263,10 +263,6 @@ struct Edge {
     f: usize,
 }
 
-impl Edge {
-    const ZERO: Edge = Edge { i0: 0, i1: 0, f: 0 };
-}
-
 impl Index<usize> for Edge {
     type Output = usize;
 
@@ -962,12 +958,10 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     // }
 
     // match up edge pairs
-    let mut edges = vec![Edge::ZERO; triangle_count.wrapping_mul(3)];
-    let vert_count = edges.len();
-    let face_count = vert_count / 3;
+    let face_count = triangle_count;
+    let vert_count = triangle_count * 3;
     build_neighbors_fast(
         &mut triangle_info_list[..face_count],
-        &mut edges,
         &triangle_vertex_list[..vert_count],
         triangle_count,
     );
@@ -1349,26 +1343,30 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 
 fn build_neighbors_fast<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
-    edges: &mut [Edge],
     triangle_vertex_list: &[usize],
     triangle_count: usize,
 ) {
     // build array of edges
-    for f in 0..triangle_count {
-        for (a, b) in (0..3).zip((0..3).cycle().skip(1)).take(3) {
+    let mut edges = (0..triangle_count)
+        .flat_map(|f| {
+            (0..3)
+                .zip((0..3).cycle().skip(1))
+                .take(3)
+                .map(move |(a, b)| (f, a, b))
+        })
+        .map(|(f, a, b)| {
             let i0 = triangle_vertex_list[f * 3 + a];
             let i1 = triangle_vertex_list[f * 3 + b];
-
-            edges[f * 3 + a] = Edge {
+            Edge {
                 // put minimum index in i0
                 i0: i0.min(i1),
                 // put maximum index in i1
                 i1: i0.max(i1),
                 // record face number
                 f,
-            };
-        }
-    }
+            }
+        })
+        .collect::<Vec<_>>();
 
     let entries = triangle_count * 3;
 
@@ -1390,7 +1388,7 @@ fn build_neighbors_fast<O: Ops>(
         // This is typically observed as the verticies in the last face being
         // out of order.
 
-        quick_sort_edges(edges, 0, INTERNAL_RND_SORT_SEED);
+        quick_sort_edges(&mut edges, 0, INTERNAL_RND_SORT_SEED);
 
         let mut s = 0;
         for i in 1..entries {
