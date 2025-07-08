@@ -1304,14 +1304,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 
             // weight contribution by the angle
             // between the two edge vectors
-            let mut cos = v1.dot(v2);
-            cos = if cos > 1f32 {
-                1f32
-            } else if cos < -1f32 {
-                -1f32
-            } else {
-                cos
-            };
+            let cos = v1.dot(v2).clamp(-1f32, 1f32);
             let angle = O::acos(cos as f64) as f32;
             let s_magnitude = triangle_info_list[f].s_magnitude;
             let t_magnitude = triangle_info_list[f].t_magnitude;
@@ -1514,11 +1507,11 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut sorted = 0..triangle_count;
     let mut unsorted = 0..faces.len();
     // search for the first degenerate triangle.
-    while let Some(a) = (&mut sorted).find(|&a| faces[a].flags & MARK_DEGENERATE != 0) {
+    while let Some(a) = sorted.find(|&a| faces[a].flags & MARK_DEGENERATE != 0) {
         unsorted.start = unsorted.start.max(a + 1);
 
         // search for the first good triangle.
-        let b = (&mut unsorted)
+        let b = unsorted
             .find(|&b| faces[b].flags & MARK_DEGENERATE == 0)
             .expect("this is not supposed to happen");
 
