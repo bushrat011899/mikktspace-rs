@@ -1411,7 +1411,8 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
     vertices: &mut [usize],
 ) -> usize {
     // Mark & count all degenerate triangles
-    let triangles_degenerate_count = (0..faces.len())
+    let triangles_degenerate_count = faces
+        .iter_mut()
         .zip(vertices.chunks_exact(3))
         .filter(|(_, i)| {
             let iter = i
@@ -1420,23 +1421,26 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
                 .map(|&i| get_position_from_index(context, i));
             iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
         })
-        .inspect(|(t, _)| faces[*t].flags |= MARK_DEGENERATE)
-        .count();
-
-    let triangle_count = faces.len() - triangles_degenerate_count;
+        .fold(0, |count, (face, _)| {
+            face.flags |= MARK_DEGENERATE;
+            count + 1
+        });
 
     // locate quads with only one good triangle
-    for chunk in faces.chunk_by_mut(|a, b| a.original_face_index == b.original_face_index) {
-        let [a, b] = chunk else { continue };
+    faces
+        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
+        .filter(|faces| faces.len() == 2)
+        .filter(|faces| {
+            faces
+                .iter()
+                .filter(|f| f.flags & MARK_DEGENERATE != 0)
+                .count()
+                == 1
+        })
+        .flatten()
+        .for_each(|face| face.flags |= QUAD_ONE_DEGEN_TRI);
 
-        // this is a quad
-        let is_degenerate_a = a.flags & MARK_DEGENERATE != 0;
-        let is_degenerate_b = b.flags & MARK_DEGENERATE != 0;
-        if is_degenerate_a ^ is_degenerate_b {
-            a.flags |= QUAD_ONE_DEGEN_TRI;
-            b.flags |= QUAD_ONE_DEGEN_TRI;
-        }
-    }
+    let triangle_count = faces.len() - triangles_degenerate_count;
 
     // reorder list so all degen triangles are moved to the back
     // without reordering the good triangles
