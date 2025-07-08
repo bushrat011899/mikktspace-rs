@@ -131,11 +131,27 @@ impl core::fmt::Display for GenerateTangentSpaceError {
 
 impl core::error::Error for GenerateTangentSpaceError {}
 
-struct TangentSpace<O: Ops> {
+struct RawTangentSpace<O: Ops> {
+    /// normalized first order face derivative
     s: Vec3<O>,
-    s_magnitude: f32,
+    /// normalized first order face derivative
     t: Vec3<O>,
+    /// original magnitude of vOs
+    s_magnitude: f32,
+    /// original magnitude of vOs
     t_magnitude: f32,
+}
+
+impl<O: Ops> Copy for RawTangentSpace<O> {}
+
+impl<O: Ops> Clone for RawTangentSpace<O> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+struct TangentSpace<O: Ops> {
+    inner: RawTangentSpace<O>,
     /// this is to average back into quads.
     counter: u8,
     orientation_preserving: bool,
@@ -152,10 +168,10 @@ impl<O: Ops> Clone for TangentSpace<O> {
 impl<'a, O: Ops> From<&'a TangentSpace<O>> for crate::TangentSpace {
     fn from(value: &'a TangentSpace<O>) -> Self {
         crate::TangentSpace {
-            tangent: [value.s.x, value.s.y, value.s.z],
-            bi_tangent: [value.t.x, value.t.y, value.t.z],
-            mag_s: value.s_magnitude,
-            mag_t: value.t_magnitude,
+            tangent: [value.inner.s.x, value.inner.s.y, value.inner.s.z],
+            bi_tangent: [value.inner.t.x, value.inner.t.y, value.inner.t.z],
+            mag_s: value.inner.s_magnitude,
+            mag_t: value.inner.t_magnitude,
             is_orientation_preserving: value.orientation_preserving,
         }
     }
@@ -171,15 +187,7 @@ struct TriangleInfo<O: Ops> {
     face_neighbors: [Option<usize>; 3],
     assigned_group: [Option<usize>; 3],
 
-    /// normalized first order face derivative
-    s: Vec3<O>,
-    /// normalized first order face derivative
-    t: Vec3<O>,
-
-    /// original magnitude of vOs
-    s_magnitude: f32,
-    /// original magnitude of vOs
-    t_magnitude: f32,
+    tangent_space: RawTangentSpace<O>,
 
     /// determines if the current and the next triangle are a quad.
     original_face_index: usize,
@@ -201,10 +209,12 @@ impl<O: Ops> TriangleInfo<O> {
     const ZERO: TriangleInfo<O> = TriangleInfo {
         face_neighbors: [None; 3],
         assigned_group: [None; 3],
-        s: Vec3::ZERO,
-        t: Vec3::ZERO,
-        s_magnitude: 0.,
-        t_magnitude: 0.,
+        tangent_space: RawTangentSpace {
+            s: Vec3::ZERO,
+            t: Vec3::ZERO,
+            s_magnitude: 0.,
+            t_magnitude: 0.,
+        },
         original_face_index: 0,
         flags: 0,
         tangent_spaces_offset: 0,
@@ -284,14 +294,15 @@ fn from_index(index: usize) -> (usize, usize) {
     (index >> 2, index & 0x3)
 }
 
-fn mean_tangent_space<O: Ops>(lhs: TangentSpace<O>, rhs: TangentSpace<O>) -> TangentSpace<O> {
-    let mut ts_res: TangentSpace<O> = TangentSpace {
+fn mean_tangent_space<O: Ops>(
+    lhs: RawTangentSpace<O>,
+    rhs: RawTangentSpace<O>,
+) -> RawTangentSpace<O> {
+    let mut ts_res = RawTangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
         t_magnitude: 0.,
-        counter: 0,
-        orientation_preserving: false,
     };
 
     // this if is important. Due to floating point precision
@@ -314,6 +325,7 @@ fn mean_tangent_space<O: Ops>(lhs: TangentSpace<O>, rhs: TangentSpace<O>) -> Tan
         ts_res.s.normalize_or_zero();
         ts_res.t.normalize_or_zero();
     }
+
     ts_res
 }
 
@@ -788,22 +800,8 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
 
     // generate neighbor info list
     for info in triangle_info_list.iter_mut().take(triangle_count) {
-        for i in 0..3 {
-            info.face_neighbors[i] = None;
-            let fresh2 = &mut info.assigned_group[i];
-            *fresh2 = None;
-            info.s.x = 0f32;
-            info.s.y = 0f32;
-            info.s.z = 0f32;
-            info.t.x = 0f32;
-            info.t.y = 0f32;
-            info.t.z = 0f32;
-            info.s_magnitude = 0f32;
-            info.t_magnitude = 0f32;
-
-            // assumed bad
-            info.flags |= GROUP_WITH_ANY;
-        }
+        // assumed bad
+        info.flags |= GROUP_WITH_ANY;
     }
 
     // evaluate first order derivatives
@@ -842,19 +840,19 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
                 1.0f32
             };
             if not_zero(s_magnitude) {
-                triangle_info_list[f].s = (sign / s_magnitude) * s;
+                triangle_info_list[f].tangent_space.s = (sign / s_magnitude) * s;
             }
             if not_zero(t_magnitude) {
-                triangle_info_list[f].t = (sign / t_magnitude) * t;
+                triangle_info_list[f].tangent_space.t = (sign / t_magnitude) * t;
             }
 
             // evaluate magnitudes prior to normalization of vOs and vOt
-            triangle_info_list[f].s_magnitude = s_magnitude / area_double;
-            triangle_info_list[f].t_magnitude = t_magnitude / area_double;
+            triangle_info_list[f].tangent_space.s_magnitude = s_magnitude / area_double;
+            triangle_info_list[f].tangent_space.t_magnitude = t_magnitude / area_double;
 
             // if this is a good triangle
-            if not_zero(triangle_info_list[f].s_magnitude)
-                && not_zero(triangle_info_list[f].t_magnitude)
+            if not_zero(triangle_info_list[f].tangent_space.s_magnitude)
+                && not_zero(triangle_info_list[f].tangent_space.t_magnitude)
             {
                 triangle_info_list[f].flags &= !GROUP_WITH_ANY;
             }
@@ -1091,16 +1089,18 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
 ) -> Vec<TangentSpace<O>> {
     let mut tangent_spaces = (0..tangent_spaces_total)
         .map(|_| TangentSpace {
-            s: Vec3::<O> {
-                x: 1.0,
-                ..Vec3::ZERO
+            inner: RawTangentSpace {
+                s: Vec3::<O> {
+                    x: 1.0,
+                    ..Vec3::ZERO
+                },
+                s_magnitude: 1.0,
+                t: Vec3::<O> {
+                    y: 1.0,
+                    ..Vec3::ZERO
+                },
+                t_magnitude: 1.0,
             },
-            s_magnitude: 1.0,
-            t: Vec3::<O> {
-                y: 1.0,
-                ..Vec3::ZERO
-            },
-            t_magnitude: 1.0,
             counter: 0,
             orientation_preserving: false,
         })
@@ -1112,7 +1112,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     };
 
     // make initial allocations
-    let mut sub_group_tangent_spaces = Vec::<TangentSpace<O>>::with_capacity(faces_max_count);
+    let mut sub_group_tangent_spaces = Vec::<RawTangentSpace<O>>::with_capacity(faces_max_count);
     let mut unified_sub_groups = Vec::<Vec<usize>>::with_capacity(faces_max_count);
     for (g, group) in groups.iter().enumerate() {
         // triangles
@@ -1133,8 +1133,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let n = get_normal_from_index(context, vertex_index);
 
             // project
-            let mut s_f = a.s - ((n.dot(a.s)) * n);
-            let mut t_f = a.t - ((n.dot(a.t)) * n);
+            let mut s_f = a.tangent_space.s - ((n.dot(a.tangent_space.s)) * n);
+            let mut t_f = a.tangent_space.t - ((n.dot(a.tangent_space.t)) * n);
             s_f.normalize_or_zero();
             t_f.normalize_or_zero();
 
@@ -1146,8 +1146,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     let b = &triangle_info_list[t];
 
                     // project
-                    let mut s_t = b.s - ((n.dot(b.s)) * n);
-                    let mut t_t = b.t - ((n.dot(b.t)) * n);
+                    let mut s_t = b.tangent_space.s - ((n.dot(b.tangent_space.s)) * n);
+                    let mut t_t = b.tangent_space.t - ((n.dot(b.tangent_space.t)) * n);
                     s_t.normalize_or_zero();
                     t_t.normalize_or_zero();
 
@@ -1194,9 +1194,9 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
 
             assert!((a.flags & ORIENT_PRESERVING != 0) == group.orientation_preserving);
 
-            *tangent_space = match tangent_space.counter {
+            tangent_space.inner = match tangent_space.counter {
                 0 => sub_group_tangent_spaces[l],
-                1 => mean_tangent_space(*tangent_space, sub_group_tangent_spaces[l]),
+                1 => mean_tangent_space(tangent_space.inner, sub_group_tangent_spaces[l]),
                 _ => panic!("counter should always be zero or one at this stage"),
             };
 
@@ -1217,14 +1217,12 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &[TriangleInfo<O>],
     context: &I,
     vertex_representative: usize,
-) -> TangentSpace<O> {
-    let mut res: TangentSpace<O> = TangentSpace {
+) -> RawTangentSpace<O> {
+    let mut res = RawTangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
         t: Vec3::ZERO,
         t_magnitude: 0.,
-        counter: 0,
-        orientation_preserving: false,
     };
 
     let angle_sum = face_indices
@@ -1250,11 +1248,15 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
             let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
             let angle = O::acos(cos as f64) as f32;
 
-            let t = [info.s, info.t]
+            let t = [info.tangent_space.s, info.tangent_space.t]
                 .map(|t| t - (n.dot(t) * n))
                 .map(Vec3::normalized_or_zero)
                 .map(|t| angle * t);
-            let t_mag = [info.s_magnitude, info.t_magnitude].map(|t| angle * t);
+            let t_mag = [
+                info.tangent_space.s_magnitude,
+                info.tangent_space.t_magnitude,
+            ]
+            .map(|t| angle * t);
 
             res.s = res.s + t[0];
             res.t = res.t + t[1];
@@ -1473,7 +1475,9 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
-    tangent_spaces: &mut [TangentSpace<O>],
+    // Using `impl Copy` to highlight this function doesn't interact with tangent
+    // space values.
+    tangent_spaces: &mut [impl Copy],
     triangle_info_list: &[TriangleInfo<O>],
     triangle_vertex_list: &[usize],
     context: &I,
