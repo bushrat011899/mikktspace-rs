@@ -29,22 +29,9 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let threshold_cos = O::cos(deg_to_rad(angular_threshold) as f64) as f32;
     let faces_total = context.get_num_faces();
 
-    // count triangles on supported faces
-    let triangles_total_count = (0..faces_total)
-        .map(|f| match context.get_num_vertices_of_face(f) {
-            3 => 1,
-            4 => 2,
-            _ => 0,
-        })
-        .sum::<usize>();
-
-    if triangles_total_count == 0 {
-        return Err(GenerateTangentSpaceError::InsufficientTriangles);
-    }
-
     // make an initial triangle --> face index list
     let (mut triangle_info_list, mut triangle_vertex_list, tangent_spaces_total) =
-        generate_initial_vertices_index_list(context, triangles_total_count);
+        generate_initial_vertices_index_list(context, faces_total);
 
     // make a welded index list of identical positions and attributes (pos, norm, texc)
     generate_shared_vertices_index_list(context, &mut triangle_vertex_list);
@@ -54,46 +41,56 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     // Additionally, move all good triangles to the start of
     // triangle_info_list[] and triangle_vertex_list[] without changing order and
     // put the degenerate triangles last.
-    let triangles_degenerate_count =
-        degen_prologue(context, &mut triangle_info_list, &mut triangle_vertex_list);
+    let triangles_degenerate_count = mark_and_count_degenerate_triangles(
+        context,
+        &mut triangle_info_list,
+    );
 
-    let triangles_count = triangles_total_count - triangles_degenerate_count;
+    mark_partially_degenerate_quads(&mut triangle_info_list);
+
+    let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
+        segregate_degenerate_triangles(
+            &mut triangle_info_list,
+            &mut triangle_vertex_list,
+            triangles_degenerate_count,
+        );
+
+    assert_eq!(triangles_degenerate.len(), triangles_degenerate_count);
 
     // evaluate triangle level attributes and neighbor list
-    initialize_triangle_info(
-        &mut triangle_info_list[..triangles_count],
-        &triangle_vertex_list,
-        context,
-    );
+    initialize_triangle_info(triangles_good, &vertices_good, context);
 
     // based on the 4 rules, identify groups based on connectivity
-    let groups = build_4_rule_groups(
-        &mut triangle_info_list[..triangles_count],
-        &triangle_vertex_list,
-    );
+    let groups = build_4_rule_groups(triangles_good, &vertices_good);
 
     // make tspaces, each group is split up into subgroups if necessary
     // based on fAngularThreshold. Finally a tangent space is made for
     // every resulting subgroup
     let mut tangent_spaces = generate_tangent_spaces(
         tangent_spaces_total,
-        &triangle_info_list,
+        &triangles_good,
         &groups,
-        &triangle_vertex_list,
+        &vertices_good,
         threshold_cos,
         context,
     );
 
-    // degenerate quads with one good triangle will be fixed by copying a space from
-    // the good triangle to the coinciding vertex.
     // all other degenerate triangles will just copy a space from any good triangle
     // with the same welded index in triangle_vertex_list[].
-    degen_epilogue(
+    generate_tangent_spaces_for_degenerate_triangles(
         &mut tangent_spaces,
-        &triangle_info_list,
-        &triangle_vertex_list,
+        &triangles_good,
+        &triangles_degenerate,
+        &vertices_good,
+        &vertices_degenerate,
+    );
+
+    // degenerate quads with one good triangle will be fixed by copying a space from
+    // the good triangle to the coinciding vertex.
+    generate_tangent_spaces_for_partially_degenerate_quads(
+        &mut tangent_spaces,
+        &triangles_good,
         context,
-        triangles_count,
     );
 
     let mut tangent_spaces_iter = tangent_spaces.iter();
@@ -114,16 +111,12 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum GenerateTangentSpaceError {
-    InsufficientTriangles,
-}
+pub(crate) enum GenerateTangentSpaceError {}
 
 impl core::fmt::Display for GenerateTangentSpaceError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            GenerateTangentSpaceError::InsufficientTriangles => {
-                f.write_str("Insufficient Triangles")
-            }
+            _ => unreachable!()
         }
     }
 }
@@ -193,7 +186,7 @@ struct TriangleInfo<O: Ops> {
 
     flags: usize,
     tangent_spaces_offset: usize,
-    vertex_indices: [u8; 4],
+    vertex_indices: [u8; 3],
 }
 
 impl<O: Ops> Copy for TriangleInfo<O> {}
@@ -202,23 +195,6 @@ impl<O: Ops> Clone for TriangleInfo<O> {
     fn clone(&self) -> Self {
         *self
     }
-}
-
-impl<O: Ops> TriangleInfo<O> {
-    const ZERO: TriangleInfo<O> = TriangleInfo {
-        face_neighbors: [None; 3],
-        assigned_group: [None; 3],
-        tangent_space: RawTangentSpace {
-            s: Vec3::ZERO,
-            t: Vec3::ZERO,
-            s_magnitude: 0.,
-            t_magnitude: 0.,
-        },
-        original_face_index: 0,
-        flags: 0,
-        tangent_spaces_offset: 0,
-        vertex_indices: [0; 4],
-    };
 }
 
 #[derive(Clone)]
@@ -603,108 +579,77 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 
 fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
-    triangles_total_count: usize,
+    faces_total: usize,
 ) -> (Vec<TriangleInfo<O>>, Vec<usize>, usize) {
-    let mut triangle_info_list = vec![TriangleInfo::ZERO; triangles_total_count];
-    let mut triangle_verticies = vec![0; triangles_total_count * 3];
+    let mut triangle_info_list = Vec::<TriangleInfo<O>>::new();
+    let mut triangle_verticies = Vec::<usize>::new();
 
-    let triangle_count = triangles_total_count;
     let mut tangent_space_offset = 0;
-    let mut destination_triangle_info_index = 0;
-    for f in 0..context.get_num_faces() {
+    for f in 0..faces_total {
         let verts = context.get_num_vertices_of_face(f);
-        if !(verts != 3 && verts != 4) {
-            triangle_info_list[destination_triangle_info_index].original_face_index = f;
-            triangle_info_list[destination_triangle_info_index].tangent_spaces_offset =
-                tangent_space_offset;
-            if verts == 3 {
-                let verticies =
-                    &mut triangle_info_list[destination_triangle_info_index].vertex_indices;
-                verticies[0] = 0_u8;
-                verticies[1] = 1_u8;
-                verticies[2] = 2_u8;
-                triangle_verticies[destination_triangle_info_index * 3] = as_index(f, 0);
-                triangle_verticies[destination_triangle_info_index * 3 + 1] = as_index(f, 1);
-                triangle_verticies[destination_triangle_info_index * 3 + 2] = as_index(f, 2);
-                destination_triangle_info_index += 1;
+
+        let mut info = TriangleInfo {
+            face_neighbors: [None; 3],
+            assigned_group: [None; 3],
+            tangent_space: RawTangentSpace {
+                s: Vec3::<O>::ZERO,
+                t: Vec3::<O>::ZERO,
+                s_magnitude: 0.,
+                t_magnitude: 0.,
+            },
+            original_face_index: f,
+            flags: 0,
+            tangent_spaces_offset: tangent_space_offset,
+            vertex_indices: [0; 3],
+        };
+
+        let i = [0, 1, 2, 3].map(|i| as_index(f, i));
+
+        if verts == 3 {
+            info.vertex_indices = [0, 1, 2];
+
+            triangle_verticies.extend_from_slice(&info.vertex_indices.map(|t| i[t as usize]));
+            triangle_info_list.push(info);
+        } else if verts == 4 {
+            let mut info_a = info.clone();
+            let mut info_b = info;
+
+            // need an order independent way to evaluate
+            // tspace on quads. This is done by splitting
+            // along the shortest diagonal.
+            let tx = i.map(|i| get_texture_coordinate_from_index(context, i));
+            let distance_squared_20 = (tx[2] - tx[0]).length_squared();
+            let distance_squared_13 = (tx[3] - tx[1]).length_squared();
+
+            let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_13 {
+                true
+            } else if distance_squared_13 < distance_squared_20 {
+                false
             } else {
-                triangle_info_list[destination_triangle_info_index + 1].original_face_index = f;
-                triangle_info_list[destination_triangle_info_index + 1].tangent_spaces_offset =
-                    tangent_space_offset;
+                let p = i.map(|i| get_position_from_index(context, i));
+                let distance_squared_20 = (p[2] - p[0]).length_squared();
+                let distance_squared_13 = (p[3] - p[1]).length_squared();
+                distance_squared_13 >= distance_squared_20
+            };
 
-                // need an order independent way to evaluate
-                // tspace on quads. This is done by splitting
-                // along the shortest diagonal.
-                let i0 = as_index(f, 0);
-                let i1 = as_index(f, 1);
-                let i2 = as_index(f, 2);
-                let i3 = as_index(f, 3);
-                let tx0 = get_texture_coordinate_from_index(context, i0);
-                let tx1 = get_texture_coordinate_from_index(context, i1);
-                let tx2 = get_texture_coordinate_from_index(context, i2);
-                let tx3 = get_texture_coordinate_from_index(context, i3);
-                let distance_squared_20 = (tx2 - tx0).length_squared();
-                let distance_squared_13 = (tx3 - tx1).length_squared();
-                let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_13 {
-                    true
-                } else if distance_squared_13 < distance_squared_20 {
-                    false
-                } else {
-                    let p0 = get_position_from_index(context, i0);
-                    let p1 = get_position_from_index(context, i1);
-                    let p2 = get_position_from_index(context, i2);
-                    let p3 = get_position_from_index(context, i3);
-                    let distance_squared_20 = (p2 - p0).length_squared();
-                    let distance_squared_13 = (p3 - p1).length_squared();
-                    distance_squared_13 >= distance_squared_20
-                };
-                if quad_diagonal_is_02 {
-                    let verticies_a =
-                        &mut triangle_info_list[destination_triangle_info_index].vertex_indices;
-                    verticies_a[0] = 0_u8;
-                    verticies_a[1] = 1_u8;
-                    verticies_a[2] = 2_u8;
-                    triangle_verticies[destination_triangle_info_index * 3] = i0;
-                    triangle_verticies[destination_triangle_info_index * 3 + 1] = i1;
-                    triangle_verticies[destination_triangle_info_index * 3 + 2] = i2;
-                    destination_triangle_info_index += 1;
-                    let verticies_b =
-                        &mut triangle_info_list[destination_triangle_info_index].vertex_indices;
-                    verticies_b[0] = 0_u8;
-                    verticies_b[1] = 2_u8;
-                    verticies_b[2] = 3_u8;
-                    triangle_verticies[destination_triangle_info_index * 3] = i0;
-                    triangle_verticies[destination_triangle_info_index * 3 + 1] = i2;
-                    triangle_verticies[destination_triangle_info_index * 3 + 2] = i3;
-                    destination_triangle_info_index += 1;
-                } else {
-                    let verticies_a =
-                        &mut triangle_info_list[destination_triangle_info_index].vertex_indices;
-                    verticies_a[0] = 0_u8;
-                    verticies_a[1] = 1_u8;
-                    verticies_a[2] = 3_u8;
-                    triangle_verticies[destination_triangle_info_index * 3] = i0;
-                    triangle_verticies[destination_triangle_info_index * 3 + 1] = i1;
-                    triangle_verticies[destination_triangle_info_index * 3 + 2] = i3;
-                    destination_triangle_info_index += 1;
-                    let verticies_b =
-                        &mut triangle_info_list[destination_triangle_info_index].vertex_indices;
-                    verticies_b[0] = 1_u8;
-                    verticies_b[1] = 2_u8;
-                    verticies_b[2] = 3_u8;
-                    triangle_verticies[destination_triangle_info_index * 3] = i1;
-                    triangle_verticies[destination_triangle_info_index * 3 + 1] = i2;
-                    triangle_verticies[destination_triangle_info_index * 3 + 2] = i3;
-                    destination_triangle_info_index += 1;
-                }
+            if quad_diagonal_is_02 {
+                info_a.vertex_indices = [0, 1, 2];
+                info_b.vertex_indices = [0, 2, 3];
+            } else {
+                info_a.vertex_indices = [0, 1, 3];
+                info_b.vertex_indices = [1, 2, 3];
             }
-            tangent_space_offset += verts;
-            assert!(destination_triangle_info_index <= triangle_count);
-        }
-    }
 
-    for info in triangle_info_list.iter_mut().take(triangle_count) {
-        info.flags = 0;
+            triangle_verticies.extend_from_slice(&info_a.vertex_indices.map(|t| i[t as usize]));
+            triangle_verticies.extend_from_slice(&info_b.vertex_indices.map(|t| i[t as usize]));
+
+            triangle_info_list.push(info_a);
+            triangle_info_list.push(info_b);
+        } else {
+            continue;
+        }
+
+        tangent_space_offset += verts;
     }
 
     // return total amount of tspaces
@@ -774,31 +719,27 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_vertex_list: &[usize],
     context: &I,
 ) {
-    let triangle_count = triangle_info_list.len();
     // triangle_info_list[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
 
     // generate neighbor info list
-    for info in triangle_info_list.iter_mut().take(triangle_count) {
+    for info in triangle_info_list.iter_mut() {
         // assumed bad
         info.flags |= GROUP_WITH_ANY;
     }
 
     // evaluate first order derivatives
-    for f in 0..triangle_count {
+    for f in 0..triangle_info_list.len() {
         // initial values
-        let v1 = get_position_from_index(context, triangle_vertex_list[f * 3]);
-        let v2 = get_position_from_index(context, triangle_vertex_list[f * 3 + 1]);
-        let v3 = get_position_from_index(context, triangle_vertex_list[f * 3 + 2]);
-        let t1 = get_texture_coordinate_from_index(context, triangle_vertex_list[f * 3]);
-        let t2 = get_texture_coordinate_from_index(context, triangle_vertex_list[f * 3 + 1]);
-        let t3 = get_texture_coordinate_from_index(context, triangle_vertex_list[f * 3 + 2]);
+        let info = &triangle_info_list[f];
+        let v = info.vertex_indices.map(|i| context.get_position(info.original_face_index, i as usize)).map(|v| Vec3::<O>::from(v));
+        let tx = info.vertex_indices.map(|i| context.get_tex_coord(info.original_face_index, i as usize)).map(|tx| Vec3::<O>::from([tx[0], tx[1], 0.]));
 
-        let t21x = t2.x - t1.x;
-        let t21y = t2.y - t1.y;
-        let t31x = t3.x - t1.x;
-        let t31y = t3.y - t1.y;
-        let d1 = v2 - v1;
-        let d2 = v3 - v1;
+        let t21x = tx[1].x - tx[0].x;
+        let t21y = tx[1].y - tx[0].y;
+        let t31x = tx[2].x - tx[0].x;
+        let t31y = tx[2].y - tx[0].y;
+        let d1 = v[1] - v[0];
+        let d2 = v[2] - v[0];
         let signed_area_double = t21x * t31y - t21y * t31x;
         let s = (t31y * d1) - (t21y * d2); // eq 18
         let t = (-t31x * d1) + (t21x * d2); // eq 19
@@ -840,7 +781,7 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
 
     // force otherwise healthy quads to a fixed orientation
     let mut t = 0;
-    while t < triangle_count - 1 {
+    while t < triangle_info_list.len() - 1 {
         let original_face_index_a = triangle_info_list[t].original_face_index;
         let original_face_index_b = triangle_info_list[t + 1].original_face_index;
         if original_face_index_a == original_face_index_b {
@@ -861,18 +802,10 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
                     if triangle_info_list[t + 1].flags & GROUP_WITH_ANY != 0
                         || calculate_texture_area(
                             context,
-                            &triangle_vertex_list[{
-                                let a = t * 3;
-                                let b = a + 3;
-                                a..b
-                            }],
+                            &triangle_info_list[t].vertex_indices.map(|i| as_index(triangle_info_list[t].original_face_index, i as usize)),
                         ) >= calculate_texture_area(
                             context,
-                            &triangle_vertex_list[{
-                                let a = (t + 1) * 3;
-                                let b = a + 3;
-                                a..b
-                            }],
+                            &triangle_info_list[t + 1].vertex_indices.map(|i| as_index(triangle_info_list[t + 1].original_face_index, i as usize)),
                         )
                     {
                         choose_orientation_first_triangle = true;
@@ -1405,28 +1338,24 @@ fn get_edge(indices: &[usize], i0: usize, i1: usize) -> Option<(usize, usize, us
         .map(|(edgenum, (a, b))| (edgenum, a, b))
 }
 
-fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
+fn mark_and_count_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     faces: &mut [TriangleInfo<O>],
-    vertices: &mut [usize],
 ) -> usize {
-    // Mark & count all degenerate triangles
-    let triangles_degenerate_count = faces
+    faces
         .iter_mut()
-        .zip(vertices.chunks_exact(3))
-        .filter(|(_, i)| {
-            let iter = i
-                .iter()
-                .cycle()
-                .map(|&i| get_position_from_index(context, i));
+        .filter(|face| {
+            let p = face.vertex_indices.map(|i| context.get_position(face.original_face_index, i as usize));
+            let iter = p.iter().cycle();
             iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
         })
-        .fold(0, |count, (face, _)| {
+        .fold(0, |count, face| {
             face.flags |= MARK_DEGENERATE;
             count + 1
-        });
+        })
+}
 
-    // locate quads with only one good triangle
+fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
     faces
         .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
         .filter(|faces| faces.len() == 2)
@@ -1439,21 +1368,31 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         .flatten()
         .for_each(|face| face.flags |= QUAD_ONE_DEGEN_TRI);
+}
 
-    let triangle_count = faces.len() - triangles_degenerate_count;
-
+/// Sort `faces` and `vertices` into a "good" first section, and a degenerate second section.
+fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
+    faces: &'faces mut [TriangleInfo<O>],
+    vertices: &'vertices mut [usize],
+    triangles_degenerate_count: usize,
+) -> (
+    (&'faces mut [TriangleInfo<O>], &'faces mut [TriangleInfo<O>]),
+    (&'vertices mut [usize], &'vertices mut [usize]),
+) {
     // reorder list so all degen triangles are moved to the back
     // without reordering the good triangles
-    let mut sorted = 0..triangle_count;
+    let mut sorted = 0..faces.len();
     let mut unsorted = 0..faces.len();
+
     // search for the first degenerate triangle.
     while let Some(a) = sorted.find(|&a| faces[a].flags & MARK_DEGENERATE != 0) {
         unsorted.start = unsorted.start.max(a + 1);
 
         // search for the first good triangle.
-        let b = unsorted
-            .find(|&b| faces[b].flags & MARK_DEGENERATE == 0)
-            .expect("this is not supposed to happen");
+        let Some(b) = unsorted.find(|&b| faces[b].flags & MARK_DEGENERATE == 0) else {
+            // If there are no more good triangles, the sorting is complete.
+            break;
+        };
 
         // swap triangle a and b
         for i in 0..3 {
@@ -1462,47 +1401,66 @@ fn degen_prologue<I: MikkTSpaceInterface<O>, O: Ops>(
         faces.swap(a, b);
     }
 
-    triangles_degenerate_count
+    let good_triangles_count = faces.len() - triangles_degenerate_count;
+    let good_vertices_count = 3 * good_triangles_count;
+
+    (
+        faces.split_at_mut(good_triangles_count),
+        vertices.split_at_mut(good_vertices_count),
+    )
 }
 
-fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
+/// Populate tangent space values for degenerate triangles from adjacent "good" triangles.
+fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
+    // Using `impl Copy` to highlight this function doesn't interact with tangent
+    // space values.
+    tangent_spaces: &mut [impl Copy],
+    triangles_good: &[TriangleInfo<O>],
+    triangle_degenerate: &[TriangleInfo<O>],
+    vertices_good: &[usize],
+    vertices_degenerate: &[usize],
+) {
+    // deal with degenerate triangles
+    // punishment for degenerate triangles is O(N^2)
+    triangle_degenerate
+        .iter()
+        .enumerate()
+        .filter(|(_index, triangle)| {
+            // degenerate triangles on a quad with one good triangle are skipped
+            // here but processed in the next loop
+            triangle.flags & QUAD_ONE_DEGEN_TRI == 0
+        })
+        .flat_map(|(index, _triangle)| (0..3).map(move |i| (index, i)))
+        .filter_map(|(t, i)| {
+            // search through the good triangles
+            (0..(3 * triangles_good.len()))
+                .find(|&j| vertices_degenerate[t * 3 + i] == vertices_good[j])
+                .map(|j| (t, i, j / 3, j % 3))
+        })
+        .map(|(dst, v_dst, src, v_src)| {
+            let vertex_dst = triangle_degenerate[dst].vertex_indices[v_dst] as usize;
+            let vertex_src = triangles_good[src].vertex_indices[v_src] as usize;
+
+            let dst = triangle_degenerate[dst].tangent_spaces_offset + vertex_dst;
+            let src = triangles_good[src].tangent_spaces_offset + vertex_src;
+
+            (dst, src)
+        })
+        .for_each(|(dst, src)| {
+            tangent_spaces[dst] = tangent_spaces[src];
+        });
+}
+
+fn generate_tangent_spaces_for_partially_degenerate_quads<I: MikkTSpaceInterface<O>, O: Ops>(
     // Using `impl Copy` to highlight this function doesn't interact with tangent
     // space values.
     tangent_spaces: &mut [impl Copy],
     triangle_info_list: &[TriangleInfo<O>],
-    triangle_vertex_list: &[usize],
     context: &I,
-    triangle_count: usize,
 ) {
-    // deal with degenerate triangles
-    // punishment for degenerate triangles is O(N^2)
-    let full_bad_fixes = (triangle_count..triangle_info_list.len())
-        .filter(|&t| {
-            // degenerate triangles on a quad with one good triangle are skipped
-            // here but processed in the next loop
-            triangle_info_list[t].flags & QUAD_ONE_DEGEN_TRI == 0
-        })
-        .flat_map(|t| (0..3).map(move |i| (t, i)))
-        .filter_map(|(t, i)| {
-            // search through the good triangles
-            (0..(3 * triangle_count))
-                .find(|&j| triangle_vertex_list[t * 3 + i] == triangle_vertex_list[j])
-                .map(|j| (t, i, j / 3, j % 3))
-        })
-        .map(|(dst, v_dst, src, v_src)| {
-            let vertex_dst = triangle_info_list[dst].vertex_indices[v_dst] as usize;
-            let vertex_src = triangle_info_list[src].vertex_indices[v_src] as usize;
-
-            let dst = triangle_info_list[dst].tangent_spaces_offset + vertex_dst;
-            let src = triangle_info_list[src].tangent_spaces_offset + vertex_src;
-
-            (dst, src)
-        });
-
     // deal with degenerate quads with one good triangle
-    let partial_bad_fixes = triangle_info_list
+    triangle_info_list
         .iter()
-        .take(triangle_count)
         // this triangle belongs to a quad where the
         // other triangle is degenerate
         .filter(|triangle_info| triangle_info.flags & QUAD_ONE_DEGEN_TRI != 0)
@@ -1524,9 +1482,8 @@ fn degen_epilogue<I: MikkTSpaceInterface<O>, O: Ops>(
                 .unwrap();
 
             (dst + offset, src + offset)
+        })
+        .for_each(|(dst, src)| {
+            tangent_spaces[dst] = tangent_spaces[src];
         });
-
-    for (dst, src) in full_bad_fixes.chain(partial_bad_fixes) {
-        tangent_spaces[dst] = tangent_spaces[src]
-    }
 }

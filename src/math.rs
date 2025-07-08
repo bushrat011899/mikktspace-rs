@@ -58,6 +58,20 @@ impl<O: Ops> Clone for Vec3<O> {
     }
 }
 
+impl<O: Ops> From<[f32; 3]> for Vec3<O> {
+    fn from([x, y, z]: [f32; 3]) -> Self {
+        Self {
+            x, y, z, ..Self::ZERO
+        }
+    }
+}
+
+impl<O: Ops> From<Vec3<O>> for [f32; 3] {
+    fn from(Vec3 { x, y, z, .. }: Vec3<O>) -> Self {
+        [x, y, z]
+    }
+}
+
 impl<O: Ops> Vec3<O> {
     pub(crate) const ZERO: Vec3<O> = Vec3 {
         x: 0.,
