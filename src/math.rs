@@ -77,6 +77,11 @@ impl<O: Ops> Vec3<O> {
         }
     }
 
+    pub(crate) fn normalized_or_zero(mut self) -> Self {
+        self.normalize_or_zero();
+        self
+    }
+
     pub(crate) fn length_squared(self) -> f32 {
         self.dot(self)
     }

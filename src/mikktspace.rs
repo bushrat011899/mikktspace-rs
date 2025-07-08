@@ -1237,7 +1237,6 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     vertex_representative: usize,
 ) -> TangentSpace<O> {
-    let face_indices_count = face_indices.len();
     let mut res: TangentSpace<O> = TangentSpace {
         s: Vec3::ZERO,
         s_magnitude: 0.,
@@ -1246,67 +1245,43 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         counter: 0,
         orientation_preserving: false,
     };
-    let mut angle_sum = 0f32;
-    res.s.x = 0f32;
-    res.s.y = 0f32;
-    res.s.z = 0f32;
-    res.t.x = 0f32;
-    res.t.y = 0f32;
-    res.t.z = 0f32;
-    res.s_magnitude = 0f32;
-    res.t_magnitude = 0f32;
 
-    for &f in face_indices.iter().take(face_indices_count) {
+    let angle_sum = face_indices
+        .iter()
+        .map(|&f| (&triangle_vertex_list[3 * f..][..3], &triangle_info_list[f]))
         // only valid triangles get to add their contribution
-        if triangle_info_list[f].flags & GROUP_WITH_ANY == 0 {
-            let i = if triangle_vertex_list[3 * f] == vertex_representative {
-                0
-            } else if triangle_vertex_list[3 * f + 1] == vertex_representative {
-                1
-            } else if triangle_vertex_list[3 * f + 2] == vertex_representative {
-                2
-            } else {
-                panic!()
-            };
+        .filter(|(_vertices, info)| info.flags & GROUP_WITH_ANY == 0)
+        .fold(0f32, |angle_sum, (vertices, info)| {
+            let i = (0..=2)
+                .find(|&i| vertices[i] == vertex_representative)
+                .unwrap();
 
-            // project
-            let index = triangle_vertex_list[3 * f + i];
-            let n = get_normal_from_index(context, index);
-            let mut s = triangle_info_list[f].s - ((n.dot(triangle_info_list[f].s)) * n);
-            let mut t = triangle_info_list[f].t - (n.dot(triangle_info_list[f].t) * n);
-            s.normalize_or_zero();
-            t.normalize_or_zero();
-
-            let i2 = triangle_vertex_list[3 * f + (if i < 2 { i + 1 } else { 0 })];
-            let i1 = triangle_vertex_list[3 * f + i];
-            let i0 = triangle_vertex_list[3 * f + (if i > 0 { i - 1 } else { 2 })];
-
-            let p0 = get_position_from_index(context, i0);
-            let p1 = get_position_from_index(context, i1);
-            let p2 = get_position_from_index(context, i2);
-            let mut v1 = p0 - p1;
-            let mut v2 = p2 - p1;
-
-            // project
-            v1 = v1 - ((n.dot(v1)) * n);
-            v1.normalize_or_zero();
-            v2 = v2 - ((n.dot(v2)) * n);
-            v2.normalize_or_zero();
+            let n = get_normal_from_index(context, vertices[i]);
+            let p = [(i + 1) % 3, i, (i + 2) % 3]
+                .map(|i| vertices[i])
+                .map(|i| get_position_from_index(context, i));
+            let v = [p[0] - p[1], p[2] - p[1]]
+                .map(|v| v - ((n.dot(v)) * n))
+                .map(Vec3::normalized_or_zero);
 
             // weight contribution by the angle
             // between the two edge vectors
-            let cos = v1.dot(v2).clamp(-1f32, 1f32);
+            let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
             let angle = O::acos(cos as f64) as f32;
-            let s_magnitude = triangle_info_list[f].s_magnitude;
-            let t_magnitude = triangle_info_list[f].t_magnitude;
 
-            res.s = res.s + (angle * s);
-            res.t = res.t + (angle * t);
-            res.s_magnitude += angle * s_magnitude;
-            res.t_magnitude += angle * t_magnitude;
-            angle_sum += angle;
-        }
-    }
+            let t = [info.s, info.t]
+                .map(|t| t - (n.dot(t) * n))
+                .map(Vec3::normalized_or_zero)
+                .map(|t| angle * t);
+            let t_mag = [info.s_magnitude, info.t_magnitude].map(|t| angle * t);
+
+            res.s = res.s + t[0];
+            res.t = res.t + t[1];
+            res.s_magnitude += t_mag[0];
+            res.t_magnitude += t_mag[1];
+            
+            angle_sum + angle
+        });
 
     // normalize
     res.s.normalize_or_zero();
