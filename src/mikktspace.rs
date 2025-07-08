@@ -1116,34 +1116,25 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     threshold_cos: f32,
     context: &I,
 ) {
-    let groups_active_count = groups.len();
-    let mut faces_max_count = 0;
-    for group in groups.iter().take(groups_active_count) {
-        if faces_max_count < group.face_indices.len() {
-            faces_max_count = group.face_indices.len();
-        }
-    }
-
-    if faces_max_count == 0 {
-        return;
-    }
+    let faces_max_count = match groups.iter().map(|group| group.face_indices.len()).max() {
+        Some(count) => count,
+        None => return,
+    };
 
     // make initial allocations
     let mut sub_group_tangent_spaces = vec![TangentSpace::ZERO; faces_max_count];
     let mut unified_sub_groups = vec![Vec::<usize>::new(); faces_max_count];
-    for (g, group) in groups.iter().enumerate().take(groups_active_count) {
+    for (g, group) in groups.iter().enumerate() {
         let mut unified_sub_groups_count = 0;
 
         // triangles
-        for i in 0..group.face_indices.len() {
+        for &f in group.face_indices.iter() {
             // triangle number
-            let f = (group.face_indices)[i];
-            let mut tmp_group = Vec::<usize>::new();
-            let index = if triangle_info_list[f].assigned_group[0_usize] == Some(g) {
+            let index = if triangle_info_list[f].assigned_group[0] == Some(g) {
                 0
-            } else if triangle_info_list[f].assigned_group[1_usize] == Some(g) {
+            } else if triangle_info_list[f].assigned_group[1] == Some(g) {
                 1
-            } else if triangle_info_list[f].assigned_group[2_usize] == Some(g) {
+            } else if triangle_info_list[f].assigned_group[2] == Some(g) {
                 2
             } else {
                 panic!()
@@ -1164,9 +1155,9 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             // original face number
             let original_face_index_f = triangle_info_list[f].original_face_index;
 
-            for j in 0..group.face_indices.len() {
+            let mut tmp_group = Vec::<usize>::new();
+            for &t in group.face_indices.iter() {
                 // triangle number
-                let t = (group.face_indices)[j];
                 let original_face_index_t = triangle_info_list[t].original_face_index;
 
                 // project
