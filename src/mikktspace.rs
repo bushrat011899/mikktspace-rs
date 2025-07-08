@@ -19,7 +19,6 @@
  */
 
 use alloc::{vec, vec::Vec};
-use core::ops::Index;
 
 use crate::{math::*, MikkTSpaceInterface};
 
@@ -237,26 +236,6 @@ impl Group {
         vertex_representative: 0,
         orientation_preserving: false,
     };
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Edge {
-    i0: usize,
-    i1: usize,
-    f: usize,
-}
-
-impl Index<usize> for Edge {
-    type Output = usize;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        match index {
-            0 => &self.i0,
-            1 => &self.i1,
-            2 => &self.f,
-            _ => panic!(),
-        }
-    }
 }
 
 struct TemporaryVertex<O: Ops> {
@@ -1278,6 +1257,13 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[usize]) {
+    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    struct Edge {
+        i0: usize,
+        i1: usize,
+        f: usize,
+    }
+
     // build array of edges
     let mut edges = vertices
         .chunks_exact(3)
@@ -1307,7 +1293,7 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[u
     // out of order.
     #[cfg(not(feature = "corrected-edge-sorting"))]
     {
-        quick_sort_edges(&mut edges, 0, INTERNAL_RND_SORT_SEED);
+        quick_sort_by_key_with_seed(&mut edges, |e| e.i0, INTERNAL_RND_SORT_SEED);
 
         let mut s = 0;
         for i in 1..edges.len() {
@@ -1315,7 +1301,7 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[u
                 continue;
             }
 
-            quick_sort_edges(&mut edges[s..i], 1, INTERNAL_RND_SORT_SEED);
+            quick_sort_by_key_with_seed(&mut edges[s..i], |e| e.i1, INTERNAL_RND_SORT_SEED);
             s = i;
         }
 
@@ -1325,7 +1311,7 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[u
                 continue;
             }
 
-            quick_sort_edges(&mut edges[s..i], 2, INTERNAL_RND_SORT_SEED);
+            quick_sort_by_key_with_seed(&mut edges[s..i], |e| e.f, INTERNAL_RND_SORT_SEED);
             s = i;
         }
     }
@@ -1361,16 +1347,17 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[u
         triangles[b.f].face_neighbors[n_b] = Some(a.f);
     }
 }
+
 /// Note that this method _should_ be able to be replaced with `[T]::sort` and an
 /// appropriate implementation of [`Ord`] for [`SEdge`].
 /// However, in initial testing this caused incorrect results, indicating this sort
 /// may not be implemented correctly.
 /// Further testing is required.
-fn quick_sort_edges(sort_buffer: &mut [Edge], channel: usize, seed: u32) {
+fn quick_sort_by_key_with_seed<T, K: Ord>(sort_buffer: &mut [T], key: fn(&T) -> K, seed: u32) {
     match sort_buffer.len() {
         0 | 1 => return,
         2 => {
-            sort_buffer.sort_by_key(|e| e[channel]);
+            sort_buffer.sort_by_key(key);
             return;
         }
         _ => {}
@@ -1382,17 +1369,17 @@ fn quick_sort_edges(sort_buffer: &mut [Edge], channel: usize, seed: u32) {
         seed.wrapping_add(t).wrapping_add(3)
     };
 
-    let pivot = sort_buffer[seed.wrapping_rem(sort_buffer.len() as u32) as usize][channel];
+    let pivot = key(&sort_buffer[seed.wrapping_rem(sort_buffer.len() as u32) as usize]);
 
     let (mut l, mut r) = (0, sort_buffer.len().saturating_sub(1));
     while l <= r {
         l = (l..sort_buffer.len())
-            .find(|&left| sort_buffer[left][channel] >= pivot)
+            .find(|&left| key(&sort_buffer[left]) >= pivot)
             .unwrap();
 
         r = (0..=r)
             .rev()
-            .find(|&right| sort_buffer[right][channel] <= pivot)
+            .find(|&right| key(&sort_buffer[right]) <= pivot)
             .unwrap();
 
         if l <= r {
@@ -1402,8 +1389,8 @@ fn quick_sort_edges(sort_buffer: &mut [Edge], channel: usize, seed: u32) {
         }
     }
 
-    quick_sort_edges(&mut sort_buffer[..=r], channel, seed);
-    quick_sort_edges(&mut sort_buffer[l..], channel, seed);
+    quick_sort_by_key_with_seed(&mut sort_buffer[..=r], key, seed);
+    quick_sort_by_key_with_seed(&mut sort_buffer[l..], key, seed);
 }
 
 /// Finds the index of the edge `(i0_in, i1_in)` within `indices`, additionally
