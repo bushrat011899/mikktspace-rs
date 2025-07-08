@@ -73,27 +73,11 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         &triangle_vertex_list,
     );
 
-    let mut tangent_spaces = (0..tangent_spaces_total)
-        .map(|_| TangentSpace {
-            s: Vec3::<O> {
-                x: 1.0,
-                ..Vec3::ZERO
-            },
-            s_magnitude: 1.0,
-            t: Vec3::<O> {
-                y: 1.0,
-                ..Vec3::ZERO
-            },
-            t_magnitude: 1.0,
-            ..TangentSpace::ZERO
-        })
-        .collect::<Vec<_>>();
-
     // make tspaces, each group is split up into subgroups if necessary
     // based on fAngularThreshold. Finally a tangent space is made for
     // every resulting subgroup
-    generate_tangent_spaces(
-        &mut tangent_spaces,
+    let mut tangent_spaces = generate_tangent_spaces(
+        tangent_spaces_total,
         &triangle_info_list,
         &groups,
         &triangle_vertex_list,
@@ -153,7 +137,7 @@ struct TangentSpace<O: Ops> {
     t: Vec3<O>,
     t_magnitude: f32,
     /// this is to average back into quads.
-    counter: usize,
+    counter: u8,
     orientation_preserving: bool,
 }
 
@@ -181,17 +165,6 @@ impl<O: Ops> From<TangentSpace<O>> for crate::TangentSpace {
     fn from(value: TangentSpace<O>) -> Self {
         crate::TangentSpace::from(&value)
     }
-}
-
-impl<O: Ops> TangentSpace<O> {
-    const ZERO: TangentSpace<O> = TangentSpace {
-        s: Vec3::ZERO,
-        s_magnitude: 0.,
-        t: Vec3::ZERO,
-        t_magnitude: 0.,
-        counter: 0,
-        orientation_preserving: false,
-    };
 }
 
 struct TriangleInfo<O: Ops> {
@@ -1109,36 +1082,49 @@ fn assign_to_group_recursive<O: Ops>(
 }
 
 fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
-    tangent_spaces: &mut [TangentSpace<O>],
+    tangent_spaces_total: usize,
     triangle_info_list: &[TriangleInfo<O>],
     groups: &[Group],
     triangle_vertex_list: &[usize],
     threshold_cos: f32,
     context: &I,
-) {
+) -> Vec<TangentSpace<O>> {
+    let mut tangent_spaces = (0..tangent_spaces_total)
+        .map(|_| TangentSpace {
+            s: Vec3::<O> {
+                x: 1.0,
+                ..Vec3::ZERO
+            },
+            s_magnitude: 1.0,
+            t: Vec3::<O> {
+                y: 1.0,
+                ..Vec3::ZERO
+            },
+            t_magnitude: 1.0,
+            counter: 0,
+            orientation_preserving: false,
+        })
+        .collect::<Vec<_>>();
+
     let faces_max_count = match groups.iter().map(|group| group.face_indices.len()).max() {
         Some(count) => count,
-        None => return,
+        None => return tangent_spaces,
     };
 
     // make initial allocations
-    let mut sub_group_tangent_spaces = vec![TangentSpace::ZERO; faces_max_count];
-    let mut unified_sub_groups = vec![Vec::<usize>::new(); faces_max_count];
+    let mut sub_group_tangent_spaces = Vec::<TangentSpace<O>>::with_capacity(faces_max_count);
+    let mut unified_sub_groups = Vec::<Vec<usize>>::with_capacity(faces_max_count);
     for (g, group) in groups.iter().enumerate() {
-        let mut unified_sub_groups_count = 0;
-
         // triangles
         for &f in group.face_indices.iter() {
+            let a = &triangle_info_list[f];
+
             // triangle number
-            let index = if triangle_info_list[f].assigned_group[0] == Some(g) {
-                0
-            } else if triangle_info_list[f].assigned_group[1] == Some(g) {
-                1
-            } else if triangle_info_list[f].assigned_group[2] == Some(g) {
-                2
-            } else {
-                panic!()
-            };
+            let index = a
+                .assigned_group
+                .iter()
+                .position(|group| group == &Some(g))
+                .unwrap();
 
             let vertex_index = triangle_vertex_list[f * 3 + index];
             assert!(vertex_index == group.vertex_representative);
@@ -1147,87 +1133,82 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let n = get_normal_from_index(context, vertex_index);
 
             // project
-            let mut s_f = triangle_info_list[f].s - ((n.dot(triangle_info_list[f].s)) * n);
-            let mut t_f = triangle_info_list[f].t - ((n.dot(triangle_info_list[f].t)) * n);
+            let mut s_f = a.s - ((n.dot(a.s)) * n);
+            let mut t_f = a.t - ((n.dot(a.t)) * n);
             s_f.normalize_or_zero();
             t_f.normalize_or_zero();
 
-            // original face number
-            let original_face_index_f = triangle_info_list[f].original_face_index;
+            let mut tmp_group = group
+                .face_indices
+                .iter()
+                .copied()
+                .filter(|&t| {
+                    let b = &triangle_info_list[t];
 
-            let mut tmp_group = Vec::<usize>::new();
-            for &t in group.face_indices.iter() {
-                // triangle number
-                let original_face_index_t = triangle_info_list[t].original_face_index;
+                    // project
+                    let mut s_t = b.s - ((n.dot(b.s)) * n);
+                    let mut t_t = b.t - ((n.dot(b.t)) * n);
+                    s_t.normalize_or_zero();
+                    t_t.normalize_or_zero();
 
-                // project
-                let mut s_t = triangle_info_list[t].s - ((n.dot(triangle_info_list[t].s)) * n);
-                let mut t_t = triangle_info_list[t].t - ((n.dot(triangle_info_list[t].t)) * n);
-                s_t.normalize_or_zero();
-                t_t.normalize_or_zero();
+                    let any = (a.flags | b.flags) & GROUP_WITH_ANY != 0;
 
-                let any = (triangle_info_list[f].flags | triangle_info_list[t].flags)
-                    & GROUP_WITH_ANY
-                    != 0;
-                // make sure triangles which belong to the same quad are joined.
-                let same_original_face = original_face_index_f == original_face_index_t;
+                    // make sure triangles which belong to the same quad are joined.
+                    let same_original_face = a.original_face_index == b.original_face_index;
 
-                let s_cos = s_f.dot(s_t);
-                let t_cos = t_f.dot(t_t);
+                    let s_cos = s_f.dot(s_t);
+                    let t_cos = t_f.dot(t_t);
 
-                assert!(f != t || same_original_face, "sanity check");
-                if any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos {
-                    tmp_group.push(t);
-                }
-            }
+                    assert!(f != t || same_original_face, "sanity check");
+
+                    any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos
+                })
+                .collect::<Vec<_>>();
 
             // sort pTmpMembers
             tmp_group.sort();
 
             // look for an existing match
-            let found = unified_sub_groups
-                .iter()
-                .take(unified_sub_groups_count)
-                .position(|g| g == &tmp_group);
+            let found = unified_sub_groups.iter().position(|g| g == &tmp_group);
 
             let l = match found {
                 Some(l) => l,
                 None => {
                     // if no match was found we allocate a new subgroup
-                    sub_group_tangent_spaces[unified_sub_groups_count] = evaluate_tangent_space(
+                    let l = sub_group_tangent_spaces.len();
+                    sub_group_tangent_spaces.push(evaluate_tangent_space(
                         &tmp_group,
                         triangle_vertex_list,
                         triangle_info_list,
                         context,
                         group.vertex_representative,
-                    );
-                    unified_sub_groups[unified_sub_groups_count] = tmp_group;
-                    let l = unified_sub_groups_count;
-                    unified_sub_groups_count += 1;
+                    ));
+                    unified_sub_groups.push(tmp_group);
                     l
                 }
             };
 
             // output tspace
-            let tangent_space_offset = triangle_info_list[f].tangent_spaces_offset;
-            let vertex = triangle_info_list[f].vertex_indices[index] as usize;
-            let tangent_space = &mut tangent_spaces[tangent_space_offset + vertex];
-            assert!(tangent_space.counter < 2);
-            assert!((triangle_info_list[f].flags & 8 != 0) == group.orientation_preserving);
-            if tangent_space.counter == 1 {
-                *tangent_space = mean_tangent_space(*tangent_space, sub_group_tangent_spaces[l]);
-                // update counter
-                tangent_space.counter = 2;
-                tangent_space.orientation_preserving = group.orientation_preserving;
-            } else {
-                assert!(tangent_space.counter == 0);
-                *tangent_space = sub_group_tangent_spaces[l];
-                // update counter
-                tangent_space.counter = 1;
-                tangent_space.orientation_preserving = group.orientation_preserving;
-            }
+            let index = a.tangent_spaces_offset + a.vertex_indices[index] as usize;
+            let tangent_space = &mut tangent_spaces[index];
+
+            assert!((a.flags & ORIENT_PRESERVING != 0) == group.orientation_preserving);
+
+            *tangent_space = match tangent_space.counter {
+                0 => sub_group_tangent_spaces[l],
+                1 => mean_tangent_space(*tangent_space, sub_group_tangent_spaces[l]),
+                _ => panic!("counter should always be zero or one at this stage"),
+            };
+
+            tangent_space.counter += 1;
+            tangent_space.orientation_preserving = group.orientation_preserving;
         }
+
+        sub_group_tangent_spaces.clear();
+        unified_sub_groups.clear();
     }
+
+    tangent_spaces
 }
 
 fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
@@ -1279,7 +1260,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
             res.t = res.t + t[1];
             res.s_magnitude += t_mag[0];
             res.t_magnitude += t_mag[1];
-            
+
             angle_sum + angle
         });
 
