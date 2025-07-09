@@ -606,8 +606,10 @@ fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
             // tspace on quads. This is done by splitting
             // along the shortest diagonal.
             let tx = i.map(|i| get_texture_coordinate_from_index(context, i));
-            let distance_squared_20 = (tx[2] - tx[0]).length_squared();
-            let distance_squared_13 = (tx[3] - tx[1]).length_squared();
+            let d20 = [0, 1].map(|i| tx[2][i] - tx[0][i]);
+            let d13 = [0, 1].map(|i| tx[3][i] - tx[1][i]);
+            let distance_squared_20 = d20[0] * d20[0] + d20[1] * d20[1];
+            let distance_squared_13 = d13[0] * d13[0] + d13[1] * d13[1];
 
             let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_13 {
                 true
@@ -665,14 +667,8 @@ fn get_normal_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
 fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     index: FaceVertex,
-) -> Vec3<O> {
-    let texc = context.get_tex_coord(index.face(), index.vertex() as usize);
-    Vec3 {
-        x: texc[0],
-        y: texc[1],
-        z: 1.0,
-        ..Vec3::ZERO
-    }
+) -> [f32; 2] {
+    context.get_tex_coord(index.face(), index.vertex() as usize)
 }
 
 /// returns the texture area times 2
@@ -680,21 +676,17 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     indices: &[FaceVertex],
 ) -> f32 {
-    let t1 = get_texture_coordinate_from_index(context, indices[0]);
-    let t2 = get_texture_coordinate_from_index(context, indices[1]);
-    let t3 = get_texture_coordinate_from_index(context, indices[2]);
+    let t = [0, 1, 2]
+        .map(|i| indices[i])
+        .map(|i| get_texture_coordinate_from_index(context, i));
 
-    let t21x = t2.x - t1.x;
-    let t21y = t2.y - t1.y;
-    let t31x = t3.x - t1.x;
-    let t31y = t3.y - t1.y;
+    let t21x = t[1][0] - t[0][0];
+    let t21y = t[1][1] - t[0][1];
+    let t31x = t[2][0] - t[0][0];
+    let t31y = t[2][1] - t[0][1];
 
     let signed_area_double = t21x * t31y - t21y * t31x;
-    if signed_area_double < 0f32 {
-        -signed_area_double
-    } else {
-        signed_area_double
-    }
+    fabsf(signed_area_double)
 }
 
 fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
