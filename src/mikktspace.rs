@@ -915,43 +915,32 @@ fn assign_to_group_recursive<O: Ops>(
     let triangle_info = &mut triangle_infos[triangle_index];
 
     // track down vertex
-    let vertex_representative = group.vertex_representative;
-    let vertices = &triangle_vertex_list[{
-        let a = 3 * triangle_index;
-        let b = a + 3;
-        a..b
-    }];
-    let i = if vertices[0] == vertex_representative {
-        0
-    } else if vertices[1] == vertex_representative {
-        1
-    } else if vertices[2] == vertex_representative {
-        2
-    } else {
-        panic!()
-    };
+    let i = triangle_vertex_list
+        .iter()
+        .skip(3 * triangle_index)
+        .take(3)
+        .position(|&v| v == group.vertex_representative)
+        .unwrap();
 
     // early out
-    if triangle_info.assigned_group[i] == Some(group.id) {
-        return true;
-    } else if (triangle_info.assigned_group[i]).is_some() {
-        return false;
+    if let Some(id) = triangle_info.assigned_group[i] {
+        return id == group.id;
     }
+
     if triangle_info.flags & GROUP_WITH_ANY != 0
-        && (triangle_info.assigned_group[0_usize]).is_none()
-        && (triangle_info.assigned_group[1_usize]).is_none()
-        && (triangle_info.assigned_group[2_usize]).is_none()
+        && triangle_info.assigned_group[0].is_none()
+        && triangle_info.assigned_group[1].is_none()
+        && triangle_info.assigned_group[2].is_none()
     {
         // first to group with a group-with-anything triangle
         // determines it's orientation.
         // This is the only existing order dependency in the code!!
         triangle_info.flags &= !ORIENT_PRESERVING;
-        triangle_info.flags |= if group.orientation_preserving {
-            ORIENT_PRESERVING
-        } else {
-            0
-        };
+        if group.orientation_preserving {
+            triangle_info.flags |= ORIENT_PRESERVING
+        }
     }
+
     let orientation_preserving = triangle_info.flags & ORIENT_PRESERVING != 0;
     if orientation_preserving != group.orientation_preserving {
         return false;
@@ -960,23 +949,11 @@ fn assign_to_group_recursive<O: Ops>(
     group.face_indices.push(triangle_index);
     triangle_info.assigned_group[i] = Some(group.id);
 
-    let face_neighbor_index_left = triangle_info.face_neighbors[i];
-    let face_neighbor_index_right = triangle_info.face_neighbors[if i > 0 { i - 1 } else { 2 }];
-    if let Some(face_neighbor_index_left) = face_neighbor_index_left {
-        assign_to_group_recursive(
-            triangle_vertex_list,
-            triangle_infos,
-            face_neighbor_index_left,
-            group,
-        );
-    }
-    if let Some(face_neighbor_index_right) = face_neighbor_index_right {
-        assign_to_group_recursive(
-            triangle_vertex_list,
-            triangle_infos,
-            face_neighbor_index_right,
-            group,
-        );
+    let neighbors = [2, 0]
+        .map(|t| (i + t) % 3)
+        .map(|i| triangle_info.face_neighbors[i]);
+    for &neighbor in neighbors.iter().flatten() {
+        assign_to_group_recursive(triangle_vertex_list, triangle_infos, neighbor, group);
     }
 
     true
