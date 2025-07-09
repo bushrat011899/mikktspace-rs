@@ -61,7 +61,10 @@ impl<O: Ops> Clone for Vec3<O> {
 impl<O: Ops> From<[f32; 3]> for Vec3<O> {
     fn from([x, y, z]: [f32; 3]) -> Self {
         Self {
-            x, y, z, ..Self::ZERO
+            x,
+            y,
+            z,
+            ..Self::ZERO
         }
     }
 }
