@@ -839,66 +839,52 @@ fn build_4_rule_groups<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
 ) -> Vec<Group> {
-    let triangle_count = triangle_info_list.len();
+    let groups_max_count = triangle_info_list.len() * 3;
+    let mut groups = Vec::<Group>::with_capacity(groups_max_count);
 
-    let groups_max_count = triangle_count * 3;
-    let mut groups = vec![Group::ZERO; groups_max_count];
-
-    let groups_max_count = triangle_count * 3;
     let mut groups_active_count = 0;
 
-    for f in 0..triangle_count {
-        for i in 0..3 {
+    for (f, i) in (0..triangle_info_list.len()).flat_map(|f| (0..3).map(move |i| (f, i))) {
+        if triangle_info_list[f].flags & GROUP_WITH_ANY != 0
+            || triangle_info_list[f].assigned_group[i].is_some()
+        {
             // if not assigned to a group
-            if triangle_info_list[f].flags & GROUP_WITH_ANY == 0
-                && triangle_info_list[f].assigned_group[i].is_none()
-            {
-                let vert_index = triangle_vertex_list[f * 3 + i];
-                assert!(groups_active_count < groups_max_count);
-                triangle_info_list[f].assigned_group[i] = Some(groups_active_count);
-                let this_group = &mut groups[groups_active_count];
-                this_group.id = groups_active_count;
-                this_group.vertex_representative = vert_index;
-                this_group.orientation_preserving =
-                    triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
-                this_group.face_indices = Vec::new();
-                groups_active_count += 1;
-
-                this_group.face_indices.push(f);
-                let orientation_preserving_f = triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
-                let face_neighbor_index_left = triangle_info_list[f].face_neighbors[i];
-                let face_neighbor_index_right =
-                    triangle_info_list[f].face_neighbors[if i > 0 { i - 1 } else { 2 }];
-
-                if let Some(face_neighbor_index_left) = face_neighbor_index_left {
-                    // neighbor
-                    let result = assign_to_group_recursive(
-                        triangle_vertex_list,
-                        triangle_info_list,
-                        face_neighbor_index_left,
-                        this_group,
-                    );
-                    let orientation_preserving_left =
-                        triangle_info_list[face_neighbor_index_left].flags & ORIENT_PRESERVING != 0;
-                    let different = orientation_preserving_f != orientation_preserving_left;
-                    assert!(result || different);
-                }
-                if let Some(face_neighbor_index_right) = face_neighbor_index_right {
-                    // neighbor
-                    let result = assign_to_group_recursive(
-                        triangle_vertex_list,
-                        triangle_info_list,
-                        face_neighbor_index_right,
-                        this_group,
-                    );
-                    let orientation_preserving_right =
-                        triangle_info_list[face_neighbor_index_right].flags & ORIENT_PRESERVING
-                            != 0;
-                    let different = orientation_preserving_f != orientation_preserving_right;
-                    assert!(result || different);
-                }
-            }
+            continue;
         }
+
+        let vert_index = triangle_vertex_list[f * 3 + i];
+        assert!(groups_active_count < groups_max_count);
+        triangle_info_list[f].assigned_group[i] = Some(groups_active_count);
+
+        let mut this_group = Group::ZERO;
+        this_group.id = groups_active_count;
+        this_group.vertex_representative = vert_index;
+        this_group.orientation_preserving = triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
+        this_group.face_indices = Vec::new();
+
+        this_group.face_indices.push(f);
+        let orientation_preserving_f = triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
+
+        let neighbors = [2, 0]
+            .map(|t| (i + t) % 3)
+            .map(|i| triangle_info_list[f].face_neighbors[i]);
+
+        for &neighbor in neighbors.iter().flatten() {
+            // neighbor
+            let result = assign_to_group_recursive(
+                triangle_vertex_list,
+                triangle_info_list,
+                neighbor,
+                &mut this_group,
+            );
+            let orientation_preserving_left =
+                triangle_info_list[neighbor].flags & ORIENT_PRESERVING != 0;
+            let different = orientation_preserving_f != orientation_preserving_left;
+            assert!(result || different);
+        }
+
+        groups.push(this_group);
+        groups_active_count += 1;
     }
 
     groups.truncate(groups_active_count);
