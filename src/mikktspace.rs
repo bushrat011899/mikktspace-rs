@@ -19,8 +19,11 @@
  */
 
 mod face_vertex;
-#[cfg(not(feature = "corrected-edge-sorting"))]
-mod quick_sort_legacy;
+#[cfg_attr(
+    not(feature = "corrected-edge-sorting"),
+    path = "mikktspace/quick_sort_legacy.rs"
+)]
+mod quick_sort;
 #[cfg_attr(
     not(feature = "corrected-vertex-welding"),
     path = "mikktspace/weld_vertices_legacy.rs"
@@ -29,11 +32,8 @@ mod weld_vertices;
 
 use alloc::{vec, vec::Vec};
 
-use self::{face_vertex::FaceVertex, weld_vertices::weld_vertices};
+use self::{face_vertex::FaceVertex, quick_sort::quick_sort_edges, weld_vertices::weld_vertices};
 use crate::{math::*, MikkTSpaceInterface};
-
-#[cfg(not(feature = "corrected-edge-sorting"))]
-use quick_sort_legacy::quick_sort_edges;
 
 pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
@@ -835,19 +835,8 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[F
         .map(|(f, &i0, &i1)| Edge { i0, i1, f })
         .collect::<Vec<_>>();
 
-    // Sort over all edges by i0, this is the pricy one.
-    // Sorts using the `Ord` implementation from `Edge` and `[Edge]::sort`.
-    // This is a correct and typical sort, but differs from the original C
-    // library.
-    #[cfg(feature = "corrected-edge-sorting")]
-    edges.sort();
-
-    // Sorts using the original quicksort implementation from the C library.
-    // Note that this includes an off-by-one error which can cause the last
-    // step in sorting to fail.
-    // This is typically observed as the verticies in the last face being
-    // out of order.
-    #[cfg(not(feature = "corrected-edge-sorting"))]
+    // Sort over all edges by i0, i1, then f.
+    // This is the pricy one.
     quick_sort_edges(&mut edges);
 
     // pair up, adjacent triangles
