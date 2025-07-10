@@ -19,10 +19,21 @@
  */
 
 mod face_vertex;
+#[cfg(not(feature = "corrected-edge-sorting"))]
+mod quick_sort_legacy;
+#[cfg_attr(
+    not(feature = "corrected-vertex-welding"),
+    path = "mikktspace/weld_vertices_legacy.rs"
+)]
+mod weld_vertices;
+
 use alloc::{vec, vec::Vec};
 
-use self::face_vertex::FaceVertex;
+use self::{face_vertex::FaceVertex, weld_vertices::weld_vertices};
 use crate::{math::*, MikkTSpaceInterface};
+
+#[cfg(not(feature = "corrected-edge-sorting"))]
+use quick_sort_legacy::quick_sort_edges;
 
 pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
@@ -36,7 +47,7 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         generate_initial_vertices_index_list(context, faces_total);
 
     // make a welded index list of identical positions and attributes (pos, norm, texc)
-    generate_shared_vertices_index_list(context, &mut triangle_vertex_list);
+    weld_vertices(context, &mut triangle_vertex_list);
 
     // mark all triangle pairs that belong to a quad with only one
     // good triangle. These need special treatment in DegenEpilogue().
@@ -246,324 +257,10 @@ impl Group {
     };
 }
 
-struct TemporaryVertex<O: Ops> {
-    vert: Vec3<O>,
-    index: usize,
-}
-
-impl<O: Ops> Copy for TemporaryVertex<O> {}
-
-impl<O: Ops> Clone for TemporaryVertex<O> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<O: Ops> TemporaryVertex<O> {
-    const ZERO: TemporaryVertex<O> = TemporaryVertex {
-        vert: Vec3::ZERO,
-        index: 0,
-    };
-}
-
-const INTERNAL_RND_SORT_SEED: u32 = 39871946;
 const MARK_DEGENERATE: u8 = 1;
 const QUAD_ONE_DEGEN_TRI: u8 = 2;
 const GROUP_WITH_ANY: u8 = 4;
 const ORIENT_PRESERVING: u8 = 8;
-
-const CELLS: usize = 2048;
-
-// it is IMPORTANT that this function is called to evaluate the hash since
-// inlining could potentially reorder instructions and generate different
-// results for the same effective input value fVal.
-#[inline(never)]
-fn find_grid_cell(min: f32, max: f32, val: f32) -> usize {
-    let face = CELLS as f32 * ((val - min) / (max - min));
-    let vertex = face as usize;
-    if vertex < CELLS {
-        vertex
-    } else {
-        CELLS - 1
-    }
-}
-
-fn generate_shared_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
-    context: &I,
-    triangle_vertices: &mut [FaceVertex],
-) {
-    // Generate bounding box
-    let mut min = get_position_from_index(context, FaceVertex::new(0, 0));
-    let mut max = min;
-    for index in triangle_vertices.iter().skip(1) {
-        let position = get_position_from_index(context, *index);
-        if min.x > position.x {
-            min.x = position.x;
-        } else if max.x < position.x {
-            max.x = position.x;
-        }
-        if min.y > position.y {
-            min.y = position.y;
-        } else if max.y < position.y {
-            max.y = position.y;
-        }
-        if min.z > position.z {
-            min.z = position.z;
-        } else if max.z < position.z {
-            max.z = position.z;
-        }
-    }
-    let delta = max - min;
-    let mut channel = 0;
-    let mut min_channel = min.x;
-    let mut max_channel = max.x;
-    if delta.y > delta.x && delta.y > delta.z {
-        channel = 1;
-        min_channel = min.y;
-        max_channel = max.y;
-    } else if delta.z > delta.x {
-        channel = 2;
-        min_channel = min.z;
-        max_channel = max.z;
-    }
-
-    // if /* can't allocate? */ {
-    //     GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, context, iNrTrianglesIn);
-    //     return;
-    // }
-
-    // make allocations
-    let mut hash_table = vec![0usize; triangle_vertices.len()];
-    let mut hash_count = vec![0usize; CELLS];
-    let mut hash_offsets = vec![0usize; CELLS];
-    let mut hash_count_2 = vec![0usize; CELLS];
-
-    // count amount of elements in each cell unit
-    for index_0 in triangle_vertices.iter() {
-        let position = get_position_from_index(context, *index_0);
-        let val = if channel == 0 {
-            position.x
-        } else if channel == 1 {
-            position.y
-        } else {
-            position.z
-        };
-        let cell = find_grid_cell(min_channel, max_channel, val);
-        let fresh0 = &mut hash_count[cell];
-        *fresh0 += 1;
-    }
-
-    // evaluate start index of each cell.
-    hash_offsets[0_usize] = 0;
-    for k in 1..CELLS {
-        hash_offsets[k] = hash_offsets[k - 1] + hash_count[k - 1];
-    }
-
-    // insert vertices
-    for (i, index_1) in triangle_vertices.iter().enumerate() {
-        let position = get_position_from_index(context, *index_1);
-        let val = if channel == 0 {
-            position.x
-        } else if channel == 1 {
-            position.y
-        } else {
-            position.z
-        };
-        let cell = find_grid_cell(min_channel, max_channel, val);
-        assert!(hash_count_2[cell] < hash_count[cell]);
-        let entry = &mut hash_table[hash_offsets[cell] + hash_count_2[cell]];
-        *entry = i; // vertex i has been inserted.
-        let fresh1 = &mut hash_count_2[cell];
-        *fresh1 += 1;
-    }
-
-    // verify the count
-    for k in 0..CELLS {
-        assert!(hash_count_2[k] == hash_count[k]);
-    }
-
-    // find maximum amount of entries in any hash entry
-    let max_count = *hash_count.iter().max().unwrap();
-
-    // complete the merge
-    let mut temporary_vertices = vec![TemporaryVertex::<O>::ZERO; max_count];
-    for k in 0..CELLS {
-        let entries = hash_count[k];
-        if entries >= 2 {
-            // if /* couldn't allocate pTmpVert? */ {
-            //     MergeVertsSlow(
-            //         piTriList_in_and_out,
-            //         context,
-            //         pTable_0 as *const usize,
-            //         iEntries,
-            //     );
-            // }
-            for e in 0..entries {
-                let i_0 = hash_table[hash_offsets[k] + e];
-                let position = get_position_from_index(context, triangle_vertices[i_0]);
-                temporary_vertices[e].vert = position;
-                temporary_vertices[e].index = i_0;
-            }
-            merge_verts_fast(
-                triangle_vertices,
-                &mut temporary_vertices,
-                context,
-                0,
-                entries - 1,
-            );
-        }
-    }
-}
-
-fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_verticies: &mut [FaceVertex],
-    temporary_verticies: &mut [TemporaryVertex<O>],
-    context: &I,
-    i_left_in: usize,
-    i_right_in: usize,
-) {
-    // make bbox
-    let (min, max) = temporary_verticies
-        .iter()
-        .take(i_right_in + 1)
-        .skip(i_left_in)
-        .fold(None, |state, t| {
-            let (mut min, mut max) = state.unwrap_or_else(|| {
-                let v = [t.vert.x, t.vert.y, t.vert.z];
-                (v, v)
-            });
-
-            for c in 0..3 {
-                min[c] = min[c].min(t.vert[c]);
-                max[c] = max[c].max(t.vert[c]);
-            }
-
-            Some((min, max))
-        })
-        .unwrap();
-
-    let dx = max[0] - min[0];
-    let dy = max[1] - min[1];
-    let dz = max[2] - min[2];
-
-    let mut channel = 0;
-    if dy > dx && dy > dz {
-        channel = 1;
-    } else if dz > dx {
-        channel = 2;
-    }
-
-    let sep = 0.5f32 * (max[channel] + min[channel]);
-
-    // stop if all vertices are NaNs
-    if !sep.is_finite() {
-        return;
-    }
-
-    // terminate recursion when the separation/average value
-    // is no longer strictly between fMin and fMax values.
-    if sep >= max[channel] || sep <= min[channel] {
-        // complete the weld
-        for l in i_left_in..=i_right_in {
-            let i = temporary_verticies[l].index;
-            let index = triangle_verticies[i];
-
-            let a = (
-                get_position_from_index(context, index),
-                get_normal_from_index(context, index),
-                get_texture_coordinate_from_index(context, index),
-            );
-
-            let i2 = temporary_verticies
-                .iter()
-                .take(l)
-                .skip(i_left_in)
-                .find_map(|t| {
-                    let i2 = t.index;
-                    let index = triangle_verticies[i2];
-
-                    let b = (
-                        get_position_from_index(context, index),
-                        get_normal_from_index(context, index),
-                        get_texture_coordinate_from_index(context, index),
-                    );
-
-                    (a == b).then_some(i2)
-                });
-
-            // merge if previously found
-            if let Some(i2) = i2 {
-                triangle_verticies[i] = triangle_verticies[i2];
-            }
-        }
-    } else {
-        let mut i_left = i_left_in;
-        let mut i_right = i_right_in;
-        assert!(i_right_in - i_left_in > 0, "at least 2 entries");
-
-        // separate (by fSep) all points between iL_in and iR_in in pTmpVert[]
-        while i_left < i_right {
-            let mut ready_left_swap = false;
-            let mut ready_right_swap = false;
-            while !ready_left_swap && i_left < i_right {
-                assert!(i_left >= i_left_in && i_left <= i_right_in);
-                ready_left_swap = temporary_verticies[i_left].vert[channel] >= sep;
-                if !ready_left_swap {
-                    i_left += 1;
-                }
-            }
-            while !ready_right_swap && i_left < i_right {
-                assert!(i_right >= i_left_in && i_right <= i_right_in);
-                ready_right_swap = temporary_verticies[i_right].vert[channel] < sep;
-                if !ready_right_swap {
-                    i_right -= 1;
-                }
-            }
-            assert!(i_left < i_right || !(ready_left_swap && ready_right_swap));
-
-            if ready_left_swap && ready_right_swap {
-                let temporary_vertex = temporary_verticies[i_left];
-                assert!(i_left < i_right);
-                temporary_verticies[i_left] = temporary_verticies[i_right];
-                temporary_verticies[i_right] = temporary_vertex;
-                i_left += 1;
-                i_right -= 1;
-            }
-        }
-
-        assert!(i_left == i_right + 1 || i_left == i_right);
-        if i_left == i_right {
-            let ready_right_swap = temporary_verticies[i_right].vert[channel] < sep;
-            if ready_right_swap {
-                i_left += 1;
-            } else {
-                i_right -= 1;
-            }
-        }
-
-        // only need to weld when there is more than 1 instance of the (x,y,z)
-        if i_left_in < i_right {
-            // weld all left of fSep
-            merge_verts_fast(
-                triangle_verticies,
-                temporary_verticies,
-                context,
-                i_left_in,
-                i_right,
-            );
-        }
-        if i_left < i_right_in {
-            // weld all right of (or equal to) fSep
-            merge_verts_fast(
-                triangle_verticies,
-                temporary_verticies,
-                context,
-                i_left,
-                i_right_in,
-            );
-        }
-    };
-}
 
 fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
@@ -1131,14 +828,14 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     res
 }
 
-fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
-    #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-    struct Edge {
-        i0: FaceVertex,
-        i1: FaceVertex,
-        f: usize,
-    }
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct Edge {
+    i0: FaceVertex,
+    i1: FaceVertex,
+    f: usize,
+}
 
+fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
     // build array of edges
     let mut edges = vertices
         .chunks_exact(3)
@@ -1167,29 +864,7 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[F
     // This is typically observed as the verticies in the last face being
     // out of order.
     #[cfg(not(feature = "corrected-edge-sorting"))]
-    {
-        quick_sort_by_key_with_seed(&mut edges, |e| e.i0, INTERNAL_RND_SORT_SEED);
-
-        let mut s = 0;
-        for i in 1..edges.len() {
-            if edges[s].i0 == edges[i].i0 {
-                continue;
-            }
-
-            quick_sort_by_key_with_seed(&mut edges[s..i], |e| e.i1, INTERNAL_RND_SORT_SEED);
-            s = i;
-        }
-
-        let mut s = 0;
-        for i in 1..edges.len() {
-            if edges[s].i0 == edges[i].i0 && edges[s].i1 == edges[i].i1 {
-                continue;
-            }
-
-            quick_sort_by_key_with_seed(&mut edges[s..i], |e| e.f, INTERNAL_RND_SORT_SEED);
-            s = i;
-        }
-    }
+    quick_sort_edges(&mut edges);
 
     // pair up, adjacent triangles
     let mut iter = edges.iter();
@@ -1221,51 +896,6 @@ fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[F
         triangles[a.f].face_neighbors[n_a] = Some(b.f);
         triangles[b.f].face_neighbors[n_b] = Some(a.f);
     }
-}
-
-/// Note that this method _should_ be able to be replaced with `[T]::sort` and an
-/// appropriate implementation of [`Ord`] for [`SEdge`].
-/// However, in initial testing this caused incorrect results, indicating this sort
-/// may not be implemented correctly.
-/// Further testing is required.
-fn quick_sort_by_key_with_seed<T, K: Ord>(sort_buffer: &mut [T], key: fn(&T) -> K, seed: u32) {
-    match sort_buffer.len() {
-        0 | 1 => return,
-        2 => {
-            sort_buffer.sort_by_key(key);
-            return;
-        }
-        _ => {}
-    }
-
-    let seed = {
-        let t = seed & 31;
-        let t = seed.wrapping_shl(t) | seed.wrapping_shr(32_u32.wrapping_sub(t));
-        seed.wrapping_add(t).wrapping_add(3)
-    };
-
-    let pivot = key(&sort_buffer[seed.wrapping_rem(sort_buffer.len() as u32) as usize]);
-
-    let (mut l, mut r) = (0, sort_buffer.len().saturating_sub(1));
-    while l <= r {
-        l = (l..sort_buffer.len())
-            .find(|&left| key(&sort_buffer[left]) >= pivot)
-            .unwrap();
-
-        r = (0..=r)
-            .rev()
-            .find(|&right| key(&sort_buffer[right]) <= pivot)
-            .unwrap();
-
-        if l <= r {
-            sort_buffer.swap(l, r);
-            l = l.saturating_add(1);
-            r = r.saturating_sub(1);
-        }
-    }
-
-    quick_sort_by_key_with_seed(&mut sort_buffer[..=r], key, seed);
-    quick_sort_by_key_with_seed(&mut sort_buffer[l..], key, seed);
 }
 
 /// Finds the index of the edge `(i0_in, i1_in)` within `indices`, additionally
