@@ -293,18 +293,10 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 
 const CELLS: usize = 2048;
 
-// it is IMPORTANT that this function is called to evaluate the hash since
-// inlining could potentially reorder instructions and generate different
-// results for the same effective input value fVal.
-#[inline(never)]
 fn find_grid_cell(min: f32, max: f32, val: f32) -> usize {
     let face = CELLS as f32 * ((val - min) / (max - min));
     let vertex = face as usize;
-    if vertex < CELLS {
-        vertex
-    } else {
-        CELLS - 1
-    }
+    vertex.min(CELLS - 1)
 }
 
 struct TemporaryVertex<O: Ops> {
