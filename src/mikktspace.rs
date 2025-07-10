@@ -442,7 +442,7 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
 
     // force otherwise healthy quads to a fixed orientation
     let mut t = 0;
-    while t < triangle_info_list.len() - 1 {
+    while t < triangle_info_list.len().saturating_sub(1) {
         let original_face_index_a = triangle_info_list[t].original_face_index;
         let original_face_index_b = triangle_info_list[t + 1].original_face_index;
         if original_face_index_a == original_face_index_b {
