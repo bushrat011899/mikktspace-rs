@@ -502,7 +502,7 @@ fn build_4_rule_groups<O: Ops>(
                 return None;
             }
 
-            let vert_index = triangle_vertex_list[f * 3 + i];
+            let vert_index = triangle_vertex_list.chunks_exact(3).nth(f).unwrap()[i];
             triangle_info_list[f].assigned_group[i] = Some(groups_active_count);
 
             let mut group = Group {
@@ -549,9 +549,10 @@ fn assign_to_group_recursive<O: Ops>(
 
     // track down vertex
     let i = triangle_vertex_list
+        .chunks_exact(3)
+        .nth(triangle_index)
+        .unwrap()
         .iter()
-        .skip(3 * triangle_index)
-        .take(3)
         .position(|&v| v == group.vertex_representative)
         .unwrap();
 
@@ -957,25 +958,27 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
     // punishment for degenerate triangles is O(N^2)
     triangle_degenerate
         .iter()
-        .enumerate()
-        .filter(|(_index, triangle)| {
+        .zip(vertices_degenerate.chunks_exact(3))
+        .filter(|(triangle, _chunk)| {
             // degenerate triangles on a quad with one good triangle are skipped
             // here but processed in the next loop
             triangle.flags & QUAD_ONE_DEGEN_TRI == 0
         })
-        .flat_map(|(index, _triangle)| (0..3).map(move |i| (index, i)))
-        .filter_map(|(t, i)| {
+        .flat_map(|(a, chunk)| chunk.iter().enumerate().map(move |(i, av)| (a, av, i)))
+        .filter_map(|(a, av, i)| {
             // search through the good triangles
-            (0..(3 * triangles_good.len()))
-                .find(|&j| vertices_degenerate[t * 3 + i] == vertices_good[j])
-                .map(|j| (t, i, j / 3, j % 3))
+            triangles_good
+                .iter()
+                .zip(vertices_good.chunks_exact(3))
+                .flat_map(|(b, chunk)| chunk.iter().enumerate().map(move |(j, bv)| (b, bv, j)))
+                .find_map(|(b, bv, j)| (av == bv).then_some((a, i, b, j)))
         })
-        .map(|(dst, v_dst, src, v_src)| {
-            let vertex_dst = triangle_degenerate[dst].vertex_indices[v_dst] as usize;
-            let vertex_src = triangles_good[src].vertex_indices[v_src] as usize;
+        .map(|(a, i, b, j)| {
+            let vertex_dst = a.vertex_indices[i] as usize;
+            let vertex_src = b.vertex_indices[j] as usize;
 
-            let dst = triangle_degenerate[dst].tangent_spaces_offset + vertex_dst;
-            let src = triangles_good[src].tangent_spaces_offset + vertex_src;
+            let dst = a.tangent_spaces_offset + vertex_dst;
+            let src = b.tangent_spaces_offset + vertex_src;
 
             (dst, src)
         })
@@ -1006,9 +1009,11 @@ fn generate_tangent_spaces_for_partially_degenerate_quads<I: MikkTSpaceInterface
             let face = triangle_info.original_face_index;
             let missing_position = context.get_position(face, dst);
 
-            let src = (0..3)
-                .find_map(|i| {
-                    let vertex = triangle_info.vertex_indices[i] as usize;
+            let src = triangle_info
+                .vertex_indices
+                .iter()
+                .find_map(|&vertex| {
+                    let vertex = vertex as usize;
                     let source_position = context.get_position(face, vertex);
                     (source_position == missing_position).then_some(vertex)
                 })
