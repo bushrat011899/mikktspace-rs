@@ -61,8 +61,11 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
         segregate_degenerate_triangles(&mut triangle_info_list, &mut triangle_vertex_list);
 
-    // evaluate triangle level attributes and neighbor list
-    initialize_triangle_info(triangles_good, &*vertices_good, context);
+    evaluate_first_order_derivatives(triangles_good, context);
+
+    fix_quad_orientation(triangles_good, context);
+
+    build_neighbors(triangles_good, &*vertices_good);
 
     // based on the 4 rules, identify groups based on connectivity
     let groups = build_4_rule_groups(triangles_good, &*vertices_good);
@@ -368,21 +371,61 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     fabsf(signed_area_double)
 }
 
-fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
+fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
-    triangle_vertex_list: &[FaceVertex],
+    context: &I,
+) {
+    // force otherwise healthy quads to a fixed orientation
+    for [a, b] in triangle_info_list
+        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
+        // this is a quad
+        .filter_map(|chunk| match chunk {
+            [a, b] => Some([a, b]),
+            _ => None,
+        })
+        // bad triangles should already have been removed by
+        // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
+        .filter(|quad| quad.iter().all(|a| a.flags & MARK_DEGENERATE == 0))
+        // if this happens the quad has extremely bad mapping!!
+        .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
+    {
+        let tx_area_a = calculate_texture_area(
+            context,
+            &a.vertex_indices
+                .map(|i| FaceVertex::new(a.original_face_index, i)),
+        );
+
+        let tx_area_b = calculate_texture_area(
+            context,
+            &b.vertex_indices
+                .map(|i| FaceVertex::new(b.original_face_index, i)),
+        );
+
+        // force match
+        let (a, b) = if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
+            (a, b)
+        } else {
+            (b, a)
+        };
+
+        // clear first
+        b.flags &= !ORIENT_PRESERVING;
+        // copy bit
+        b.flags |= a.flags & ORIENT_PRESERVING;
+    }
+}
+
+fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
+    triangle_info_list: &mut [TriangleInfo<O>],
     context: &I,
 ) {
     // triangle_info_list[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
-
     // generate neighbor info list
+    // evaluate first order derivatives
     for info in triangle_info_list.iter_mut() {
         // assumed bad
         info.flags |= GROUP_WITH_ANY;
-    }
 
-    // evaluate first order derivatives
-    for info in triangle_info_list.iter_mut() {
         // initial values
         let v = info
             .vertex_indices
@@ -432,52 +475,6 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
             }
         }
     }
-
-    // force otherwise healthy quads to a fixed orientation
-    for [a, b] in triangle_info_list
-        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
-        // this is a quad
-        .filter_map(|chunk| match chunk {
-            [a, b] => Some([a, b]),
-            _ => None,
-        })
-        // bad triangles should already have been removed by
-        // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
-        .filter(|quad| quad.iter().all(|a| a.flags & MARK_DEGENERATE == 0))
-        // if this happens the quad has extremely bad mapping!!
-        .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
-    {
-        let tx_area_a = calculate_texture_area(
-            context,
-            &a.vertex_indices
-                .map(|i| FaceVertex::new(a.original_face_index, i)),
-        );
-
-        let tx_area_b = calculate_texture_area(
-            context,
-            &b.vertex_indices
-                .map(|i| FaceVertex::new(b.original_face_index, i)),
-        );
-
-        // force match
-        let (a, b) = if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
-            (a, b)
-        } else {
-            (b, a)
-        };
-
-        // clear first
-        b.flags &= !ORIENT_PRESERVING;
-        // copy bit
-        b.flags |= a.flags & ORIENT_PRESERVING;
-    }
-
-    // if /* can't allocate */ {
-    //     BuildNeighborsSlow(triangle_info_list, triangle_vertex_list, iNrTrianglesIn);
-    // }
-
-    // match up edge pairs
-    build_neighbors_fast(triangle_info_list, triangle_vertex_list);
 }
 
 fn build_4_rule_groups<O: Ops>(
@@ -791,7 +788,7 @@ struct Edge {
     f: usize,
 }
 
-fn build_neighbors_fast<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
+fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
     // build array of edges
     let mut edges = vertices
         .chunks_exact(3)
