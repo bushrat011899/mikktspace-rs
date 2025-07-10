@@ -364,16 +364,14 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     indices: &[FaceVertex],
 ) -> f32 {
-    let t = [0, 1, 2]
+    let tx = [0, 1, 2]
         .map(|i| indices[i])
         .map(|i| get_texture_coordinate_from_index(context, i));
 
-    let t21x = t[1][0] - t[0][0];
-    let t21y = t[1][1] - t[0][1];
-    let t31x = t[2][0] - t[0][0];
-    let t31y = t[2][1] - t[0][1];
+    let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
 
-    let signed_area_double = t21x * t31y - t21y * t31x;
+    let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
+
     fabsf(signed_area_double)
 }
 
@@ -399,18 +397,14 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
             .map(Vec3::<O>::from);
         let tx = info
             .vertex_indices
-            .map(|i| context.get_tex_coord(info.original_face_index, i as usize))
-            .map(|tx| Vec3::<O>::from([tx[0], tx[1], 0.]));
+            .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
 
-        let t21x = tx[1].x - tx[0].x;
-        let t21y = tx[1].y - tx[0].y;
-        let t31x = tx[2].x - tx[0].x;
-        let t31y = tx[2].y - tx[0].y;
-        let d1 = v[1] - v[0];
-        let d2 = v[2] - v[0];
-        let signed_area_double = t21x * t31y - t21y * t31x;
-        let s = (t31y * d1) - (t21y * d2); // eq 18
-        let t = (-t31x * d1) + (t21x * d2); // eq 19
+        let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
+        let d_v = [1, 2].map(|i| v[i] - v[0]);
+
+        let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
+        let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
+        let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
 
         info.flags |= if signed_area_double > 0f32 {
             ORIENT_PRESERVING
