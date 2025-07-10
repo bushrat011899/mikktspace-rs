@@ -248,15 +248,6 @@ struct Group {
     orientation_preserving: bool,
 }
 
-impl Group {
-    const ZERO: Group = Group {
-        id: 0,
-        face_indices: Vec::new(),
-        vertex_representative: FaceVertex::new(0, 0),
-        orientation_preserving: false,
-    };
-}
-
 const MARK_DEGENERATE: u8 = 1;
 const QUAD_ONE_DEGEN_TRI: u8 = 2;
 const GROUP_WITH_ANY: u8 = 4;
@@ -547,7 +538,6 @@ fn build_4_rule_groups<O: Ops>(
                 vertex_representative: vert_index,
                 orientation_preserving: triangle_info_list[f].flags & ORIENT_PRESERVING != 0,
                 face_indices: vec![f],
-                ..Group::ZERO
             };
 
             let orientation_preserving_f = triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
