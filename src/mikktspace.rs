@@ -54,19 +54,12 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     // Additionally, move all good triangles to the start of
     // triangle_info_list[] and triangle_vertex_list[] without changing order and
     // put the degenerate triangles last.
-    let triangles_degenerate_count =
-        mark_and_count_degenerate_triangles(context, &mut triangle_info_list);
+    mark_degenerate_triangles(context, &mut triangle_info_list);
 
     mark_partially_degenerate_quads(&mut triangle_info_list);
 
     let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
-        segregate_degenerate_triangles(
-            &mut triangle_info_list,
-            &mut triangle_vertex_list,
-            triangles_degenerate_count,
-        );
-
-    assert_eq!(triangles_degenerate.len(), triangles_degenerate_count);
+        segregate_degenerate_triangles(&mut triangle_info_list, &mut triangle_vertex_list);
 
     // evaluate triangle level attributes and neighbor list
     initialize_triangle_info(triangles_good, &*vertices_good, context);
@@ -866,10 +859,10 @@ fn get_edge(
         .map(|(edgenum, (a, b))| (edgenum, a, b))
 }
 
-fn mark_and_count_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
+fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     faces: &mut [TriangleInfo<O>],
-) -> usize {
+) {
     faces
         .iter_mut()
         .filter(|face| {
@@ -879,10 +872,7 @@ fn mark_and_count_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
             let iter = p.iter().cycle();
             iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
         })
-        .fold(0, |count, face| {
-            face.flags |= MARK_DEGENERATE;
-            count + 1
-        })
+        .for_each(|face| face.flags |= MARK_DEGENERATE);
 }
 
 fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
@@ -905,7 +895,6 @@ fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
 fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
     faces: &'faces mut [TriangleInfo<O>],
     vertices: &'vertices mut [FaceVertex],
-    triangles_degenerate_count: usize,
 ) -> (
     (&'faces mut [TriangleInfo<O>], &'faces mut [TriangleInfo<O>]),
     (&'vertices mut [FaceVertex], &'vertices mut [FaceVertex]),
@@ -935,7 +924,7 @@ fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
         faces.swap(a, b);
     }
 
-    let good_triangles_count = faces.len() - triangles_degenerate_count;
+    let good_triangles_count = faces.partition_point(|face| face.flags & MARK_DEGENERATE == 0);
     let good_vertices_count = 3 * good_triangles_count;
 
     (
