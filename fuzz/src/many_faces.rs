@@ -1,14 +1,9 @@
 #![no_main]
 
-#[path = "../src/lib.rs"]
-mod geometry;
-
-use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
+use mikktspace_rs_fuzz::Geometry;
 
-use crate::geometry::TriangulatedGeometry;
-
-fuzz_target!(|value: TriangulatedGeometry| {
+fuzz_target!(|value: Geometry| {
     let reference = {
         let mut value = value.clone();
         mikktspace_sys::gen_tang_space_default(&mut value);

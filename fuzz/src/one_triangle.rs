@@ -1,15 +1,11 @@
 #![no_main]
 
-#[path = "../src/lib.rs"]
-mod geometry;
-
 use arbitrary::{Arbitrary, Unstructured};
 use libfuzzer_sys::fuzz_target;
-
-use crate::geometry::{Triangle, TriangulatedGeometry, Vertex};
+use mikktspace_rs_fuzz::{Face, Geometry, Vertex};
 
 #[derive(Debug)]
-struct OneTriangle(TriangulatedGeometry);
+struct OneTriangle(Geometry);
 
 impl Arbitrary<'_> for OneTriangle {
     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self, arbitrary::Error> {
@@ -18,12 +14,10 @@ impl Arbitrary<'_> for OneTriangle {
             Vertex::arbitrary(u)?,
             Vertex::arbitrary(u)?,
         ];
-        let triangles = vec![Triangle {
-            vertex_indices: [0, 1, 2],
-        }];
-        let mut value = TriangulatedGeometry {
+        let faces = vec![Face::Triangle([0, 1, 2])];
+        let mut value = Geometry {
             vertices,
-            triangles,
+            faces,
         };
 
         value.validate()?;

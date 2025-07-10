@@ -5,7 +5,6 @@ publish = false
 edition = "2024"
 
 [lib]
-path = "src/lib.rs"
 
 [features]
 corrected-edge-sorting = ["mikktspace-rs/corrected-edge-sorting"]
@@ -26,14 +25,14 @@ version = "0.1.1"
 
 [[bin]]
 name = "one_triangle"
-path = "fuzz_targets/one_triangle.rs"
+path = "src/one_triangle.rs"
 test = false
 doc = false
 bench = false
 
 [[bin]]
-name = "many_triangles"
-path = "fuzz_targets/many_triangles.rs"
+name = "many_faces"
+path = "src/many_faces.rs"
 test = false
 doc = false
 bench = false

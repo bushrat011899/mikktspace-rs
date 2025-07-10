@@ -27,26 +27,45 @@ impl PartialEq for Vertex {
 }
 
 #[derive(Debug, Clone, PartialEq, Arbitrary)]
-pub struct Face {
-    pub vertex_indices: Vec<usize>,
+pub enum Face {
+    Triangle([usize; 3]),
+    Quad([usize; 4]),
+    Arbitrary(Vec<usize>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Arbitrary)]
-pub struct Triangle {
-    pub vertex_indices: [usize; 3],
+impl core::ops::Deref for Face {
+    type Target = [usize];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Triangle(inner) => &*inner,
+            Self::Quad(inner) => &*inner,
+            Self::Arbitrary(inner) => inner.as_slice(),
+        }
+    }
+}
+
+impl core::ops::DerefMut for Face {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Triangle(inner) => &mut *inner,
+            Self::Quad(inner) => &mut *inner,
+            Self::Arbitrary(inner) => inner.deref_mut(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct TriangulatedGeometry {
+pub struct Geometry {
     pub vertices: Vec<Vertex>,
-    pub triangles: Vec<Triangle>,
+    pub faces: Vec<Face>,
 }
 
-impl TriangulatedGeometry {
+impl Geometry {
     pub fn validate(&mut self) -> Result<(), arbitrary::Error> {
         let Self {
             vertices,
-            triangles,
+            faces,
         } = self;
 
         // Known failure: no vertices
@@ -55,13 +74,19 @@ impl TriangulatedGeometry {
         }
 
         // Known failure: no faces
-        if triangles.is_empty() {
+        if faces.is_empty() {
             return Err(arbitrary::Error::IncorrectFormat);
         }
 
         // Known failure: face vertex indices out of range
-        for triangle in triangles.iter_mut() {
-            triangle.vertex_indices = triangle.vertex_indices.map(|i| i % vertices.len());
+        for face in faces.iter_mut() {
+            if face.is_empty() {
+                return Err(arbitrary::Error::IncorrectFormat);
+            }
+            
+            for vertex in face.iter_mut() {
+                *vertex %= vertices.len();
+            }
         }
 
         // Known failure: NaN values
@@ -81,8 +106,8 @@ impl TriangulatedGeometry {
         }
 
         // Known failure: Identical positions within a face
-        for face in triangles.iter() {
-            let mut iter = face.vertex_indices.iter();
+        for face in faces.iter() {
+            let mut iter = face.iter();
             while let Some(a) = iter.next() {
                 for b in iter.clone() {
                     if vertices[*a].position == vertices[*b].position {
@@ -117,11 +142,11 @@ impl TriangulatedGeometry {
 
         let mut errors = String::new();
 
-        if self.triangles.len() != other.triangles.len() {
-            let _ = writeln!(&mut errors, "- Expected {} triangles; found {}", self.triangles.len(), other.triangles.len());
+        if self.faces.len() != other.faces.len() {
+            let _ = writeln!(&mut errors, "- Expected {} triangles; found {}", self.faces.len(), other.faces.len());
         }
 
-        for (a, b) in self.triangles.iter().zip(other.triangles.iter()).filter(|(a, b)| a != b) {
+        for (a, b) in self.faces.iter().zip(other.faces.iter()).filter(|(a, b)| a != b) {
             let _ = writeln!(&mut errors, "- Expected {:?} triangle; found {:?}", a, b);
         }
 
@@ -151,11 +176,11 @@ impl TriangulatedGeometry {
     }
 }
 
-impl Arbitrary<'_> for TriangulatedGeometry {
+impl Arbitrary<'_> for Geometry {
     fn arbitrary(u: &mut Unstructured<'_>) -> Result<Self, arbitrary::Error> {
         let mut value = Self {
             vertices: Vec::<Vertex>::arbitrary(u)?,
-            triangles: Vec::<Triangle>::arbitrary(u)?,
+            faces: Vec::<Face>::arbitrary(u)?,
         };
 
         value.validate()?;
@@ -164,25 +189,25 @@ impl Arbitrary<'_> for TriangulatedGeometry {
     }
 }
 
-impl mikktspace_sys::MikkTSpaceInterface for TriangulatedGeometry {
+impl mikktspace_sys::MikkTSpaceInterface for Geometry {
     fn get_num_faces(&self) -> usize {
-        self.triangles.len()
+        self.faces.len()
     }
 
-    fn get_num_vertices_of_face(&self, _face: usize) -> usize {
-        3
+    fn get_num_vertices_of_face(&self, face: usize) -> usize {
+        self.faces[face].len()
     }
 
     fn get_position(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].position
+        self.vertices[self.faces[face][vert]].position
     }
 
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].normal
+        self.vertices[self.faces[face][vert]].normal
     }
 
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].tex_coord
+        self.vertices[self.faces[face][vert]].tex_coord
     }
 
     fn set_tspace(
@@ -195,29 +220,29 @@ impl mikktspace_sys::MikkTSpaceInterface for TriangulatedGeometry {
         face: usize,
         vert: usize,
     ) {
-        self.vertices[self.triangles[face].vertex_indices[vert]].tangent = tangent;
+        self.vertices[self.faces[face][vert]].tangent = tangent;
     }
 }
 
-impl mikktspace_rs::MikkTSpaceInterface for TriangulatedGeometry {
+impl mikktspace_rs::MikkTSpaceInterface for Geometry {
     fn get_num_faces(&self) -> usize {
-        self.triangles.len()
+        self.faces.len()
     }
 
-    fn get_num_vertices_of_face(&self, _face: usize) -> usize {
-        3
+    fn get_num_vertices_of_face(&self, face: usize) -> usize {
+        self.faces[face].len()
     }
 
     fn get_position(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].position
+        self.vertices[self.faces[face][vert]].position
     }
 
     fn get_normal(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].normal
+        self.vertices[self.faces[face][vert]].normal
     }
 
     fn get_tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
-        self.vertices[self.triangles[face].vertex_indices[vert]].tex_coord
+        self.vertices[self.faces[face][vert]].tex_coord
     }
 
     fn set_tangent_space(
@@ -226,6 +251,6 @@ impl mikktspace_rs::MikkTSpaceInterface for TriangulatedGeometry {
         face: usize,
         vert: usize,
     ) {
-        self.vertices[self.triangles[face].vertex_indices[vert]].tangent = tangent_space.tangent();
+        self.vertices[self.faces[face][vert]].tangent = tangent_space.tangent();
     }
 }
