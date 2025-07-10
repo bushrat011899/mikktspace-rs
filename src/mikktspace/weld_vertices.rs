@@ -1,3 +1,11 @@
+//! Provides [`weld_vertices`]; a method to deduplicate [`FaceVertex`] values in
+//! a list.
+//! This implementation is based on [`BTreeMap`] and provides good performance
+//! characteristics and predicable behavior.
+//! When presented with two identical vertices, the lowest index value will be used.
+//! This essentially means the first vertices on the first faces will be kept as
+//! the originals, while later ones will be replaced.
+
 use alloc::collections::BTreeMap;
 
 use crate::{

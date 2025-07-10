@@ -1,3 +1,8 @@
+//! Provides [`weld_vertices`]; a method to deduplicate [`FaceVertex`] values in
+//! a list.
+//! This implementation is overly complex and has poor `NaN` handling _deliberately_
+//! to match the original C implementation.
+
 use alloc::vec;
 
 use crate::{

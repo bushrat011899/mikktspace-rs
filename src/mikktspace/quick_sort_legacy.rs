@@ -1,3 +1,9 @@
+//! This is a deliberately _broken_ implementation of quick-sort.
+//! It exists to provide _identical_ sorting to the original C implementation
+//! of `mikktspace` when sorting edges.
+//!
+//! Details on how this implementation is broken can be found [on GitHub](https://github.com/mmikk/MikkTSpace/issues/5).
+
 use super::Edge;
 
 pub(super) fn quick_sort_edges(edges: &mut [Edge]) {

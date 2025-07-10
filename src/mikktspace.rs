@@ -944,15 +944,18 @@ fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
 ) {
     // reorder list so all degen triangles are moved to the back
     // without reordering the good triangles
-    let mut sorted = 0..faces.len();
-    let mut unsorted = 0..faces.len();
+    let (mut proper, mut degenerate) = (0..faces.len(), 0..faces.len());
+    loop {
+        // search for the first degenerate triangle.
+        let Some(a) = proper.find(|&a| faces[a].flags & MARK_DEGENERATE != 0) else {
+            break;
+        };
 
-    // search for the first degenerate triangle.
-    while let Some(a) = sorted.find(|&a| faces[a].flags & MARK_DEGENERATE != 0) {
-        unsorted.start = unsorted.start.max(a + 1);
+        // To preserve local ordering, only swap with a good triangle after this degenerate
+        degenerate.start = degenerate.start.max(a + 1);
 
         // search for the first good triangle.
-        let Some(b) = unsorted.find(|&b| faces[b].flags & MARK_DEGENERATE == 0) else {
+        let Some(b) = degenerate.find(|&b| faces[b].flags & MARK_DEGENERATE == 0) else {
             // If there are no more good triangles, the sorting is complete.
             break;
         };
