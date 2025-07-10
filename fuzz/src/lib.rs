@@ -110,6 +110,45 @@ impl TriangulatedGeometry {
 
         Ok(())
     }
+
+    /// Compares two geometries totally before panicking _if_ they differ.
+    pub fn assert_eq(&self, other: &Self) {
+        use core::fmt::Write;
+
+        let mut errors = String::new();
+
+        if self.triangles.len() != other.triangles.len() {
+            let _ = writeln!(&mut errors, "- Expected {} triangles; found {}", self.triangles.len(), other.triangles.len());
+        }
+
+        for (a, b) in self.triangles.iter().zip(other.triangles.iter()).filter(|(a, b)| a != b) {
+            let _ = writeln!(&mut errors, "- Expected {:?} triangle; found {:?}", a, b);
+        }
+
+        if self.vertices.len() != other.vertices.len() {
+            let _ = writeln!(&mut errors, "- Expected {} vertices; found {}", self.vertices.len(), other.vertices.len());
+        }
+
+        for (a, b) in self.vertices.iter().zip(other.vertices.iter()).filter(|(a, b)| a != b) {
+            let _ = writeln!(&mut errors, "  - Differing vertex:");
+            if a.position != b.position {
+                let _ = writeln!(&mut errors, "    - Expected {:?} position; found {:?}", a.position, b.position);
+            }
+            if a.normal != b.normal {
+                let _ = writeln!(&mut errors, "    - Expected {:?} normal; found {:?}", a.normal, b.normal);
+            }
+            if a.tex_coord != b.tex_coord {
+                let _ = writeln!(&mut errors, "    - Expected {:?} texture coordinate; found {:?}", a.tex_coord, b.tex_coord);
+            }
+            if a.tangent != b.tangent {
+                let _ = writeln!(&mut errors, "    - Expected {:?} tangent; found {:?}", a.tangent, b.tangent);
+            }
+        }
+
+        if !errors.is_empty() {
+            panic!("Difference Summary:\n{}", errors);
+        }
+    }
 }
 
 impl Arbitrary<'_> for TriangulatedGeometry {

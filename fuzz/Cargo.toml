@@ -7,6 +7,10 @@ edition = "2024"
 [lib]
 path = "src/lib.rs"
 
+[features]
+corrected-edge-sorting = ["mikktspace-rs/corrected-edge-sorting"]
+corrected-vertex-welding = ["mikktspace-rs/corrected-vertex-welding"]
+
 [package.metadata]
 cargo-fuzz = true
 

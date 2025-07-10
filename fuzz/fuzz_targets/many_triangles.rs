@@ -21,15 +21,5 @@ fuzz_target!(|value: TriangulatedGeometry| {
         value
     };
 
-    if reference != value {
-        let r = reference.vertices.iter();
-        let v = value.vertices.iter();
-
-        r.zip(v).for_each(|(r, v)| assert_eq!(r, v));
-
-        assert_eq!(
-            reference, value,
-            "tangents equal, but something else was changed improperly!"
-        );
-    }
+    reference.assert_eq(&value);
 });
