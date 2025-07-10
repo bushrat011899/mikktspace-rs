@@ -441,64 +441,42 @@ fn initialize_triangle_info<I: MikkTSpaceInterface<O>, O: Ops>(
     }
 
     // force otherwise healthy quads to a fixed orientation
-    let mut t = 0;
-    while t < triangle_info_list.len().saturating_sub(1) {
-        let original_face_index_a = triangle_info_list[t].original_face_index;
-        let original_face_index_b = triangle_info_list[t + 1].original_face_index;
-        if original_face_index_a == original_face_index_b {
-            // this is a quad
-            let is_degenerate_a = triangle_info_list[t].flags & MARK_DEGENERATE != 0;
-            let is_degenerate_b = triangle_info_list[t + 1].flags & MARK_DEGENERATE != 0;
+    for [a, b] in triangle_info_list
+        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
+        // this is a quad
+        .filter_map(|chunk| match chunk {
+            [a, b] => Some([a, b]),
+            _ => None,
+        })
+        // bad triangles should already have been removed by
+        // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
+        .filter(|quad| quad.iter().all(|a| a.flags & MARK_DEGENERATE == 0))
+        // if this happens the quad has extremely bad mapping!!
+        .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
+    {
+        let tx_area_a = calculate_texture_area(
+            context,
+            &a.vertex_indices
+                .map(|i| FaceVertex::new(a.original_face_index, i)),
+        );
 
-            // bad triangles should already have been removed by
-            // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
-            if !(is_degenerate_a || is_degenerate_b) {
-                let orientation_preserving_a = triangle_info_list[t].flags & ORIENT_PRESERVING != 0;
-                let orientation_preserving_b =
-                    triangle_info_list[t + 1].flags & ORIENT_PRESERVING != 0;
+        let tx_area_b = calculate_texture_area(
+            context,
+            &b.vertex_indices
+                .map(|i| FaceVertex::new(b.original_face_index, i)),
+        );
 
-                // if this happens the quad has extremely bad mapping!!
-                if orientation_preserving_a != orientation_preserving_b {
-                    let mut choose_orientation_first_triangle = false;
-                    if triangle_info_list[t + 1].flags & GROUP_WITH_ANY != 0
-                        || calculate_texture_area(
-                            context,
-                            &triangle_info_list[t].vertex_indices.map(|i| {
-                                FaceVertex::new(triangle_info_list[t].original_face_index, i)
-                            }),
-                        ) >= calculate_texture_area(
-                            context,
-                            &triangle_info_list[t + 1].vertex_indices.map(|i| {
-                                FaceVertex::new(triangle_info_list[t + 1].original_face_index, i)
-                            }),
-                        )
-                    {
-                        choose_orientation_first_triangle = true;
-                    }
-
-                    // force match
-                    let t0 = if choose_orientation_first_triangle {
-                        t
-                    } else {
-                        t + 1
-                    };
-                    let t1_0 = if choose_orientation_first_triangle {
-                        t + 1
-                    } else {
-                        t
-                    };
-
-                    // clear first
-                    triangle_info_list[t1_0].flags &= !ORIENT_PRESERVING;
-                    // copy bit
-                    triangle_info_list[t1_0].flags |=
-                        triangle_info_list[t0].flags & ORIENT_PRESERVING;
-                }
-            }
-            t += 2;
+        // force match
+        let (a, b) = if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
+            (a, b)
         } else {
-            t += 1;
-        }
+            (b, a)
+        };
+
+        // clear first
+        b.flags &= !ORIENT_PRESERVING;
+        // copy bit
+        b.flags |= a.flags & ORIENT_PRESERVING;
     }
 
     // if /* can't allocate */ {
