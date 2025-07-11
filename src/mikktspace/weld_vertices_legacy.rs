@@ -3,7 +3,7 @@
 //! This implementation is overly complex and has poor `NaN` handling _deliberately_
 //! to match the original C implementation.
 
-use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::{
     math::Vec3,
@@ -18,168 +18,95 @@ pub(super) fn weld_vertices<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     triangle_vertices: &mut [FaceVertex],
 ) {
-    // Generate bounding box
-    let mut min = get_position_from_index(context, FaceVertex::new(0, 0));
-    let mut max = min;
-    for index in triangle_vertices.iter().skip(1) {
-        let position = get_position_from_index(context, *index);
-        if min.x > position.x {
-            min.x = position.x;
-        } else if max.x < position.x {
-            max.x = position.x;
-        }
-        if min.y > position.y {
-            min.y = position.y;
-        } else if max.y < position.y {
-            max.y = position.y;
-        }
-        if min.z > position.z {
-            min.z = position.z;
-        } else if max.z < position.z {
-            max.z = position.z;
-        }
-    }
-    let delta = max - min;
-    let mut channel = 0;
-    let mut min_channel = min.x;
-    let mut max_channel = max.x;
-    if delta.y > delta.x && delta.y > delta.z {
-        channel = 1;
-        min_channel = min.y;
-        max_channel = max.y;
-    } else if delta.z > delta.x {
-        channel = 2;
-        min_channel = min.z;
-        max_channel = max.z;
-    }
+    // make bbox
+    let Some((min, max)) = triangle_vertices
+        .iter()
+        .map(|&i| get_position_from_index(context, i))
+        .fold(None, |state, v| {
+            let (mut min, mut max) = state.unwrap_or((v, v));
 
-    // if /* can't allocate? */ {
-    //     GenerateSharedVerticesIndexListSlow(piTriList_in_and_out, context, iNrTrianglesIn);
-    //     return;
-    // }
-
-    // make allocations
-    let mut hash_table = vec![0usize; triangle_vertices.len()];
-    let mut hash_count = vec![0usize; CELLS];
-    let mut hash_offsets = vec![0usize; CELLS];
-    let mut hash_count_2 = vec![0usize; CELLS];
-
-    // count amount of elements in each cell unit
-    for index_0 in triangle_vertices.iter() {
-        let position = get_position_from_index(context, *index_0);
-        let val = if channel == 0 {
-            position.x
-        } else if channel == 1 {
-            position.y
-        } else {
-            position.z
-        };
-        let cell = find_grid_cell(min_channel, max_channel, val);
-        let fresh0 = &mut hash_count[cell];
-        *fresh0 += 1;
-    }
-
-    // evaluate start index of each cell.
-    hash_offsets[0_usize] = 0;
-    for k in 1..CELLS {
-        hash_offsets[k] = hash_offsets[k - 1] + hash_count[k - 1];
-    }
-
-    // insert vertices
-    for (i, index_1) in triangle_vertices.iter().enumerate() {
-        let position = get_position_from_index(context, *index_1);
-        let val = if channel == 0 {
-            position.x
-        } else if channel == 1 {
-            position.y
-        } else {
-            position.z
-        };
-        let cell = find_grid_cell(min_channel, max_channel, val);
-        assert!(hash_count_2[cell] < hash_count[cell]);
-        let entry = &mut hash_table[hash_offsets[cell] + hash_count_2[cell]];
-        *entry = i; // vertex i has been inserted.
-        let fresh1 = &mut hash_count_2[cell];
-        *fresh1 += 1;
-    }
-
-    // verify the count
-    for k in 0..CELLS {
-        assert!(hash_count_2[k] == hash_count[k]);
-    }
-
-    // find maximum amount of entries in any hash entry
-    let max_count = *hash_count.iter().max().unwrap();
-
-    // complete the merge
-    let mut temporary_vertices = vec![TemporaryVertex::<O>::ZERO; max_count];
-    for k in 0..CELLS {
-        let entries = hash_count[k];
-        if entries >= 2 {
-            // if /* couldn't allocate pTmpVert? */ {
-            //     MergeVertsSlow(
-            //         piTriList_in_and_out,
-            //         context,
-            //         pTable_0 as *const usize,
-            //         iEntries,
-            //     );
-            // }
-            for e in 0..entries {
-                let i_0 = hash_table[hash_offsets[k] + e];
-                let position = get_position_from_index(context, triangle_vertices[i_0]);
-                temporary_vertices[e].vert = position;
-                temporary_vertices[e].index = i_0;
+            for c in 0..3 {
+                min[c] = min[c].min(v[c]);
+                max[c] = max[c].max(v[c]);
             }
-            merge_verts_fast(
-                triangle_vertices,
-                &mut temporary_vertices,
-                context,
-                0,
-                entries - 1,
-            );
-        }
+
+            Some((min, max))
+        })
+    else {
+        // If we cannot generate a bounding box then there are no vertices to weld.
+        return;
+    };
+
+    let d = max - min;
+
+    let c_max = if d.y > d.x && d.y > d.z {
+        1
+    } else if d.z > d.x {
+        2
+    } else {
+        0
+    };
+
+    let mut temporary_vertices = triangle_vertices
+        .iter()
+        .map(|&v| get_position_from_index(context, v))
+        .enumerate()
+        .map(|(index, position)| TemporaryVertex {
+            group: {
+                const GROUPS: u16 = 2048;
+                let t = (position[c_max] - min[c_max]) / d[c_max];
+                let group = (GROUPS as f32 * t.clamp(0., 1.)) as u16;
+                group.clamp(0, GROUPS - 1)
+            },
+            position,
+            original_index: index,
+        })
+        .collect::<Vec<_>>();
+
+    temporary_vertices.sort_by_key(|v| v.group);
+
+    for chunk in temporary_vertices.chunk_by_mut(|a, b| a.group == b.group) {
+        merge_verts_fast(context, triangle_vertices, chunk);
     }
 }
 
 fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_verticies: &mut [FaceVertex],
-    temporary_verticies: &mut [TemporaryVertex<O>],
     context: &I,
-    i_left_in: usize,
-    i_right_in: usize,
+    vertices: &mut [FaceVertex],
+    buffer: &mut [TemporaryVertex<O>],
 ) {
+    // If there is only a single element (or no elements), merging is complete.
+    if buffer.len() < 2 {
+        return;
+    }
+
     // make bbox
-    let (min, max) = temporary_verticies
+    let (min, max) = buffer
         .iter()
-        .take(i_right_in + 1)
-        .skip(i_left_in)
-        .fold(None, |state, t| {
-            let (mut min, mut max) = state.unwrap_or_else(|| {
-                let v = [t.vert.x, t.vert.y, t.vert.z];
-                (v, v)
-            });
+        .map(|t| t.position)
+        .fold(None, |state, v| {
+            let (mut min, mut max) = state.unwrap_or((v, v));
 
             for c in 0..3 {
-                min[c] = min[c].min(t.vert[c]);
-                max[c] = max[c].max(t.vert[c]);
+                min[c] = min[c].min(v[c]);
+                max[c] = max[c].max(v[c]);
             }
 
             Some((min, max))
         })
         .unwrap();
 
-    let dx = max[0] - min[0];
-    let dy = max[1] - min[1];
-    let dz = max[2] - min[2];
+    let d = max - min;
 
-    let mut channel = 0;
-    if dy > dx && dy > dz {
-        channel = 1;
-    } else if dz > dx {
-        channel = 2;
-    }
+    let c = if d.y > d.x && d.y > d.z {
+        1
+    } else if d.z > d.x {
+        2
+    } else {
+        0
+    };
 
-    let sep = 0.5f32 * (max[channel] + min[channel]);
+    let sep = 0.5f32 * (max[c] + min[c]);
 
     // stop if all vertices are NaNs
     if !sep.is_finite() {
@@ -188,120 +115,75 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 
     // terminate recursion when the separation/average value
     // is no longer strictly between fMin and fMax values.
-    if sep >= max[channel] || sep <= min[channel] {
+    if !(min[c] < sep && sep < max[c]) {
         // complete the weld
-        for l in i_left_in..=i_right_in {
-            let i = temporary_verticies[l].index;
-            let index = triangle_verticies[i];
+        for (l, v_a) in buffer.iter().enumerate() {
+            let i = v_a.original_index;
+            let index = vertices[i];
 
             let a = (
-                get_position_from_index(context, index),
+                v_a.position,
                 get_normal_from_index(context, index),
                 get_texture_coordinate_from_index(context, index),
             );
 
-            let i2 = temporary_verticies
-                .iter()
-                .take(l)
-                .skip(i_left_in)
-                .find_map(|t| {
-                    let i2 = t.index;
-                    let index = triangle_verticies[i2];
+            let j = buffer.iter().take(l).find_map(|v_b| {
+                let j = v_b.original_index;
+                let index = vertices[j];
 
-                    let b = (
-                        get_position_from_index(context, index),
-                        get_normal_from_index(context, index),
-                        get_texture_coordinate_from_index(context, index),
-                    );
+                let b = (
+                    v_b.position,
+                    get_normal_from_index(context, index),
+                    get_texture_coordinate_from_index(context, index),
+                );
 
-                    (a == b).then_some(i2)
-                });
+                (a == b).then_some(j)
+            });
 
             // merge if previously found
-            if let Some(i2) = i2 {
-                triangle_verticies[i] = triangle_verticies[i2];
-            }
-        }
-    } else {
-        let mut i_left = i_left_in;
-        let mut i_right = i_right_in;
-        assert!(i_right_in - i_left_in > 0, "at least 2 entries");
-
-        // separate (by fSep) all points between iL_in and iR_in in pTmpVert[]
-        while i_left < i_right {
-            let mut ready_left_swap = false;
-            let mut ready_right_swap = false;
-            while !ready_left_swap && i_left < i_right {
-                assert!(i_left >= i_left_in && i_left <= i_right_in);
-                ready_left_swap = temporary_verticies[i_left].vert[channel] >= sep;
-                if !ready_left_swap {
-                    i_left += 1;
-                }
-            }
-            while !ready_right_swap && i_left < i_right {
-                assert!(i_right >= i_left_in && i_right <= i_right_in);
-                ready_right_swap = temporary_verticies[i_right].vert[channel] < sep;
-                if !ready_right_swap {
-                    i_right -= 1;
-                }
-            }
-            assert!(i_left < i_right || !(ready_left_swap && ready_right_swap));
-
-            if ready_left_swap && ready_right_swap {
-                let temporary_vertex = temporary_verticies[i_left];
-                assert!(i_left < i_right);
-                temporary_verticies[i_left] = temporary_verticies[i_right];
-                temporary_verticies[i_right] = temporary_vertex;
-                i_left += 1;
-                i_right -= 1;
+            if let Some(j) = j {
+                vertices[i] = vertices[j];
             }
         }
 
-        assert!(i_left == i_right + 1 || i_left == i_right);
-        if i_left == i_right {
-            let ready_right_swap = temporary_verticies[i_right].vert[channel] < sep;
-            if ready_right_swap {
-                i_left += 1;
-            } else {
-                i_right -= 1;
+        return;
+    }
+
+    // separate into vertices either left or right of the separation plane by
+    // swapping pairs.
+    let mut unsorted = 0..buffer.len();
+    while unsorted.len() >= 2 {
+        let l = unsorted.find(|&i| buffer[i].position[c] >= sep);
+        let r = (&mut unsorted).rev().find(|&i| buffer[i].position[c] < sep);
+
+        unsorted = match (l, r) {
+            (Some(l), Some(r)) => {
+                buffer.swap(l, r);
+                (l + 1)..r
             }
-        }
+            (None, Some(r)) => unsorted.start..(r + 1),
+            (Some(l), None) => l..(l + 1),
+            (None, None) => unsorted,
+        };
+    }
 
-        // only need to weld when there is more than 1 instance of the (x,y,z)
-        if i_left_in < i_right {
-            // weld all left of fSep
-            merge_verts_fast(
-                triangle_verticies,
-                temporary_verticies,
-                context,
-                i_left_in,
-                i_right,
-            );
-        }
-        if i_left < i_right_in {
-            // weld all right of (or equal to) fSep
-            merge_verts_fast(
-                triangle_verticies,
-                temporary_verticies,
-                context,
-                i_left,
-                i_right_in,
-            );
-        }
-    };
-}
+    // separation above only operates on pairs, so there may be a single unsorted
+    // entry left.
+    if !unsorted.is_empty() && buffer[unsorted.start].position[c] < sep {
+        unsorted.start += 1;
+    }
 
-const CELLS: usize = 2048;
-
-fn find_grid_cell(min: f32, max: f32, val: f32) -> usize {
-    let face = CELLS as f32 * ((val - min) / (max - min));
-    let vertex = face as usize;
-    vertex.min(CELLS - 1)
+    // merge vertices in each separated buffer
+    let (left, right) = buffer.split_at_mut(unsorted.start);
+    for part in [left, right] {
+        merge_verts_fast(context, vertices, part);
+    }
 }
 
 struct TemporaryVertex<O: Ops> {
-    vert: Vec3<O>,
-    index: usize,
+    position: Vec3<O>,
+    original_index: usize,
+    group: u16,
 }
 
 impl<O: Ops> Copy for TemporaryVertex<O> {}
@@ -310,11 +192,4 @@ impl<O: Ops> Clone for TemporaryVertex<O> {
     fn clone(&self) -> Self {
         *self
     }
-}
-
-impl<O: Ops> TemporaryVertex<O> {
-    const ZERO: TemporaryVertex<O> = TemporaryVertex {
-        vert: Vec3::ZERO,
-        index: 0,
-    };
 }

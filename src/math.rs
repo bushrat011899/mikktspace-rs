@@ -20,7 +20,7 @@
 
 use core::{
     marker::PhantomData,
-    ops::{Add, Index, Mul, Sub},
+    ops::{Add, Index, IndexMut, Mul, Sub},
 };
 
 /// Provides the math operations required by the tangent space algorithm but which
@@ -116,6 +116,17 @@ impl<O: Ops> Index<usize> for Vec3<O> {
             0 => &self.x,
             1 => &self.y,
             2 => &self.z,
+            _ => panic!(),
+        }
+    }
+}
+
+impl<O: Ops> IndexMut<usize> for Vec3<O> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            2 => &mut self.z,
             _ => panic!(),
         }
     }
