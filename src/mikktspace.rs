@@ -43,10 +43,28 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let faces_total = context.get_num_faces();
 
     // make an initial triangle --> face index list
-    let (mut triangle_info_list, mut triangle_vertex_list, tangent_spaces_total) =
-        generate_initial_vertices_index_list(context, faces_total);
+    let mut triangle_info_list = generate_triangle_info_list(context, faces_total);
+
+    // `generate_triangle_info_list` generates `triangle_info_list` such that the
+    // last value will have the largest `tangent_spaces_offset`.
+    debug_assert!(triangle_info_list.is_sorted_by_key(|info| info.tangent_spaces_offset));
+
+    // Get the total number of tangent space values to be computed
+    let tangent_spaces_total = triangle_info_list
+        .last()
+        .map(|info| {
+            info.tangent_spaces_offset + context.get_num_vertices_of_face(info.original_face_index)
+        })
+        .unwrap_or(0);
 
     // make a welded index list of identical positions and attributes (pos, norm, texc)
+    let mut triangle_vertex_list = triangle_info_list
+        .iter()
+        .flat_map(|info| {
+            info.vertex_indices
+                .map(|t| FaceVertex::new(info.original_face_index, t))
+        })
+        .collect::<Vec<_>>();
     weld_vertices(context, &mut triangle_vertex_list);
 
     // mark all triangle pairs that belong to a quad with only one
@@ -249,85 +267,80 @@ const QUAD_ONE_DEGEN_TRI: u8 = 2;
 const GROUP_WITH_ANY: u8 = 4;
 const ORIENT_PRESERVING: u8 = 8;
 
-fn generate_initial_vertices_index_list<I: MikkTSpaceInterface<O>, O: Ops>(
+fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     faces_total: usize,
-) -> (Vec<TriangleInfo<O>>, Vec<FaceVertex>, usize) {
-    let mut triangle_info_list = Vec::<TriangleInfo<O>>::new();
-    let mut triangle_verticies = Vec::<FaceVertex>::new();
-
-    let mut tangent_space_offset = 0;
-    for f in 0..faces_total {
-        let verts = context.get_num_vertices_of_face(f);
-
-        let mut info = TriangleInfo {
-            face_neighbors: [None; 3],
-            assigned_group: [None; 3],
-            tangent_space: RawTangentSpace {
-                s: Vec3::<O>::ZERO,
-                t: Vec3::<O>::ZERO,
-                s_magnitude: 0.,
-                t_magnitude: 0.,
-            },
-            original_face_index: f,
-            flags: 0,
-            tangent_spaces_offset: tangent_space_offset,
-            vertex_indices: [0; 3],
-        };
-
-        let i = [0, 1, 2, 3].map(|i| FaceVertex::new(f, i));
-
-        if verts == 3 {
-            info.vertex_indices = [0, 1, 2];
-
-            triangle_verticies.extend_from_slice(&info.vertex_indices.map(|t| i[t as usize]));
-            triangle_info_list.push(info);
-        } else if verts == 4 {
-            let mut info_a = info;
-            let mut info_b = info;
-
-            // need an order independent way to evaluate
-            // tspace on quads. This is done by splitting
-            // along the shortest diagonal.
-            let tx = i.map(|i| get_texture_coordinate_from_index(context, i));
-            let d20 = [0, 1].map(|i| tx[2][i] - tx[0][i]);
-            let d13 = [0, 1].map(|i| tx[3][i] - tx[1][i]);
-            let distance_squared_20 = d20[0] * d20[0] + d20[1] * d20[1];
-            let distance_squared_13 = d13[0] * d13[0] + d13[1] * d13[1];
-
-            let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_13 {
-                true
-            } else if distance_squared_13 < distance_squared_20 {
-                false
-            } else {
-                let p = i.map(|i| get_position_from_index(context, i));
-                let distance_squared_20 = (p[2] - p[0]).length_squared();
-                let distance_squared_13 = (p[3] - p[1]).length_squared();
-                distance_squared_13 >= distance_squared_20
+) -> Vec<TriangleInfo<O>> {
+    (0..faces_total)
+        .filter_map(|f| match context.get_num_vertices_of_face(f) {
+            verts @ (3 | 4) => Some((f, verts)),
+            _ => None,
+        })
+        .scan(0, |tangent_space_offset, (f, verts)| {
+            let result = (f, verts, *tangent_space_offset);
+            *tangent_space_offset += verts;
+            Some(result)
+        })
+        .flat_map(|(f, verts, tangent_space_offset)| {
+            let mut info = TriangleInfo {
+                face_neighbors: [None; 3],
+                assigned_group: [None; 3],
+                tangent_space: RawTangentSpace {
+                    s: Vec3::<O>::ZERO,
+                    t: Vec3::<O>::ZERO,
+                    s_magnitude: 0.,
+                    t_magnitude: 0.,
+                },
+                original_face_index: f,
+                flags: 0,
+                tangent_spaces_offset: tangent_space_offset,
+                vertex_indices: [0; 3],
             };
 
-            if quad_diagonal_is_02 {
-                info_a.vertex_indices = [0, 1, 2];
-                info_b.vertex_indices = [0, 2, 3];
+            if verts == 3 {
+                info.vertex_indices = [0, 1, 2];
+
+                [Some(info), None]
+            } else if verts == 4 {
+                let mut info_a = info;
+                let mut info_b = info;
+
+                // need an order independent way to evaluate
+                // tspace on quads. This is done by splitting
+                // along the shortest diagonal.
+                let i = [0, 1, 2, 3].map(|i| FaceVertex::new(f, i));
+                let tx = i.map(|i| get_texture_coordinate_from_index(context, i));
+                let d20 = [0, 1].map(|i| tx[2][i] - tx[0][i]);
+                let d31 = [0, 1].map(|i| tx[3][i] - tx[1][i]);
+                let distance_squared_20 = d20[0] * d20[0] + d20[1] * d20[1];
+                let distance_squared_31 = d31[0] * d31[0] + d31[1] * d31[1];
+
+                let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_31 {
+                    true
+                } else if distance_squared_31 < distance_squared_20 {
+                    false
+                } else {
+                    let p = i.map(|i| get_position_from_index(context, i));
+                    let distance_squared_20 = (p[2] - p[0]).length_squared();
+                    let distance_squared_31 = (p[3] - p[1]).length_squared();
+                    distance_squared_31 >= distance_squared_20
+                };
+
+                if quad_diagonal_is_02 {
+                    info_a.vertex_indices = [0, 1, 2];
+                    info_b.vertex_indices = [0, 2, 3];
+                } else {
+                    info_a.vertex_indices = [0, 1, 3];
+                    info_b.vertex_indices = [1, 2, 3];
+                }
+
+                [Some(info_a), Some(info_b)]
             } else {
-                info_a.vertex_indices = [0, 1, 3];
-                info_b.vertex_indices = [1, 2, 3];
+                unreachable!()
             }
-
-            triangle_verticies.extend_from_slice(&info_a.vertex_indices.map(|t| i[t as usize]));
-            triangle_verticies.extend_from_slice(&info_b.vertex_indices.map(|t| i[t as usize]));
-
-            triangle_info_list.push(info_a);
-            triangle_info_list.push(info_b);
-        } else {
-            continue;
-        }
-
-        tangent_space_offset += verts;
-    }
-
-    // return total amount of tspaces
-    (triangle_info_list, triangle_verticies, tangent_space_offset)
+        })
+        .flatten()
+        .collect::<Vec<_>>()
 }
 
 fn get_position_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
