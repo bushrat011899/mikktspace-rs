@@ -313,16 +313,15 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 let d = [(2, 0), (3, 1)].map(|(a, b)| [0, 1].map(|i| tx[a][i] - tx[b][i]));
                 let l = d.map(|d| d[0] * d[0] + d[1] * d[1]);
 
-                let quad_diagonal_is_02 =
-                    match l[0].partial_cmp(&l[1]) {
-                        Some(core::cmp::Ordering::Less) => true,
-                        Some(core::cmp::Ordering::Greater) => false,
-                        _ => {
-                            let p = i.map(|i| get_position_from_index(context, i));
-                            let d = [(2, 0), (3, 1)].map(|(a, b)| (p[a] - p[b]).length_squared());
-                            d[1] >= d[0]
-                        }
-                    };
+                let quad_diagonal_is_02 = match l[0].partial_cmp(&l[1]) {
+                    Some(core::cmp::Ordering::Less) => true,
+                    Some(core::cmp::Ordering::Greater) => false,
+                    _ => {
+                        let p = i.map(|i| get_position_from_index(context, i));
+                        let d = [(2, 0), (3, 1)].map(|(a, b)| (p[a] - p[b]).length_squared());
+                        d[1] >= d[0]
+                    }
+                };
 
                 if quad_diagonal_is_02 {
                     info_a.vertex_indices = [0, 1, 2];
@@ -434,33 +433,38 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
     // triangle_info_list[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
     // generate neighbor info list
     // evaluate first order derivatives
-    for info in triangle_info_list.iter_mut() {
-        // assumed bad
-        info.flags |= GROUP_WITH_ANY;
+    triangle_info_list
+        .iter_mut()
+        .map(|info| {
+            // initial values
+            let v = info
+                .vertex_indices
+                .map(|i| context.get_position(info.original_face_index, i as usize))
+                .map(Vec3::<O>::from);
+            let tx = info
+                .vertex_indices
+                .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
 
-        // initial values
-        let v = info
-            .vertex_indices
-            .map(|i| context.get_position(info.original_face_index, i as usize))
-            .map(Vec3::<O>::from);
-        let tx = info
-            .vertex_indices
-            .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
+            let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
+            let d_v = [1, 2].map(|i| v[i] - v[0]);
 
-        let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
-        let d_v = [1, 2].map(|i| v[i] - v[0]);
+            let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
+            let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
+            let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
 
-        let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
-        let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
-        let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
+            // assumed bad
+            info.flags |= GROUP_WITH_ANY;
 
-        info.flags |= if signed_area_double > 0f32 {
-            ORIENT_PRESERVING
-        } else {
-            0
-        };
+            info.flags |= if signed_area_double > 0f32 {
+                ORIENT_PRESERVING
+            } else {
+                0
+            };
 
-        if not_zero(signed_area_double) {
+            (info, s, t, signed_area_double)
+        })
+        .filter(|(_, _, _, signed_area_double)| not_zero(*signed_area_double))
+        .map(|(info, s, t, signed_area_double)| {
             let area_double = fabsf(signed_area_double);
             let s_magnitude = s.length();
             let t_magnitude = t.length();
@@ -480,13 +484,15 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
             info.tangent_space.s_magnitude = s_magnitude / area_double;
             info.tangent_space.t_magnitude = t_magnitude / area_double;
 
+            info
+        })
+        .filter(|info| {
+            not_zero(info.tangent_space.s_magnitude) && not_zero(info.tangent_space.t_magnitude)
+        })
+        .for_each(|info| {
             // if this is a good triangle
-            if not_zero(info.tangent_space.s_magnitude) && not_zero(info.tangent_space.t_magnitude)
-            {
-                info.flags &= !GROUP_WITH_ANY;
-            }
-        }
-    }
+            info.flags &= !GROUP_WITH_ANY;
+        });
 }
 
 fn build_4_rule_groups<O: Ops>(
