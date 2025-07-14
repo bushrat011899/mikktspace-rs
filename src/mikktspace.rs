@@ -372,9 +372,11 @@ fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
 /// returns the texture area times 2
 fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
-    indices: &[FaceVertex],
+    info: &TriangleInfo<O>,
 ) -> f32 {
-    let tx = [0, 1, 2].map(|i| get_texture_coordinate_from_index(context, indices[i]));
+    let tx = info
+        .vertex_indices
+        .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
     let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
 
     let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
@@ -400,26 +402,17 @@ fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
         // if this happens the quad has extremely bad mapping!!
         .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
         .map(|[a, b]| {
-            let tx_area_a = calculate_texture_area(
-                context,
-                &a.vertex_indices
-                    .map(|i| FaceVertex::new(a.original_face_index, i)),
-            );
-
-            let tx_area_b = calculate_texture_area(
-                context,
-                &b.vertex_indices
-                    .map(|i| FaceVertex::new(b.original_face_index, i)),
-            );
+            let tx_area_a = calculate_texture_area(context, &*a);
+            let tx_area_b = calculate_texture_area(context, &*b);
 
             // force match
             if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
-                (a, b)
+                [a, b]
             } else {
-                (b, a)
+                [b, a]
             }
         })
-        .for_each(|(a, b)| {
+        .for_each(|[a, b]| {
             // clear first
             b.flags &= !ORIENT_PRESERVING;
             // copy bit
