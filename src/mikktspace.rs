@@ -449,6 +449,8 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
             let d_v = [1, 2].map(|i| v[i] - v[0]);
 
             let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
+
+            let area_double = fabsf(signed_area_double);
             let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
             let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
 
@@ -461,28 +463,22 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
                 0
             };
 
-            (info, s, t, signed_area_double)
+            (info, s, t, area_double)
         })
-        .filter(|(_, _, _, signed_area_double)| not_zero(*signed_area_double))
-        .map(|(info, s, t, signed_area_double)| {
-            let area_double = fabsf(signed_area_double);
-            let s_magnitude = s.length();
-            let t_magnitude = t.length();
+        .filter(|(_, _, _, area_double)| not_zero(*area_double))
+        .map(|(info, s, t, area_double)| {
             let sign = if info.flags & ORIENT_PRESERVING == 0 {
                 -1.0f32
             } else {
                 1.0f32
             };
-            if not_zero(s_magnitude) {
-                info.tangent_space.s = (sign / s_magnitude) * s;
-            }
-            if not_zero(t_magnitude) {
-                info.tangent_space.t = (sign / t_magnitude) * t;
-            }
 
-            // evaluate magnitudes prior to normalization of vOs and vOt
-            info.tangent_space.s_magnitude = s_magnitude / area_double;
-            info.tangent_space.t_magnitude = t_magnitude / area_double;
+            info.tangent_space = RawTangentSpace {
+                s: s.normalized_or_zero() * sign,
+                t: t.normalized_or_zero() * sign,
+                s_magnitude: s.length() / area_double,
+                t_magnitude: t.length() / area_double,
+            };
 
             info
         })
