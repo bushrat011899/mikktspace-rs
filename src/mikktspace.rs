@@ -127,7 +127,18 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
             // All healthy triangles on the other hand are built to always be either or.
             // set data
             for v in 0..vertices {
-                context.set_tangent_space(tangent_spaces_iter.next().unwrap().into(), f, v);
+                let tangent_space = tangent_spaces_iter.next().unwrap().unwrap_or(TangentSpace {
+                    value: RawTangentSpace {
+                        s: [1., 0., 0.].into(),
+                        s_magnitude: 1.0,
+                        t: [0., 1., 0.].into(),
+                        t_magnitude: 1.0,
+                    },
+                    orientation_preserving: false,
+                    is_averaged: false,
+                });
+
+                context.set_tangent_space(tangent_space.into(), f, v);
             }
         }
     }
@@ -147,13 +158,13 @@ impl core::fmt::Display for GenerateTangentSpaceError {
 impl core::error::Error for GenerateTangentSpaceError {}
 
 struct RawTangentSpace<O: Ops> {
-    /// normalized first order face derivative
+    /// Normalized first order face derivative.
     s: Vec3<O>,
-    /// normalized first order face derivative
+    /// Normalized first order face derivative.
     t: Vec3<O>,
-    /// original magnitude of vOs
+    /// Original magnitude of [`s`](RawTangentSpace::s).
     s_magnitude: f32,
-    /// original magnitude of vOs
+    /// Original magnitude of [`t`](RawTangentSpace::t).
     t_magnitude: f32,
 }
 
@@ -209,9 +220,9 @@ impl<O: Ops> RawTangentSpace<O> {
 }
 
 struct TangentSpace<O: Ops> {
-    inner: RawTangentSpace<O>,
-    /// this is to average back into quads.
-    counter: u8,
+    /// [`RawTangentSpace`] value this [`TangentSpace`] contains.
+    value: RawTangentSpace<O>,
+    is_averaged: bool,
     orientation_preserving: bool,
 }
 
@@ -226,10 +237,10 @@ impl<O: Ops> Clone for TangentSpace<O> {
 impl<'a, O: Ops> From<&'a TangentSpace<O>> for crate::TangentSpace {
     fn from(value: &'a TangentSpace<O>) -> Self {
         crate::TangentSpace {
-            tangent: [value.inner.s.x, value.inner.s.y, value.inner.s.z],
-            bi_tangent: [value.inner.t.x, value.inner.t.y, value.inner.t.z],
-            mag_s: value.inner.s_magnitude,
-            mag_t: value.inner.t_magnitude,
+            tangent: [value.value.s.x, value.value.s.y, value.value.s.z],
+            bi_tangent: [value.value.t.x, value.value.t.y, value.value.t.z],
+            mag_s: value.value.s_magnitude,
+            mag_t: value.value.t_magnitude,
             is_orientation_preserving: value.orientation_preserving,
         }
     }
@@ -242,20 +253,31 @@ impl<O: Ops> From<TangentSpace<O>> for crate::TangentSpace {
 }
 
 struct TriangleInfo<O: Ops> {
+    /// Stores the index of each neighboring triangle to this one, if any.
+    /// Indices correspond to _edges_ of this triangle, rather than _vertices_.
     face_neighbors: [Option<usize>; 3],
+
+    /// Stores which [`Group`] each vertex on this triangle is a member of, if any.
     assigned_group: [Option<usize>; 3],
 
     tangent: RawTangentSpace<O>,
 
-    /// determines if the current and the next triangle are a quad.
+    /// Determines if the current and the next triangle are a quad.
     original_face_index: usize,
 
-    flags: u8,
     tangent_spaces_offset: usize,
     /// Indicates which vertex this triangle does not contain from its original face.
     /// For triangles, this will be [`None`].
     /// For quads, it will be a value in the range `0..=3`.
     missing_vertex: Option<u8>,
+    /// Indicates that one or more vertices of this triangle are coincident,
+    /// reducing the triangle to either a line or point.
+    is_degenerate: bool,
+    /// Indicates this triangle is a member of a quad where one of the triangles
+    /// is degenerate, but the other is not.
+    quad_with_one_degenerate_triangle: bool,
+    group_with_any: bool,
+    orientation_preserving: bool,
 }
 
 impl<O: Ops> Copy for TriangleInfo<O> {}
@@ -273,7 +295,7 @@ impl<O: Ops> TriangleInfo<O> {
             Some(0) => [1, 2, 3],
             Some(1) => [0, 2, 3],
             Some(2) => [0, 1, 3],
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }
@@ -285,11 +307,6 @@ struct Group {
     vertex_representative: FaceVertex,
     orientation_preserving: bool,
 }
-
-const MARK_DEGENERATE: u8 = 1;
-const QUAD_ONE_DEGEN_TRI: u8 = 2;
-const GROUP_WITH_ANY: u8 = 4;
-const ORIENT_PRESERVING: u8 = 8;
 
 fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
@@ -311,9 +328,12 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 assigned_group: [None; 3],
                 tangent: RawTangentSpace::ZERO,
                 original_face_index: f,
-                flags: 0,
                 tangent_spaces_offset: tangent_space_offset,
                 missing_vertex: None,
+                is_degenerate: false,
+                quad_with_one_degenerate_triangle: false,
+                group_with_any: false,
+                orientation_preserving: false,
             };
 
             if verts == 3 {
@@ -411,25 +431,22 @@ fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         // bad triangles should already have been removed by
         // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
-        .filter(|quad| quad.iter().all(|a| a.flags & MARK_DEGENERATE == 0))
+        .filter(|quad| quad.iter().all(|a| !a.is_degenerate))
         // if this happens the quad has extremely bad mapping!!
-        .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
+        .filter(|[a, b]| a.orientation_preserving != b.orientation_preserving)
         .map(|[a, b]| {
             let tx_area_a = calculate_texture_area(context, &*a);
             let tx_area_b = calculate_texture_area(context, &*b);
 
             // force match
-            if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
+            if b.group_with_any || tx_area_a >= tx_area_b {
                 [a, b]
             } else {
                 [b, a]
             }
         })
         .for_each(|[a, b]| {
-            // clear first
-            b.flags &= !ORIENT_PRESERVING;
-            // copy bit
-            b.flags |= a.flags & ORIENT_PRESERVING;
+            b.orientation_preserving = a.orientation_preserving;
         });
 }
 
@@ -462,10 +479,10 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
             let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
 
             // assumed bad
-            info.flags |= GROUP_WITH_ANY;
+            info.group_with_any = true;
 
             if signed_area_double > 0f32 {
-                info.flags |= ORIENT_PRESERVING;
+                info.orientation_preserving = true;
             }
 
             (info, s, t, area_double)
@@ -474,10 +491,10 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
         .map(|(info, s, t, area_double)| {
             // multiplying by `sign` ensures NaN byte compatibility with the C
             // implementation, compared to conditional negation.
-            let sign = if info.flags & ORIENT_PRESERVING == 0 {
-                -1.0f32
-            } else {
+            let sign = if info.orientation_preserving {
                 1.0f32
+            } else {
+                -1.0f32
             };
 
             info.tangent = RawTangentSpace {
@@ -492,7 +509,7 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
         .filter(|info| not_zero(info.tangent.s_magnitude) && not_zero(info.tangent.t_magnitude))
         .for_each(|info| {
             // if this is a good triangle
-            info.flags &= !GROUP_WITH_ANY;
+            info.group_with_any = false;
         });
 }
 
@@ -507,11 +524,11 @@ fn build_4_rule_groups<O: Ops>(
         .filter_map(|(f, i, vertex_representative)| {
             let info = &mut triangle_info_list[f];
 
-            if info.flags & GROUP_WITH_ANY != 0 || info.assigned_group[i].is_some() {
+            if info.group_with_any || info.assigned_group[i].is_some() {
                 return None;
             }
 
-            let orientation_preserving = info.flags & ORIENT_PRESERVING != 0;
+            let orientation_preserving = info.orientation_preserving;
 
             let mut group = Group {
                 id: ids.next().unwrap(),
@@ -535,7 +552,7 @@ fn build_4_rule_groups<O: Ops>(
 
                 debug_assert!({
                     let orientation_preserving_neighbor =
-                        triangle_info_list[neighbor].flags & ORIENT_PRESERVING != 0;
+                        triangle_info_list[neighbor].orientation_preserving;
                     let different = orientation_preserving != orientation_preserving_neighbor;
 
                     result || different
@@ -569,7 +586,7 @@ fn assign_to_group_recursive<O: Ops>(
         return id == group.id;
     }
 
-    if triangle_info.flags & GROUP_WITH_ANY != 0
+    if triangle_info.group_with_any
         && triangle_info.assigned_group[0].is_none()
         && triangle_info.assigned_group[1].is_none()
         && triangle_info.assigned_group[2].is_none()
@@ -577,14 +594,13 @@ fn assign_to_group_recursive<O: Ops>(
         // first to group with a group-with-anything triangle
         // determines it's orientation.
         // This is the only existing order dependency in the code!!
-        triangle_info.flags &= !ORIENT_PRESERVING;
+        triangle_info.orientation_preserving = false;
         if group.orientation_preserving {
-            triangle_info.flags |= ORIENT_PRESERVING
+            triangle_info.orientation_preserving = true;
         }
     }
 
-    let orientation_preserving = triangle_info.flags & ORIENT_PRESERVING != 0;
-    if orientation_preserving != group.orientation_preserving {
+    if triangle_info.orientation_preserving != group.orientation_preserving {
         return false;
     }
 
@@ -608,19 +624,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_vertex_list: &[FaceVertex],
     threshold_cos: f32,
     context: &I,
-) -> Vec<TangentSpace<O>> {
-    let mut tangent_spaces = (0..tangent_spaces_total)
-        .map(|_| TangentSpace {
-            inner: RawTangentSpace {
-                s: [1., 0., 0.].into(),
-                s_magnitude: 1.0,
-                t: [0., 1., 0.].into(),
-                t_magnitude: 1.0,
-            },
-            counter: 0,
-            orientation_preserving: false,
-        })
-        .collect::<Vec<_>>();
+) -> Vec<Option<TangentSpace<O>>> {
+    let mut tangent_spaces = vec![None; tangent_spaces_total];
 
     let Some(faces_max_count) = groups.iter().map(|group| group.face_indices.len()).max() else {
         return tangent_spaces;
@@ -642,7 +647,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                 .unwrap();
 
             let vertex_index = triangle_vertex_list[f * 3 + index];
-            assert!(vertex_index == group.vertex_representative);
+            debug_assert!(vertex_index == group.vertex_representative);
 
             // is normalized already
             let n = get_normal_from_index(context, vertex_index);
@@ -662,7 +667,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     let s_t = (b.tangent.s - ((n.dot(b.tangent.s)) * n)).normalized_or_zero();
                     let t_t = (b.tangent.t - ((n.dot(b.tangent.t)) * n)).normalized_or_zero();
 
-                    let any = (a.flags | b.flags) & GROUP_WITH_ANY != 0;
+                    let any = a.group_with_any || b.group_with_any;
 
                     // make sure triangles which belong to the same quad are joined.
                     let same_original_face = a.original_face_index == b.original_face_index;
@@ -670,7 +675,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     let s_cos = s_f.dot(s_t);
                     let t_cos = t_f.dot(t_t);
 
-                    assert!(f != t || same_original_face, "sanity check");
+                    debug_assert!(f != t || same_original_face, "sanity check");
 
                     any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos
                 })
@@ -701,16 +706,22 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let index = a.tangent_spaces_offset + a.vertex_indices()[index] as usize;
             let tangent_space = &mut tangent_spaces[index];
 
-            assert!((a.flags & ORIENT_PRESERVING != 0) == group.orientation_preserving);
+            debug_assert!(a.orientation_preserving == group.orientation_preserving);
 
-            tangent_space.inner = match tangent_space.counter {
-                0 => sub_group_tangent_spaces[l],
-                1 => tangent_space.inner.mean(sub_group_tangent_spaces[l]),
-                _ => panic!("counter should always be zero or one at this stage"),
-            };
-
-            tangent_space.counter += 1;
-            tangent_space.orientation_preserving = group.orientation_preserving;
+            if let Some(tangent_space) = tangent_space {
+                debug_assert!(!tangent_space.is_averaged);
+                *tangent_space = TangentSpace {
+                    value: tangent_space.value.mean(sub_group_tangent_spaces[l]),
+                    is_averaged: true,
+                    orientation_preserving: group.orientation_preserving,
+                };
+            } else {
+                *tangent_space = Some(TangentSpace {
+                    value: sub_group_tangent_spaces[l],
+                    is_averaged: false,
+                    orientation_preserving: group.orientation_preserving,
+                });
+            }
         }
 
         sub_group_tangent_spaces.clear();
@@ -731,7 +742,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         .iter()
         .map(|&f| (&triangle_vertex_list[3 * f..][..3], &triangle_info_list[f]))
         // only valid triangles get to add their contribution
-        .filter(|(_vertices, info)| info.flags & GROUP_WITH_ANY == 0)
+        .filter(|(_vertices, info)| !info.group_with_any)
         .fold(
             (0f32, RawTangentSpace::ZERO),
             |(angle_sum, mut res), (vertices, info)| {
@@ -789,7 +800,6 @@ fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVe
     // build array of edges
     let mut edges = vertices
         .chunks_exact(3)
-        .take(triangles.len())
         .enumerate()
         .flat_map(|(f, chunk)| {
             chunk
@@ -864,22 +874,16 @@ fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
             let iter = p.iter().cycle();
             iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
         })
-        .for_each(|face| face.flags |= MARK_DEGENERATE);
+        .for_each(|face| face.is_degenerate = true);
 }
 
 fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
     faces
         .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
         .filter(|faces| faces.len() == 2)
-        .filter(|faces| {
-            faces
-                .iter()
-                .filter(|f| f.flags & MARK_DEGENERATE != 0)
-                .count()
-                == 1
-        })
+        .filter(|faces| faces.iter().filter(|f| f.is_degenerate).count() == 1)
         .flatten()
-        .for_each(|face| face.flags |= QUAD_ONE_DEGEN_TRI);
+        .for_each(|face| face.quad_with_one_degenerate_triangle = true);
 }
 
 /// Sort `faces` and `vertices` into a "good" first section, and a degenerate second section.
@@ -896,7 +900,7 @@ fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
     let (mut proper, mut degenerate) = (0..faces.len(), 0..faces.len());
     loop {
         // search for the first degenerate triangle.
-        let Some(a) = proper.find(|&a| faces[a].flags & MARK_DEGENERATE != 0) else {
+        let Some(a) = proper.find(|&a| faces[a].is_degenerate) else {
             break;
         };
 
@@ -904,7 +908,7 @@ fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
         degenerate.start = degenerate.start.max(a + 1);
 
         // search for the first good triangle.
-        let Some(b) = degenerate.find(|&b| faces[b].flags & MARK_DEGENERATE == 0) else {
+        let Some(b) = degenerate.find(|&b| !faces[b].is_degenerate) else {
             // If there are no more good triangles, the sorting is complete.
             break;
         };
@@ -916,7 +920,7 @@ fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
         faces.swap(a, b);
     }
 
-    let good_triangles_count = faces.partition_point(|face| face.flags & MARK_DEGENERATE == 0);
+    let good_triangles_count = faces.partition_point(|face| !face.is_degenerate);
     let good_vertices_count = 3 * good_triangles_count;
 
     (
@@ -943,7 +947,7 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
         .filter(|(triangle, _chunk)| {
             // degenerate triangles on a quad with one good triangle are skipped
             // here but processed in the next loop
-            triangle.flags & QUAD_ONE_DEGEN_TRI == 0
+            !triangle.quad_with_one_degenerate_triangle
         })
         .flat_map(|(a, chunk)| chunk.iter().enumerate().map(move |(i, av)| (a, av, i)))
         .filter_map(|(a, av, i)| {
@@ -977,7 +981,7 @@ fn generate_tangent_spaces_for_partially_degenerate_quads<I: MikkTSpaceInterface
         .iter()
         // this triangle belongs to a quad where the
         // other triangle is degenerate
-        .filter(|triangle_info| triangle_info.flags & QUAD_ONE_DEGEN_TRI != 0)
+        .filter(|triangle_info| triangle_info.quad_with_one_degenerate_triangle)
         .map(|triangle_info| {
             let dst = triangle_info.missing_vertex.unwrap() as usize;
 
