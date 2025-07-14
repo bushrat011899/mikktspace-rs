@@ -157,16 +157,16 @@ impl Geometry {
         for (a, b) in self.vertices.iter().zip(other.vertices.iter()).filter(|(a, b)| a != b) {
             let _ = writeln!(&mut errors, "  - Differing vertex:");
             if a.position != b.position {
-                let _ = writeln!(&mut errors, "    - Expected {:?} position; found {:?}", a.position, b.position);
+                let _ = writeln!(&mut errors, "    - Expected position {:?}; found {:?}", a.position, b.position);
             }
             if a.normal != b.normal {
-                let _ = writeln!(&mut errors, "    - Expected {:?} normal; found {:?}", a.normal, b.normal);
+                let _ = writeln!(&mut errors, "    - Expected normal {:?}; found {:?}", a.normal, b.normal);
             }
             if a.tex_coord != b.tex_coord {
-                let _ = writeln!(&mut errors, "    - Expected {:?} texture coordinate; found {:?}", a.tex_coord, b.tex_coord);
+                let _ = writeln!(&mut errors, "    - Expected texture coordinate {:?}; found {:?}", a.tex_coord, b.tex_coord);
             }
             if a.tangent != b.tangent {
-                let _ = writeln!(&mut errors, "    - Expected {:?} tangent; found {:?}", a.tangent, b.tangent);
+                let _ = writeln!(&mut errors, "    - Expected tangent {:?}; found {:?}", a.tangent, b.tangent);
             }
         }
 

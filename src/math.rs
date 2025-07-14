@@ -20,7 +20,7 @@
 
 use core::{
     marker::PhantomData,
-    ops::{Add, Index, IndexMut, Mul, Sub},
+    ops::{Add, Index, IndexMut, Mul, Neg, Sub},
 };
 
 /// Provides the math operations required by the tangent space algorithm but which
@@ -182,6 +182,19 @@ impl<O: Ops> Mul<Vec3<O>> for f32 {
 impl<O: Ops> PartialEq for Vec3<O> {
     fn eq(&self, other: &Self) -> bool {
         self.x == other.x && self.y == other.y && self.z == other.z
+    }
+}
+
+impl<O: Ops> Neg for Vec3<O> {
+    type Output = Vec3<O>;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            _phantom: PhantomData,
+        }
     }
 }
 

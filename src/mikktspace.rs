@@ -175,6 +175,15 @@ impl<O: Ops> Clone for RawTangentSpace<O> {
 }
 
 impl<O: Ops> RawTangentSpace<O> {
+    const ZERO: Self = Self {
+        s: Vec3::ZERO,
+        t: Vec3::ZERO,
+        s_magnitude: 0f32,
+        t_magnitude: 0f32,
+    };
+}
+
+impl<O: Ops> RawTangentSpace<O> {
     fn mean(self, rhs: Self) -> Self {
         // this if is important. Due to floating point precision
         // averaging when ts0==ts1 will cause a slight difference
@@ -285,12 +294,7 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
             let mut info = TriangleInfo {
                 face_neighbors: [None; 3],
                 assigned_group: [None; 3],
-                tangent_space: RawTangentSpace {
-                    s: Vec3::<O>::ZERO,
-                    t: Vec3::<O>::ZERO,
-                    s_magnitude: 0.,
-                    t_magnitude: 0.,
-                },
+                tangent_space: RawTangentSpace::ZERO,
                 original_face_index: f,
                 flags: 0,
                 tangent_spaces_offset: tangent_space_offset,
@@ -370,10 +374,7 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     indices: &[FaceVertex],
 ) -> f32 {
-    let tx = [0, 1, 2]
-        .map(|i| indices[i])
-        .map(|i| get_texture_coordinate_from_index(context, i));
-
+    let tx = [0, 1, 2].map(|i| get_texture_coordinate_from_index(context, indices[i]));
     let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
 
     let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
@@ -449,24 +450,24 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
             let d_v = [1, 2].map(|i| v[i] - v[0]);
 
             let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
-
             let area_double = fabsf(signed_area_double);
+
             let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
             let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
 
             // assumed bad
             info.flags |= GROUP_WITH_ANY;
-
-            info.flags |= if signed_area_double > 0f32 {
-                ORIENT_PRESERVING
-            } else {
-                0
-            };
+            
+            if signed_area_double > 0f32 {
+                info.flags |= ORIENT_PRESERVING;
+            }
 
             (info, s, t, area_double)
         })
         .filter(|(_, _, _, area_double)| not_zero(*area_double))
         .map(|(info, s, t, area_double)| {
+            // multiplying by `sign` ensures NaN byte compatibility with the C
+            // implementation, compared to conditional negation.
             let sign = if info.flags & ORIENT_PRESERVING == 0 {
                 -1.0f32
             } else {
@@ -500,29 +501,24 @@ fn build_4_rule_groups<O: Ops>(
         .zip(triangle_vertex_list.chunks_exact(3))
         .flat_map(|(f, chunk)| chunk.iter().enumerate().map(move |(i, &vert)| (f, i, vert)))
         .filter_map(|(f, i, vertex_representative)| {
-            if triangle_info_list[f].flags & GROUP_WITH_ANY != 0
-                || triangle_info_list[f].assigned_group[i].is_some()
-            {
-                // if not assigned to a group
+            let info = &mut triangle_info_list[f];
+
+            if info.flags & GROUP_WITH_ANY != 0 || info.assigned_group[i].is_some() {
                 return None;
             }
 
-            let id = ids.next().unwrap();
-
-            triangle_info_list[f].assigned_group[i] = Some(id);
+            let orientation_preserving = info.flags & ORIENT_PRESERVING != 0;
 
             let mut group = Group {
-                id,
+                id: ids.next().unwrap(),
                 vertex_representative,
-                orientation_preserving: triangle_info_list[f].flags & ORIENT_PRESERVING != 0,
+                orientation_preserving,
                 face_indices: vec![f],
             };
 
-            let orientation_preserving_f = triangle_info_list[f].flags & ORIENT_PRESERVING != 0;
+            info.assigned_group[i] = Some(group.id);
 
-            let neighbors = [2, 0]
-                .map(|t| (i + t) % 3)
-                .map(|i| triangle_info_list[f].face_neighbors[i]);
+            let neighbors = [2, 0].map(|t| (i + t) % 3).map(|i| info.face_neighbors[i]);
 
             for &neighbor in neighbors.iter().flatten() {
                 // neighbor
@@ -533,10 +529,10 @@ fn build_4_rule_groups<O: Ops>(
                     &mut group,
                 );
 
-                assert!({
-                    let orientation_preserving_left =
+                debug_assert!({
+                    let orientation_preserving_neighbor =
                         triangle_info_list[neighbor].flags & ORIENT_PRESERVING != 0;
-                    let different = orientation_preserving_f != orientation_preserving_left;
+                    let different = orientation_preserving != orientation_preserving_neighbor;
 
                     result || different
                 });
@@ -612,15 +608,9 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut tangent_spaces = (0..tangent_spaces_total)
         .map(|_| TangentSpace {
             inner: RawTangentSpace {
-                s: Vec3::<O> {
-                    x: 1.0,
-                    ..Vec3::ZERO
-                },
+                s: [1., 0., 0.].into(),
                 s_magnitude: 1.0,
-                t: Vec3::<O> {
-                    y: 1.0,
-                    ..Vec3::ZERO
-                },
+                t: [0., 1., 0.].into(),
                 t_magnitude: 1.0,
             },
             counter: 0,
@@ -628,9 +618,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         .collect::<Vec<_>>();
 
-    let faces_max_count = match groups.iter().map(|group| group.face_indices.len()).max() {
-        Some(count) => count,
-        None => return tangent_spaces,
+    let Some(faces_max_count) = groups.iter().map(|group| group.face_indices.len()).max() else {
+        return tangent_spaces;
     };
 
     // make initial allocations
@@ -655,10 +644,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let n = get_normal_from_index(context, vertex_index);
 
             // project
-            let mut s_f = a.tangent_space.s - ((n.dot(a.tangent_space.s)) * n);
-            let mut t_f = a.tangent_space.t - ((n.dot(a.tangent_space.t)) * n);
-            s_f.normalize_or_zero();
-            t_f.normalize_or_zero();
+            let s_f = (a.tangent_space.s - ((n.dot(a.tangent_space.s)) * n)).normalized_or_zero();
+            let t_f = (a.tangent_space.t - ((n.dot(a.tangent_space.t)) * n)).normalized_or_zero();
 
             let mut tmp_group = group
                 .face_indices
@@ -668,10 +655,10 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     let b = &triangle_info_list[t];
 
                     // project
-                    let mut s_t = b.tangent_space.s - ((n.dot(b.tangent_space.s)) * n);
-                    let mut t_t = b.tangent_space.t - ((n.dot(b.tangent_space.t)) * n);
-                    s_t.normalize_or_zero();
-                    t_t.normalize_or_zero();
+                    let s_t =
+                        (b.tangent_space.s - ((n.dot(b.tangent_space.s)) * n)).normalized_or_zero();
+                    let t_t =
+                        (b.tangent_space.t - ((n.dot(b.tangent_space.t)) * n)).normalized_or_zero();
 
                     let any = (a.flags | b.flags) & GROUP_WITH_ANY != 0;
 
@@ -691,11 +678,10 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             tmp_group.sort();
 
             // look for an existing match
-            let found = unified_sub_groups.iter().position(|g| g == &tmp_group);
-
-            let l = match found {
-                Some(l) => l,
-                None => {
+            let l = unified_sub_groups
+                .iter()
+                .position(|g| g == &tmp_group)
+                .unwrap_or_else(|| {
                     // if no match was found we allocate a new subgroup
                     let l = sub_group_tangent_spaces.len();
                     sub_group_tangent_spaces.push(evaluate_tangent_space(
@@ -707,8 +693,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     ));
                     unified_sub_groups.push(tmp_group);
                     l
-                }
-            };
+                });
 
             // output tspace
             let index = a.tangent_spaces_offset + a.vertex_indices[index] as usize;
@@ -746,24 +731,16 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         // only valid triangles get to add their contribution
         .filter(|(_vertices, info)| info.flags & GROUP_WITH_ANY == 0)
         .fold(
-            (
-                0f32,
-                RawTangentSpace {
-                    s: Vec3::ZERO,
-                    s_magnitude: 0.,
-                    t: Vec3::ZERO,
-                    t_magnitude: 0.,
-                },
-            ),
+            (0f32, RawTangentSpace::ZERO),
             |(angle_sum, mut res), (vertices, info)| {
                 let i = (0..=2)
                     .find(|&i| vertices[i] == vertex_representative)
                     .unwrap();
 
                 let n = get_normal_from_index(context, vertices[i]);
-                let p = [(i + 1) % 3, i, (i + 2) % 3]
-                    .map(|i| vertices[i])
-                    .map(|i| get_position_from_index(context, i));
+                let p = [1, 0, 2]
+                    .map(|j| (i + j) % 3)
+                    .map(|i| get_position_from_index(context, vertices[i]));
                 let v = [p[0] - p[1], p[2] - p[1]]
                     .map(|v| v - ((n.dot(v)) * n))
                     .map(Vec3::normalized_or_zero);
@@ -834,7 +811,7 @@ fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVe
     let mut iter = edges.iter();
     while let Some(a) = iter.next() {
         // resolve index ordering and edge_num
-        let (n_a, i0_a, i1_a) = get_edge(&vertices[a.f * 3..][..3], a.i0, a.i1).unwrap();
+        let (n_a, (i0_a, i1_a)) = get_edge(&vertices[a.f * 3..][..3], a.i0, a.i1).unwrap();
 
         if triangles[a.f].face_neighbors[n_a].is_some() {
             continue;
@@ -847,7 +824,7 @@ fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVe
             .find_map(|b| {
                 // flip i0_B and i1_B
                 // resolve index ordering and edge_num
-                let (n_b, i1_b, i0_b) = get_edge(&vertices[b.f * 3..][..3], b.i0, b.i1).unwrap();
+                let (n_b, (i1_b, i0_b)) = get_edge(&vertices[b.f * 3..][..3], b.i0, b.i1).unwrap();
                 let unassigned_b = triangles[b.f].face_neighbors[n_b].is_none();
 
                 ((i0_a, i1_a) == (i0_b, i1_b) && unassigned_b).then_some((b, n_b))
@@ -868,14 +845,12 @@ fn get_edge(
     indices: &[FaceVertex],
     i0: FaceVertex,
     i1: FaceVertex,
-) -> Option<(usize, FaceVertex, FaceVertex)> {
-    indices
-        .iter()
-        .copied()
-        .zip(indices.iter().copied().cycle().skip(1))
+) -> Option<(usize, (FaceVertex, FaceVertex))> {
+    let iter = indices.iter().copied();
+    iter.clone()
+        .zip(iter.cycle().skip(1))
         .enumerate()
         .find(|&(_, (a, b))| (a.min(b), a.max(b)) == (i0.min(i1), i0.max(i1)))
-        .map(|(edgenum, (a, b))| (edgenum, a, b))
 }
 
 fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
@@ -982,13 +957,10 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
                 .find_map(|(b, bv, j)| (av == bv).then_some((a, i, b, j)))
         })
         .map(|(a, i, b, j)| {
-            let vertex_dst = a.vertex_indices[i] as usize;
-            let vertex_src = b.vertex_indices[j] as usize;
-
-            let dst = a.tangent_spaces_offset + vertex_dst;
-            let src = b.tangent_spaces_offset + vertex_src;
-
-            (dst, src)
+            (
+                a.tangent_spaces_offset + a.vertex_indices[i] as usize,
+                b.tangent_spaces_offset + b.vertex_indices[j] as usize,
+            )
         })
         .for_each(|(dst, src)| {
             tangent_spaces[dst] = tangent_spaces[src];
