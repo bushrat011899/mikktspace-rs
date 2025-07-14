@@ -56,7 +56,7 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let mut triangle_vertex_list = triangle_info_list
         .iter()
         .flat_map(|info| {
-            info.vertex_indices
+            info.vertex_indices()
                 .map(|t| FaceVertex::new(info.original_face_index, t))
         })
         .collect::<Vec<_>>();
@@ -252,7 +252,10 @@ struct TriangleInfo<O: Ops> {
 
     flags: u8,
     tangent_spaces_offset: usize,
-    vertex_indices: [u8; 3],
+    /// Indicates which vertex this triangle does not contain from its original face.
+    /// For triangles, this will be [`None`].
+    /// For quads, it will be a value in the range `0..=3`.
+    missing_vertex: Option<u8>,
 }
 
 impl<O: Ops> Copy for TriangleInfo<O> {}
@@ -260,6 +263,18 @@ impl<O: Ops> Copy for TriangleInfo<O> {}
 impl<O: Ops> Clone for TriangleInfo<O> {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<O: Ops> TriangleInfo<O> {
+    const fn vertex_indices(&self) -> [u8; 3] {
+        match self.missing_vertex {
+            None | Some(3) => [0, 1, 2],
+            Some(0) => [1, 2, 3],
+            Some(1) => [0, 2, 3],
+            Some(2) => [0, 1, 3],
+            _ => unreachable!()
+        }
     }
 }
 
@@ -291,19 +306,17 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
             Some(result)
         })
         .flat_map(|(f, verts, tangent_space_offset)| {
-            let mut info = TriangleInfo {
+            let info = TriangleInfo {
                 face_neighbors: [None; 3],
                 assigned_group: [None; 3],
                 tangent: RawTangentSpace::ZERO,
                 original_face_index: f,
                 flags: 0,
                 tangent_spaces_offset: tangent_space_offset,
-                vertex_indices: [0; 3],
+                missing_vertex: None,
             };
 
             if verts == 3 {
-                info.vertex_indices = [0, 1, 2];
-
                 [Some(info), None]
             } else if verts == 4 {
                 let mut info_a = info;
@@ -328,11 +341,11 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 };
 
                 if quad_diagonal_is_02 {
-                    info_a.vertex_indices = [0, 1, 2];
-                    info_b.vertex_indices = [0, 2, 3];
+                    info_a.missing_vertex = Some(3);
+                    info_b.missing_vertex = Some(1);
                 } else {
-                    info_a.vertex_indices = [0, 1, 3];
-                    info_b.vertex_indices = [1, 2, 3];
+                    info_a.missing_vertex = Some(2);
+                    info_b.missing_vertex = Some(0);
                 }
 
                 [Some(info_a), Some(info_b)]
@@ -375,7 +388,7 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     info: &TriangleInfo<O>,
 ) -> f32 {
     let tx = info
-        .vertex_indices
+        .vertex_indices()
         .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
     let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
 
@@ -432,11 +445,11 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
         .map(|info| {
             // initial values
             let v = info
-                .vertex_indices
+                .vertex_indices()
                 .map(|i| context.get_position(info.original_face_index, i as usize))
                 .map(Vec3::<O>::from);
             let tx = info
-                .vertex_indices
+                .vertex_indices()
                 .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
 
             let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
@@ -685,7 +698,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                 });
 
             // output tspace
-            let index = a.tangent_spaces_offset + a.vertex_indices[index] as usize;
+            let index = a.tangent_spaces_offset + a.vertex_indices()[index] as usize;
             let tangent_space = &mut tangent_spaces[index];
 
             assert!((a.flags & ORIENT_PRESERVING != 0) == group.orientation_preserving);
@@ -846,7 +859,7 @@ fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
         .iter_mut()
         .filter(|face| {
             let p = face
-                .vertex_indices
+                .vertex_indices()
                 .map(|i| context.get_position(face.original_face_index, i as usize));
             let iter = p.iter().cycle();
             iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
@@ -943,8 +956,8 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
         })
         .map(|(a, i, b, j)| {
             (
-                a.tangent_spaces_offset + a.vertex_indices[i] as usize,
-                b.tangent_spaces_offset + b.vertex_indices[j] as usize,
+                a.tangent_spaces_offset + a.vertex_indices()[i] as usize,
+                b.tangent_spaces_offset + b.vertex_indices()[j] as usize,
             )
         })
         .for_each(|(dst, src)| {
@@ -966,16 +979,14 @@ fn generate_tangent_spaces_for_partially_degenerate_quads<I: MikkTSpaceInterface
         // other triangle is degenerate
         .filter(|triangle_info| triangle_info.flags & QUAD_ONE_DEGEN_TRI != 0)
         .map(|triangle_info| {
-            let dst = (0..=3)
-                .find(|v| !triangle_info.vertex_indices.contains(v))
-                .unwrap() as usize;
+            let dst = triangle_info.missing_vertex.unwrap() as usize;
 
             let offset = triangle_info.tangent_spaces_offset;
             let face = triangle_info.original_face_index;
             let missing_position = context.get_position(face, dst);
 
             let src = triangle_info
-                .vertex_indices
+                .vertex_indices()
                 .iter()
                 .find_map(|&vertex| {
                     let vertex = vertex as usize;
