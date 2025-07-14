@@ -315,16 +315,17 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 let distance_squared_20 = d20[0] * d20[0] + d20[1] * d20[1];
                 let distance_squared_31 = d31[0] * d31[0] + d31[1] * d31[1];
 
-                let quad_diagonal_is_02 = if distance_squared_20 < distance_squared_31 {
-                    true
-                } else if distance_squared_31 < distance_squared_20 {
-                    false
-                } else {
-                    let p = i.map(|i| get_position_from_index(context, i));
-                    let distance_squared_20 = (p[2] - p[0]).length_squared();
-                    let distance_squared_31 = (p[3] - p[1]).length_squared();
-                    distance_squared_31 >= distance_squared_20
-                };
+                let quad_diagonal_is_02 =
+                    match distance_squared_20.partial_cmp(&distance_squared_31) {
+                        Some(core::cmp::Ordering::Less) => true,
+                        Some(core::cmp::Ordering::Greater) => false,
+                        _ => {
+                            let p = i.map(|i| get_position_from_index(context, i));
+                            let distance_squared_20 = (p[2] - p[0]).length_squared();
+                            let distance_squared_31 = (p[3] - p[1]).length_squared();
+                            distance_squared_31 >= distance_squared_20
+                        }
+                    };
 
                 if quad_diagonal_is_02 {
                     info_a.vertex_indices = [0, 1, 2];
@@ -495,10 +496,11 @@ fn build_4_rule_groups<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
 ) -> Vec<Group> {
-    let mut groups_active_count = 0;
+    let mut ids = 0..;
     (0..triangle_info_list.len())
-        .flat_map(|f| (0..3).map(move |i| (f, i)))
-        .filter_map(|(f, i)| {
+        .zip(triangle_vertex_list.chunks_exact(3))
+        .flat_map(|(f, chunk)| chunk.iter().enumerate().map(move |(i, &vert)| (f, i, vert)))
+        .filter_map(|(f, i, vertex_representative)| {
             if triangle_info_list[f].flags & GROUP_WITH_ANY != 0
                 || triangle_info_list[f].assigned_group[i].is_some()
             {
@@ -506,12 +508,13 @@ fn build_4_rule_groups<O: Ops>(
                 return None;
             }
 
-            let vert_index = triangle_vertex_list.chunks_exact(3).nth(f).unwrap()[i];
-            triangle_info_list[f].assigned_group[i] = Some(groups_active_count);
+            let id = ids.next().unwrap();
+
+            triangle_info_list[f].assigned_group[i] = Some(id);
 
             let mut group = Group {
-                id: groups_active_count,
-                vertex_representative: vert_index,
+                id,
+                vertex_representative,
                 orientation_preserving: triangle_info_list[f].flags & ORIENT_PRESERVING != 0,
                 face_indices: vec![f],
             };
@@ -531,13 +534,15 @@ fn build_4_rule_groups<O: Ops>(
                     &mut group,
                 );
 
-                let orientation_preserving_left =
-                    triangle_info_list[neighbor].flags & ORIENT_PRESERVING != 0;
-                let different = orientation_preserving_f != orientation_preserving_left;
-                assert!(result || different);
+                assert!({
+                    let orientation_preserving_left =
+                        triangle_info_list[neighbor].flags & ORIENT_PRESERVING != 0;
+                    let different = orientation_preserving_f != orientation_preserving_left;
+
+                    result || different
+                });
             }
 
-            groups_active_count += 1;
             Some(group)
         })
         .collect::<Vec<_>>()
