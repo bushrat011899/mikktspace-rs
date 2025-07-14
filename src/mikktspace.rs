@@ -45,6 +45,23 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     // make an initial triangle --> face index list
     let mut triangle_info_list = generate_triangle_info_list(context, faces_total);
 
+    // mark all triangles where one or more vertices are coincident.
+    mark_degenerate_triangles(context, &mut triangle_info_list);
+
+    // mark all triangle pairs that belong to a quad with only one
+    // good triangle.
+    mark_partially_degenerate_quads(&mut triangle_info_list);
+
+    // make a welded index list of identical positions and attributes (pos, norm, texc)
+    let mut triangle_vertex_list = triangle_info_list
+        .iter()
+        .flat_map(|info| {
+            info.vertex_indices
+                .map(|t| FaceVertex::new(info.original_face_index, t))
+        })
+        .collect::<Vec<_>>();
+    weld_vertices(context, &mut triangle_vertex_list);
+
     // `generate_triangle_info_list` generates `triangle_info_list` such that the
     // last value will have the largest `tangent_spaces_offset`.
     debug_assert!(triangle_info_list.is_sorted_by_key(|info| info.tangent_spaces_offset));
@@ -57,25 +74,8 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         .unwrap_or(0);
 
-    // make a welded index list of identical positions and attributes (pos, norm, texc)
-    let mut triangle_vertex_list = triangle_info_list
-        .iter()
-        .flat_map(|info| {
-            info.vertex_indices
-                .map(|t| FaceVertex::new(info.original_face_index, t))
-        })
-        .collect::<Vec<_>>();
-    weld_vertices(context, &mut triangle_vertex_list);
-
-    // mark all triangle pairs that belong to a quad with only one
-    // good triangle. These need special treatment in DegenEpilogue().
-    // Additionally, move all good triangles to the start of
-    // triangle_info_list[] and triangle_vertex_list[] without changing order and
-    // put the degenerate triangles last.
-    mark_degenerate_triangles(context, &mut triangle_info_list);
-
-    mark_partially_degenerate_quads(&mut triangle_info_list);
-
+    // Move all good triangles to the start of triangle_info_list[] and triangle_vertex_list[]
+    // without changing order and put the degenerate triangles last.
     let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
         segregate_degenerate_triangles(&mut triangle_info_list, &mut triangle_vertex_list);
 
@@ -389,7 +389,7 @@ fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
 ) {
     // force otherwise healthy quads to a fixed orientation
-    for [a, b] in triangle_info_list
+    triangle_info_list
         .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
         // this is a quad
         .filter_map(|chunk| match chunk {
@@ -401,31 +401,32 @@ fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
         .filter(|quad| quad.iter().all(|a| a.flags & MARK_DEGENERATE == 0))
         // if this happens the quad has extremely bad mapping!!
         .filter(|[a, b]| (a.flags & ORIENT_PRESERVING != 0) != (b.flags & ORIENT_PRESERVING != 0))
-    {
-        let tx_area_a = calculate_texture_area(
-            context,
-            &a.vertex_indices
-                .map(|i| FaceVertex::new(a.original_face_index, i)),
-        );
+        .map(|[a, b]| {
+            let tx_area_a = calculate_texture_area(
+                context,
+                &a.vertex_indices
+                    .map(|i| FaceVertex::new(a.original_face_index, i)),
+            );
 
-        let tx_area_b = calculate_texture_area(
-            context,
-            &b.vertex_indices
-                .map(|i| FaceVertex::new(b.original_face_index, i)),
-        );
+            let tx_area_b = calculate_texture_area(
+                context,
+                &b.vertex_indices
+                    .map(|i| FaceVertex::new(b.original_face_index, i)),
+            );
 
-        // force match
-        let (a, b) = if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
-            (a, b)
-        } else {
-            (b, a)
-        };
-
-        // clear first
-        b.flags &= !ORIENT_PRESERVING;
-        // copy bit
-        b.flags |= a.flags & ORIENT_PRESERVING;
-    }
+            // force match
+            if b.flags & GROUP_WITH_ANY != 0 || tx_area_a >= tx_area_b {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        })
+        .for_each(|(a, b)| {
+            // clear first
+            b.flags &= !ORIENT_PRESERVING;
+            // copy bit
+            b.flags |= a.flags & ORIENT_PRESERVING;
+        });
 }
 
 fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
