@@ -245,7 +245,7 @@ struct TriangleInfo<O: Ops> {
     face_neighbors: [Option<usize>; 3],
     assigned_group: [Option<usize>; 3],
 
-    tangent_space: RawTangentSpace<O>,
+    tangent: RawTangentSpace<O>,
 
     /// determines if the current and the next triangle are a quad.
     original_face_index: usize,
@@ -294,7 +294,7 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
             let mut info = TriangleInfo {
                 face_neighbors: [None; 3],
                 assigned_group: [None; 3],
-                tangent_space: RawTangentSpace::ZERO,
+                tangent: RawTangentSpace::ZERO,
                 original_face_index: f,
                 flags: 0,
                 tangent_spaces_offset: tangent_space_offset,
@@ -457,7 +457,7 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
 
             // assumed bad
             info.flags |= GROUP_WITH_ANY;
-            
+
             if signed_area_double > 0f32 {
                 info.flags |= ORIENT_PRESERVING;
             }
@@ -474,7 +474,7 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
                 1.0f32
             };
 
-            info.tangent_space = RawTangentSpace {
+            info.tangent = RawTangentSpace {
                 s: s.normalized_or_zero() * sign,
                 t: t.normalized_or_zero() * sign,
                 s_magnitude: s.length() / area_double,
@@ -483,9 +483,7 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
 
             info
         })
-        .filter(|info| {
-            not_zero(info.tangent_space.s_magnitude) && not_zero(info.tangent_space.t_magnitude)
-        })
+        .filter(|info| not_zero(info.tangent.s_magnitude) && not_zero(info.tangent.t_magnitude))
         .for_each(|info| {
             // if this is a good triangle
             info.flags &= !GROUP_WITH_ANY;
@@ -644,8 +642,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let n = get_normal_from_index(context, vertex_index);
 
             // project
-            let s_f = (a.tangent_space.s - ((n.dot(a.tangent_space.s)) * n)).normalized_or_zero();
-            let t_f = (a.tangent_space.t - ((n.dot(a.tangent_space.t)) * n)).normalized_or_zero();
+            let s_f = (a.tangent.s - ((n.dot(a.tangent.s)) * n)).normalized_or_zero();
+            let t_f = (a.tangent.t - ((n.dot(a.tangent.t)) * n)).normalized_or_zero();
 
             let mut tmp_group = group
                 .face_indices
@@ -655,10 +653,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                     let b = &triangle_info_list[t];
 
                     // project
-                    let s_t =
-                        (b.tangent_space.s - ((n.dot(b.tangent_space.s)) * n)).normalized_or_zero();
-                    let t_t =
-                        (b.tangent_space.t - ((n.dot(b.tangent_space.t)) * n)).normalized_or_zero();
+                    let s_t = (b.tangent.s - ((n.dot(b.tangent.s)) * n)).normalized_or_zero();
+                    let t_t = (b.tangent.t - ((n.dot(b.tangent.t)) * n)).normalized_or_zero();
 
                     let any = (a.flags | b.flags) & GROUP_WITH_ANY != 0;
 
@@ -750,15 +746,11 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
                 let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
                 let angle = O::acos(cos as f64) as f32;
 
-                let t = [info.tangent_space.s, info.tangent_space.t]
+                let t = [info.tangent.s, info.tangent.t]
                     .map(|t| t - (n.dot(t) * n))
                     .map(Vec3::normalized_or_zero)
                     .map(|t| angle * t);
-                let t_mag = [
-                    info.tangent_space.s_magnitude,
-                    info.tangent_space.t_magnitude,
-                ]
-                .map(|t| angle * t);
+                let t_mag = [info.tangent.s_magnitude, info.tangent.t_magnitude].map(|t| angle * t);
 
                 res.s = res.s + t[0];
                 res.t = res.t + t[1];
