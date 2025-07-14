@@ -736,53 +736,57 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     vertex_representative: FaceVertex,
 ) -> RawTangentSpace<O> {
-    let mut res = RawTangentSpace {
-        s: Vec3::ZERO,
-        s_magnitude: 0.,
-        t: Vec3::ZERO,
-        t_magnitude: 0.,
-    };
-
-    let angle_sum = face_indices
+    let (angle_sum, mut res) = face_indices
         .iter()
         .map(|&f| (&triangle_vertex_list[3 * f..][..3], &triangle_info_list[f]))
         // only valid triangles get to add their contribution
         .filter(|(_vertices, info)| info.flags & GROUP_WITH_ANY == 0)
-        .fold(0f32, |angle_sum, (vertices, info)| {
-            let i = (0..=2)
-                .find(|&i| vertices[i] == vertex_representative)
-                .unwrap();
+        .fold(
+            (
+                0f32,
+                RawTangentSpace {
+                    s: Vec3::ZERO,
+                    s_magnitude: 0.,
+                    t: Vec3::ZERO,
+                    t_magnitude: 0.,
+                },
+            ),
+            |(angle_sum, mut res), (vertices, info)| {
+                let i = (0..=2)
+                    .find(|&i| vertices[i] == vertex_representative)
+                    .unwrap();
 
-            let n = get_normal_from_index(context, vertices[i]);
-            let p = [(i + 1) % 3, i, (i + 2) % 3]
-                .map(|i| vertices[i])
-                .map(|i| get_position_from_index(context, i));
-            let v = [p[0] - p[1], p[2] - p[1]]
-                .map(|v| v - ((n.dot(v)) * n))
-                .map(Vec3::normalized_or_zero);
+                let n = get_normal_from_index(context, vertices[i]);
+                let p = [(i + 1) % 3, i, (i + 2) % 3]
+                    .map(|i| vertices[i])
+                    .map(|i| get_position_from_index(context, i));
+                let v = [p[0] - p[1], p[2] - p[1]]
+                    .map(|v| v - ((n.dot(v)) * n))
+                    .map(Vec3::normalized_or_zero);
 
-            // weight contribution by the angle
-            // between the two edge vectors
-            let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
-            let angle = O::acos(cos as f64) as f32;
+                // weight contribution by the angle
+                // between the two edge vectors
+                let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
+                let angle = O::acos(cos as f64) as f32;
 
-            let t = [info.tangent_space.s, info.tangent_space.t]
-                .map(|t| t - (n.dot(t) * n))
-                .map(Vec3::normalized_or_zero)
+                let t = [info.tangent_space.s, info.tangent_space.t]
+                    .map(|t| t - (n.dot(t) * n))
+                    .map(Vec3::normalized_or_zero)
+                    .map(|t| angle * t);
+                let t_mag = [
+                    info.tangent_space.s_magnitude,
+                    info.tangent_space.t_magnitude,
+                ]
                 .map(|t| angle * t);
-            let t_mag = [
-                info.tangent_space.s_magnitude,
-                info.tangent_space.t_magnitude,
-            ]
-            .map(|t| angle * t);
 
-            res.s = res.s + t[0];
-            res.t = res.t + t[1];
-            res.s_magnitude += t_mag[0];
-            res.t_magnitude += t_mag[1];
+                res.s = res.s + t[0];
+                res.t = res.t + t[1];
+                res.s_magnitude += t_mag[0];
+                res.t_magnitude += t_mag[1];
 
-            angle_sum + angle
-        });
+                (angle_sum + angle, res)
+            },
+        );
 
     // normalize
     res.s.normalize_or_zero();
