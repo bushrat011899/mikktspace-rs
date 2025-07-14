@@ -310,20 +310,17 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 // along the shortest diagonal.
                 let i = [0, 1, 2, 3].map(|i| FaceVertex::new(f, i));
                 let tx = i.map(|i| get_texture_coordinate_from_index(context, i));
-                let d20 = [0, 1].map(|i| tx[2][i] - tx[0][i]);
-                let d31 = [0, 1].map(|i| tx[3][i] - tx[1][i]);
-                let distance_squared_20 = d20[0] * d20[0] + d20[1] * d20[1];
-                let distance_squared_31 = d31[0] * d31[0] + d31[1] * d31[1];
+                let d = [(2, 0), (3, 1)].map(|(a, b)| [0, 1].map(|i| tx[a][i] - tx[b][i]));
+                let l = d.map(|d| d[0] * d[0] + d[1] * d[1]);
 
                 let quad_diagonal_is_02 =
-                    match distance_squared_20.partial_cmp(&distance_squared_31) {
+                    match l[0].partial_cmp(&l[1]) {
                         Some(core::cmp::Ordering::Less) => true,
                         Some(core::cmp::Ordering::Greater) => false,
                         _ => {
                             let p = i.map(|i| get_position_from_index(context, i));
-                            let distance_squared_20 = (p[2] - p[0]).length_squared();
-                            let distance_squared_31 = (p[3] - p[1]).length_squared();
-                            distance_squared_31 >= distance_squared_20
+                            let d = [(2, 0), (3, 1)].map(|(a, b)| (p[a] - p[b]).length_squared());
+                            d[1] >= d[0]
                         }
                     };
 
