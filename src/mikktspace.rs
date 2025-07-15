@@ -73,6 +73,9 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 }
 
 /// Generate [`TangentSpace`] values for the provided [geometry](MikkTSpaceInterface).
+///
+/// This is separated from [`generate_tangent_space`] to highlight this step does
+/// not require mutable access to the provided [context](MikkTSpaceInterface).
 fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     threshold_cos: f32,
@@ -672,8 +675,8 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             let n = get_normal_from_index(context, vertex_index);
 
             // project
-            let s_f = (a.tangent.s - ((n.dot(a.tangent.s)) * n)).normalized_or_zero();
-            let t_f = (a.tangent.t - ((n.dot(a.tangent.t)) * n)).normalized_or_zero();
+            let s_a = (a.tangent.s - ((n.dot(a.tangent.s)) * n)).normalized_or_zero();
+            let t_a = (a.tangent.t - ((n.dot(a.tangent.t)) * n)).normalized_or_zero();
 
             let mut tmp_group = group
                 .face_indices
@@ -682,26 +685,28 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                 .filter(|&t| {
                     let b = &triangle_info_list[t];
 
-                    // project
-                    let s_t = (b.tangent.s - ((n.dot(b.tangent.s)) * n)).normalized_or_zero();
-                    let t_t = (b.tangent.t - ((n.dot(b.tangent.t)) * n)).normalized_or_zero();
+                    let meets_threshold = {
+                        // project
+                        let s_b = (b.tangent.s - ((n.dot(b.tangent.s)) * n)).normalized_or_zero();
+                        let t_b = (b.tangent.t - ((n.dot(b.tangent.t)) * n)).normalized_or_zero();
+
+                        let s_cos = s_a.dot(s_b);
+                        let t_cos = t_a.dot(t_b);
+
+                        s_cos > threshold_cos && t_cos > threshold_cos
+                    };
 
                     let any = a.group_with_any || b.group_with_any;
 
                     // make sure triangles which belong to the same quad are joined.
                     let same_original_face = a.original_face_index == b.original_face_index;
 
-                    let s_cos = s_f.dot(s_t);
-                    let t_cos = t_f.dot(t_t);
-
-                    debug_assert!(f != t || same_original_face, "sanity check");
-
-                    any || same_original_face || s_cos > threshold_cos && t_cos > threshold_cos
+                    any || same_original_face || meets_threshold
                 })
                 .collect::<Vec<_>>();
 
             // sort pTmpMembers
-            tmp_group.sort();
+            tmp_group.sort_unstable();
 
             // look for an existing match
             let l = unified_sub_groups
@@ -851,8 +856,7 @@ fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVe
     quick_sort_edges(&mut edges);
 
     // pair up, adjacent triangles
-    let mut iter = edges.iter();
-    while let Some(a) = iter.next() {
+    for (index, a) in edges.iter().enumerate() {
         // resolve index ordering and edge_num
         let (n_a, (i0_a, i1_a)) = get_edge(&vertices[a.f * 3..][..3], a.i0, a.i1).unwrap();
 
@@ -861,8 +865,11 @@ fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVe
         }
 
         // get true index ordering
-        let found = iter
-            .clone()
+        let found = edges
+            .iter()
+            .skip(index + 1)
+            // If `edges` is improperly sorted, neighbors may not be found for
+            // faces with the largest `i0`.
             .take_while(|b| (a.i0, a.i1) == (b.i0, b.i1))
             .find_map(|b| {
                 // flip i0_B and i1_B

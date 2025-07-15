@@ -52,7 +52,7 @@ pub(super) fn weld_vertices<I: MikkTSpaceInterface<O>, O: Ops>(
         .map(|&v| get_position_from_index(context, v))
         .enumerate()
         .map(|(index, position)| TemporaryVertex {
-            group: {
+            bucket: {
                 const GROUPS: u16 = 2048;
                 let t = (position[c_max] - min[c_max]) / d[c_max];
                 let group = (GROUPS as f32 * t.clamp(0., 1.)) as u16;
@@ -63,9 +63,9 @@ pub(super) fn weld_vertices<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         .collect::<Vec<_>>();
 
-    temporary_vertices.sort_by_key(|v| v.group);
+    temporary_vertices.sort_by_key(|v| v.bucket);
 
-    for chunk in temporary_vertices.chunk_by_mut(|a, b| a.group == b.group) {
+    for chunk in temporary_vertices.chunk_by_mut(|a, b| a.bucket == b.bucket) {
         merge_verts_fast(context, triangle_vertices, chunk);
     }
 }
@@ -183,7 +183,7 @@ fn merge_verts_fast<I: MikkTSpaceInterface<O>, O: Ops>(
 struct TemporaryVertex<O: Ops> {
     position: Vec3<O>,
     original_index: usize,
-    group: u16,
+    bucket: u16,
 }
 
 impl<O: Ops> Copy for TemporaryVertex<O> {}
