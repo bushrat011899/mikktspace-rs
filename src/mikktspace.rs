@@ -42,6 +42,42 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     let threshold_cos = O::cos(deg_to_rad(angular_threshold) as f64) as f32;
     let faces_total = context.get_num_faces();
 
+    let tangent_spaces = get_tangent_spaces(&*context, threshold_cos, faces_total)?;
+
+    let mut tangent_spaces_iter = tangent_spaces.iter();
+    for f in 0..faces_total {
+        let vertices = context.get_num_vertices_of_face(f);
+        if vertices == 3 || vertices == 4 {
+            // I've decided to let degenerate triangles and group-with-anythings
+            // vary between left/right hand coordinate systems at the vertices.
+            // All healthy triangles on the other hand are built to always be either or.
+            // set data
+            for v in 0..vertices {
+                let tangent_space = tangent_spaces_iter.next().unwrap().unwrap_or(TangentSpace {
+                    value: RawTangentSpace {
+                        s: [1., 0., 0.].into(),
+                        s_magnitude: 1.0,
+                        t: [0., 1., 0.].into(),
+                        t_magnitude: 1.0,
+                    },
+                    orientation_preserving: false,
+                    is_averaged: false,
+                });
+
+                context.set_tangent_space(tangent_space.into(), f, v);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Generate [`TangentSpace`] values for the provided [geometry](MikkTSpaceInterface).
+fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
+    context: &I,
+    threshold_cos: f32,
+    faces_total: usize,
+) -> Result<Vec<Option<TangentSpace<O>>>, GenerateTangentSpaceError> {
     // make an initial triangle --> face index list
     let mut triangle_info_list = generate_triangle_info_list(context, faces_total);
 
@@ -109,32 +145,7 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         context,
     );
 
-    let mut tangent_spaces_iter = tangent_spaces.iter();
-    for f in 0..faces_total {
-        let vertices = context.get_num_vertices_of_face(f);
-        if vertices == 3 || vertices == 4 {
-            // I've decided to let degenerate triangles and group-with-anythings
-            // vary between left/right hand coordinate systems at the vertices.
-            // All healthy triangles on the other hand are built to always be either or.
-            // set data
-            for v in 0..vertices {
-                let tangent_space = tangent_spaces_iter.next().unwrap().unwrap_or(TangentSpace {
-                    value: RawTangentSpace {
-                        s: [1., 0., 0.].into(),
-                        s_magnitude: 1.0,
-                        t: [0., 1., 0.].into(),
-                        t_magnitude: 1.0,
-                    },
-                    orientation_preserving: false,
-                    is_averaged: false,
-                });
-
-                context.set_tangent_space(tangent_space.into(), f, v);
-            }
-        }
-    }
-
-    Ok(())
+    Ok(tangent_spaces)
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
