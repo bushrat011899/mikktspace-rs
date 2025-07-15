@@ -45,11 +45,8 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     // make an initial triangle --> face index list
     let mut triangle_info_list = generate_triangle_info_list(context, faces_total);
 
-    // mark all triangles where one or more vertices are coincident.
     mark_degenerate_triangles(context, &mut triangle_info_list);
 
-    // mark all triangle pairs that belong to a quad with only one
-    // good triangle.
     mark_partially_degenerate_quads(&mut triangle_info_list);
 
     // make a welded index list of identical positions and attributes (pos, norm, texc)
@@ -74,8 +71,6 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
         })
         .unwrap_or(0);
 
-    // Move all good triangles to the start of triangle_info_list[] and triangle_vertex_list[]
-    // without changing order and put the degenerate triangles last.
     let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
         segregate_degenerate_triangles(&mut triangle_info_list, &mut triangle_vertex_list);
 
@@ -85,12 +80,8 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 
     build_neighbors(triangles_good, &*vertices_good);
 
-    // based on the 4 rules, identify groups based on connectivity
     let groups = build_4_rule_groups(triangles_good, &*vertices_good);
 
-    // make tspaces, each group is split up into subgroups if necessary
-    // based on fAngularThreshold. Finally a tangent space is made for
-    // every resulting subgroup
     let mut tangent_spaces = generate_tangent_spaces(
         tangent_spaces_total,
         &*triangles_good,
@@ -402,7 +393,7 @@ fn get_texture_coordinate_from_index<I: MikkTSpaceInterface<O>, O: Ops>(
     context.get_tex_coord(index.face(), index.vertex() as usize)
 }
 
-/// returns the texture area times 2
+/// Returns the texture area times 2.
 fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     info: &TriangleInfo<O>,
@@ -417,11 +408,11 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     fabsf(signed_area_double)
 }
 
+/// Force otherwise healthy quads to a fixed orientation.
 fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     context: &I,
 ) {
-    // force otherwise healthy quads to a fixed orientation
     triangle_info_list
         .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
         // this is a quad
@@ -450,13 +441,11 @@ fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
         });
 }
 
+/// Computes a first-order solution for [`tangent`](TriangleInfo::tangent).
 fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     context: &I,
 ) {
-    // triangle_info_list[f].iFlag is cleared in GenerateInitialVerticesIndexList() which is called before this function.
-    // generate neighbor info list
-    // evaluate first order derivatives
     triangle_info_list
         .iter_mut()
         .map(|info| {
@@ -513,6 +502,7 @@ fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
         });
 }
 
+/// Based on the 4 rules, identify [groups](Group) based on connectivity.
 fn build_4_rule_groups<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
@@ -617,6 +607,9 @@ fn assign_to_group_recursive<O: Ops>(
     true
 }
 
+/// Generate a list of [`TangentSpace`]s.
+/// Each [`Group`] is split up into subgroups if necessary based on `threshold_cos`.
+/// Finally a [`TangentSpace`] is made for every resulting subgroup
 fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     tangent_spaces_total: usize,
     triangle_info_list: &[TriangleInfo<O>],
@@ -796,6 +789,7 @@ struct Edge {
     f: usize,
 }
 
+/// Populates [`face_neighbors`](TriangleInfo::face_neighbors) based on matching edges.
 fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
     // build array of edges
     let mut edges = vertices
@@ -861,6 +855,7 @@ fn get_edge(
         .find(|&(_, (a, b))| (a.min(b), a.max(b)) == (i0.min(i1), i0.max(i1)))
 }
 
+/// Populates [`is_degenerate`](TriangleInfo::is_degenerate).
 fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     faces: &mut [TriangleInfo<O>],
@@ -877,6 +872,7 @@ fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
         .for_each(|face| face.is_degenerate = true);
 }
 
+/// Populates [`quad_with_one_degenerate_triangle`](TriangleInfo::quad_with_one_degenerate_triangle).
 fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
     faces
         .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
@@ -887,6 +883,7 @@ fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
 }
 
 /// Sort `faces` and `vertices` into a "good" first section, and a degenerate second section.
+/// This is a stable sort, preserving the existing order of the respective sections.
 #[expect(clippy::type_complexity)]
 fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
     faces: &'faces mut [TriangleInfo<O>],
