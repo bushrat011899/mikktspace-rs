@@ -78,16 +78,25 @@ fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     threshold_cos: f32,
     faces_total: usize,
 ) -> Result<Vec<Option<TangentSpace<O>>>, GenerateTangentSpaceError> {
-    // make an initial triangle --> face index list
+    // This set of operations can be done on-line.
+    // That is, they do not require an intermediatory buffer.
     let mut triangle_info_list = generate_triangle_info_list(context, faces_total);
 
-    mark_degenerate_triangles(context, &mut triangle_info_list);
+    // Below here, we require buffered triangle and vertex information.
 
-    mark_partially_degenerate_quads(&mut triangle_info_list);
+    // Want to partition by degeneracy
+    let (triangles_good, triangles_degenerate) = {
+        triangle_info_list.sort_by_key(|face| (face.is_degenerate, face.tangent_spaces_offset));
+        let partition = triangle_info_list.partition_point(|face| !face.is_degenerate);
+        triangle_info_list.split_at_mut(partition)
+    };
 
-    // make a welded index list of identical positions and attributes (pos, norm, texc)
-    let mut triangle_vertex_list = triangle_info_list
+    // Make a welded index list of identical positions and attributes (pos, norm, texc).
+    // By creating this list after segregating good and degenerate triangles, this list
+    // is also automatically segregated as well.
+    let mut triangle_vertex_list = triangles_good
         .iter()
+        .chain(triangles_degenerate.iter())
         .flat_map(|info| {
             info.vertex_indices()
                 .map(|t| FaceVertex::new(info.original_face_index, t))
@@ -95,53 +104,11 @@ fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
         .collect::<Vec<_>>();
     weld_vertices(context, &mut triangle_vertex_list);
 
-    // `generate_triangle_info_list` generates `triangle_info_list` such that the
-    // last value will have the largest `tangent_spaces_offset`.
-    debug_assert!(triangle_info_list.is_sorted_by_key(|info| info.tangent_spaces_offset));
-
-    // Get the total number of tangent space values to be computed
-    let tangent_spaces_total = triangle_info_list
-        .last()
-        .map(|info| {
-            info.tangent_spaces_offset + context.get_num_vertices_of_face(info.original_face_index)
-        })
-        .unwrap_or(0);
-
-    let ((triangles_good, triangles_degenerate), (vertices_good, vertices_degenerate)) =
-        segregate_degenerate_triangles(&mut triangle_info_list, &mut triangle_vertex_list);
-
-    evaluate_first_order_derivatives(triangles_good, context);
-
-    fix_quad_orientation(triangles_good, context);
-
-    build_neighbors(triangles_good, &*vertices_good);
-
-    let groups = build_4_rule_groups(triangles_good, &*vertices_good);
-
-    let mut tangent_spaces = generate_tangent_spaces(
-        tangent_spaces_total,
-        &*triangles_good,
-        &groups,
-        &*vertices_good,
-        threshold_cos,
-        context,
-    );
-
-    // all other degenerate triangles will just copy a space from any good triangle
-    // with the same welded index in triangle_vertex_list[].
-    generate_tangent_spaces_for_degenerate_triangles(
-        &mut tangent_spaces,
-        &*triangles_good,
+    let tangent_spaces = generate_tangent_spaces(
+        triangles_good,
         &*triangles_degenerate,
-        &*vertices_good,
-        &*vertices_degenerate,
-    );
-
-    // degenerate quads with one good triangle will be fixed by copying a space from
-    // the good triangle to the coinciding vertex.
-    generate_tangent_spaces_for_partially_degenerate_quads(
-        &mut tangent_spaces,
-        &*triangles_good,
+        &*triangle_vertex_list,
+        threshold_cos,
         context,
     );
 
@@ -315,22 +282,25 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
     faces_total: usize,
 ) -> Vec<TriangleInfo<O>> {
     (0..faces_total)
+        // Only support triangles and quads
         .filter_map(|f| match context.get_num_vertices_of_face(f) {
             verts @ (3 | 4) => Some((f, verts)),
             _ => None,
         })
+        // Track `tangent_space_offset` state
         .scan(0, |tangent_space_offset, (f, verts)| {
             let result = (f, verts, *tangent_space_offset);
             *tangent_space_offset += verts;
             Some(result)
         })
-        .flat_map(|(f, verts, tangent_space_offset)| {
+        // Triangulate supported faces and map them to `TriangleInfo`s
+        .map(|(f, verts, tangent_spaces_offset)| {
             let info = TriangleInfo {
                 face_neighbors: [None; 3],
                 assigned_group: [None; 3],
                 tangent: RawTangentSpace::ZERO,
                 original_face_index: f,
-                tangent_spaces_offset: tangent_space_offset,
+                tangent_spaces_offset,
                 missing_vertex: None,
                 is_degenerate: false,
                 quad_with_one_degenerate_triangle: false,
@@ -375,6 +345,127 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
                 unreachable!()
             }
         })
+        // Mark faces as degenerate.
+        // Done at the chunk stage to simplify marking partially degenerate quads.
+        .map(|mut chunk| {
+            for face in &mut chunk {
+                let Some(face) = face else { continue };
+                let p = face
+                    .vertex_indices()
+                    .map(|i| context.get_position(face.original_face_index, i as usize));
+                let iter = p.iter().cycle();
+                if iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b) {
+                    face.is_degenerate = true
+                }
+            }
+            chunk
+        })
+        // Mark quads with exactly one degenerate triangle
+        .map(|mut chunk| {
+            let [Some(a), Some(b)] = &mut chunk else {
+                return chunk;
+            };
+
+            if a.is_degenerate ^ b.is_degenerate {
+                a.quad_with_one_degenerate_triangle = true;
+                b.quad_with_one_degenerate_triangle = true;
+            }
+
+            chunk
+        })
+        // Computes a first-order solution for `tangent`.
+        .map(|mut chunk| {
+            chunk
+                .iter_mut()
+                .flatten()
+                .filter(|info| !info.is_degenerate)
+                .map(|info| {
+                    // initial values
+                    let v = info
+                        .vertex_indices()
+                        .map(|i| context.get_position(info.original_face_index, i as usize))
+                        .map(Vec3::<O>::from);
+                    let tx = info
+                        .vertex_indices()
+                        .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
+
+                    let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
+                    let d_v = [1, 2].map(|i| v[i] - v[0]);
+
+                    let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
+                    let area_double = fabsf(signed_area_double);
+
+                    let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
+                    let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
+
+                    // assumed bad
+                    info.group_with_any = true;
+
+                    if signed_area_double > 0f32 {
+                        info.orientation_preserving = true;
+                    }
+
+                    (info, s, t, area_double)
+                })
+                .filter(|(_, _, _, area_double)| not_zero(*area_double))
+                .map(|(info, s, t, area_double)| {
+                    // multiplying by `sign` ensures NaN byte compatibility with the C
+                    // implementation, compared to conditional negation.
+                    let sign = if info.orientation_preserving {
+                        1.0f32
+                    } else {
+                        -1.0f32
+                    };
+
+                    info.tangent = RawTangentSpace {
+                        s: s.normalized_or_zero() * sign,
+                        t: t.normalized_or_zero() * sign,
+                        s_magnitude: s.length() / area_double,
+                        t_magnitude: t.length() / area_double,
+                    };
+
+                    info
+                })
+                .filter(|info| {
+                    not_zero(info.tangent.s_magnitude) && not_zero(info.tangent.t_magnitude)
+                })
+                .for_each(|info| {
+                    // if this is a good triangle
+                    info.group_with_any = false;
+                });
+
+            chunk
+        })
+        // Force otherwise healthy quads to a fixed orientation.
+        .map(|mut chunk| {
+            let [Some(a), Some(b)] = &mut chunk else {
+                return chunk;
+            };
+
+            if a.is_degenerate || b.is_degenerate {
+                return chunk;
+            }
+
+            // if this happens the quad has extremely bad mapping!!
+            if a.orientation_preserving == b.orientation_preserving {
+                return chunk;
+            }
+
+            let tx_area_a = calculate_texture_area(context, &*a);
+            let tx_area_b = calculate_texture_area(context, &*b);
+
+            // force match
+            let [a, b] = if b.group_with_any || tx_area_a >= tx_area_b {
+                [a, b]
+            } else {
+                [b, a]
+            };
+
+            b.orientation_preserving = a.orientation_preserving;
+
+            chunk
+        })
+        .flatten()
         .flatten()
         .collect::<Vec<_>>()
 }
@@ -419,105 +510,13 @@ fn calculate_texture_area<I: MikkTSpaceInterface<O>, O: Ops>(
     fabsf(signed_area_double)
 }
 
-/// Force otherwise healthy quads to a fixed orientation.
-fn fix_quad_orientation<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_info_list: &mut [TriangleInfo<O>],
-    context: &I,
-) {
-    triangle_info_list
-        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
-        // this is a quad
-        .filter_map(|chunk| match chunk {
-            [a, b] => Some([a, b]),
-            _ => None,
-        })
-        // bad triangles should already have been removed by
-        // DegenPrologue(), but just in case check bIsDeg_a and bIsDeg_a are false
-        .filter(|quad| quad.iter().all(|a| !a.is_degenerate))
-        // if this happens the quad has extremely bad mapping!!
-        .filter(|[a, b]| a.orientation_preserving != b.orientation_preserving)
-        .map(|[a, b]| {
-            let tx_area_a = calculate_texture_area(context, &*a);
-            let tx_area_b = calculate_texture_area(context, &*b);
-
-            // force match
-            if b.group_with_any || tx_area_a >= tx_area_b {
-                [a, b]
-            } else {
-                [b, a]
-            }
-        })
-        .for_each(|[a, b]| {
-            b.orientation_preserving = a.orientation_preserving;
-        });
-}
-
-/// Computes a first-order solution for [`tangent`](TriangleInfo::tangent).
-fn evaluate_first_order_derivatives<I: MikkTSpaceInterface<O>, O: Ops>(
-    triangle_info_list: &mut [TriangleInfo<O>],
-    context: &I,
-) {
-    triangle_info_list
-        .iter_mut()
-        .map(|info| {
-            // initial values
-            let v = info
-                .vertex_indices()
-                .map(|i| context.get_position(info.original_face_index, i as usize))
-                .map(Vec3::<O>::from);
-            let tx = info
-                .vertex_indices()
-                .map(|i| context.get_tex_coord(info.original_face_index, i as usize));
-
-            let d_tx = [1, 2].map(|t| [0, 1].map(|i| tx[t][i] - tx[0][i]));
-            let d_v = [1, 2].map(|i| v[i] - v[0]);
-
-            let signed_area_double = d_tx[0][0] * d_tx[1][1] - d_tx[0][1] * d_tx[1][0];
-            let area_double = fabsf(signed_area_double);
-
-            let s = (d_tx[1][1] * d_v[0]) - (d_tx[0][1] * d_v[1]); // eq 18
-            let t = (-d_tx[1][0] * d_v[0]) + (d_tx[0][0] * d_v[1]); // eq 19
-
-            // assumed bad
-            info.group_with_any = true;
-
-            if signed_area_double > 0f32 {
-                info.orientation_preserving = true;
-            }
-
-            (info, s, t, area_double)
-        })
-        .filter(|(_, _, _, area_double)| not_zero(*area_double))
-        .map(|(info, s, t, area_double)| {
-            // multiplying by `sign` ensures NaN byte compatibility with the C
-            // implementation, compared to conditional negation.
-            let sign = if info.orientation_preserving {
-                1.0f32
-            } else {
-                -1.0f32
-            };
-
-            info.tangent = RawTangentSpace {
-                s: s.normalized_or_zero() * sign,
-                t: t.normalized_or_zero() * sign,
-                s_magnitude: s.length() / area_double,
-                t_magnitude: t.length() / area_double,
-            };
-
-            info
-        })
-        .filter(|info| not_zero(info.tangent.s_magnitude) && not_zero(info.tangent.t_magnitude))
-        .for_each(|info| {
-            // if this is a good triangle
-            info.group_with_any = false;
-        });
-}
-
 /// Based on the 4 rules, identify [groups](Group) based on connectivity.
 fn build_4_rule_groups<O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
 ) -> Vec<Group> {
+    let (triangle_vertex_list, _) = triangle_vertex_list.split_at(triangle_info_list.len() * 3);
+
     let mut ids = 0..;
     (0..triangle_info_list.len())
         .zip(triangle_vertex_list.chunks_exact(3))
@@ -622,13 +621,29 @@ fn assign_to_group_recursive<O: Ops>(
 /// Each [`Group`] is split up into subgroups if necessary based on `threshold_cos`.
 /// Finally a [`TangentSpace`] is made for every resulting subgroup
 fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
-    tangent_spaces_total: usize,
-    triangle_info_list: &[TriangleInfo<O>],
-    groups: &[Group],
+    triangle_info_list: &mut [TriangleInfo<O>],
+    triangles_degenerate: &[TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
     threshold_cos: f32,
     context: &I,
 ) -> Vec<Option<TangentSpace<O>>> {
+    // Get the total number of tangent space values to be computed
+    let tangent_spaces_total = triangle_info_list
+        .last()
+        .into_iter()
+        .chain(triangles_degenerate.last().into_iter())
+        .max_by_key(|info| info.tangent_spaces_offset)
+        .map(|info| {
+            info.tangent_spaces_offset + context.get_num_vertices_of_face(info.original_face_index)
+        })
+        .unwrap_or(0);
+
+    build_neighbors(triangle_info_list, &*triangle_vertex_list);
+
+    let groups = build_4_rule_groups(triangle_info_list, &*triangle_vertex_list);
+
+    let triangle_info_list = &*triangle_info_list;
+
     let mut tangent_spaces = vec![None; tangent_spaces_total];
 
     let Some(faces_max_count) = groups.iter().map(|group| group.face_indices.len()).max() else {
@@ -732,6 +747,19 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
         unified_sub_groups.clear();
     }
 
+    generate_tangent_spaces_for_degenerate_triangles(
+        &mut tangent_spaces,
+        &*triangle_info_list,
+        &*triangles_degenerate,
+        &*triangle_vertex_list,
+    );
+
+    generate_tangent_spaces_for_partially_degenerate_quads(
+        &mut tangent_spaces,
+        &*triangle_info_list,
+        context,
+    );
+
     tangent_spaces
 }
 
@@ -802,6 +830,8 @@ struct Edge {
 
 /// Populates [`face_neighbors`](TriangleInfo::face_neighbors) based on matching edges.
 fn build_neighbors<O: Ops>(triangles: &mut [TriangleInfo<O>], vertices: &[FaceVertex]) {
+    let (vertices, _) = vertices.split_at(triangles.len() * 3);
+
     // build array of edges
     let mut edges = vertices
         .chunks_exact(3)
@@ -866,77 +896,6 @@ fn get_edge(
         .find(|&(_, (a, b))| (a.min(b), a.max(b)) == (i0.min(i1), i0.max(i1)))
 }
 
-/// Populates [`is_degenerate`](TriangleInfo::is_degenerate).
-fn mark_degenerate_triangles<I: MikkTSpaceInterface<O>, O: Ops>(
-    context: &I,
-    faces: &mut [TriangleInfo<O>],
-) {
-    faces
-        .iter_mut()
-        .filter(|face| {
-            let p = face
-                .vertex_indices()
-                .map(|i| context.get_position(face.original_face_index, i as usize));
-            let iter = p.iter().cycle();
-            iter.clone().zip(iter.skip(1)).take(3).any(|(a, b)| a == b)
-        })
-        .for_each(|face| face.is_degenerate = true);
-}
-
-/// Populates [`quad_with_one_degenerate_triangle`](TriangleInfo::quad_with_one_degenerate_triangle).
-fn mark_partially_degenerate_quads<O: Ops>(faces: &mut [TriangleInfo<O>]) {
-    faces
-        .chunk_by_mut(|a, b| a.original_face_index == b.original_face_index)
-        .filter(|faces| faces.len() == 2)
-        .filter(|faces| faces.iter().filter(|f| f.is_degenerate).count() == 1)
-        .flatten()
-        .for_each(|face| face.quad_with_one_degenerate_triangle = true);
-}
-
-/// Sort `faces` and `vertices` into a "good" first section, and a degenerate second section.
-/// This is a stable sort, preserving the existing order of the respective sections.
-#[expect(clippy::type_complexity)]
-fn segregate_degenerate_triangles<'faces, 'vertices, O: Ops>(
-    faces: &'faces mut [TriangleInfo<O>],
-    vertices: &'vertices mut [FaceVertex],
-) -> (
-    (&'faces mut [TriangleInfo<O>], &'faces mut [TriangleInfo<O>]),
-    (&'vertices mut [FaceVertex], &'vertices mut [FaceVertex]),
-) {
-    // reorder list so all degen triangles are moved to the back
-    // without reordering the good triangles
-    let (mut proper, mut degenerate) = (0..faces.len(), 0..faces.len());
-    loop {
-        // search for the first degenerate triangle.
-        let Some(a) = proper.find(|&a| faces[a].is_degenerate) else {
-            break;
-        };
-
-        // To preserve local ordering, only swap with a good triangle after this degenerate
-        degenerate.start = degenerate.start.max(a + 1);
-
-        // search for the first good triangle.
-        let Some(b) = degenerate.find(|&b| !faces[b].is_degenerate) else {
-            // If there are no more good triangles, the sorting is complete.
-            break;
-        };
-
-        // swap triangle a and b
-        for i in 0..3 {
-            vertices.swap(a * 3 + i, b * 3 + i);
-        }
-        faces.swap(a, b);
-    }
-
-    let good_triangles_count = faces.partition_point(|face| !face.is_degenerate);
-    let good_vertices_count = 3 * good_triangles_count;
-
-    (
-        faces.split_at_mut(good_triangles_count),
-        vertices.split_at_mut(good_vertices_count),
-    )
-}
-
 /// Populate tangent space values for degenerate triangles from adjacent "good" triangles.
 fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
     // Using `impl Copy` to highlight this function doesn't interact with tangent
@@ -944,9 +903,10 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
     tangent_spaces: &mut [impl Copy],
     triangles_good: &[TriangleInfo<O>],
     triangle_degenerate: &[TriangleInfo<O>],
-    vertices_good: &[FaceVertex],
-    vertices_degenerate: &[FaceVertex],
+    triangle_vertices: &[FaceVertex],
 ) {
+    let (vertices_good, vertices_degenerate) = triangle_vertices.split_at(triangles_good.len() * 3);
+
     // deal with degenerate triangles
     // punishment for degenerate triangles is O(N^2)
     triangle_degenerate
@@ -977,6 +937,8 @@ fn generate_tangent_spaces_for_degenerate_triangles<O: Ops>(
         });
 }
 
+/// Degenerate quads with one good triangle will be fixed by copying a space from
+/// the good triangle to the coinciding vertex.
 fn generate_tangent_spaces_for_partially_degenerate_quads<I: MikkTSpaceInterface<O>, O: Ops>(
     // Using `impl Copy` to highlight this function doesn't interact with tangent
     // space values.
