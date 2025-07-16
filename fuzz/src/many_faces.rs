@@ -12,7 +12,7 @@ fuzz_target!(|value: Geometry| {
 
     let value = {
         let mut value = value;
-        mikktspace_rs::gen_tang_space_default(&mut value);
+        let _ = mikktspace_rs::generate_tangent_space(&mut value);
         value
     };
 

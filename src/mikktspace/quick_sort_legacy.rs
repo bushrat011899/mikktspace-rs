@@ -5,6 +5,26 @@
 //! Details on how this implementation is broken can be found
 //! [on GitHub](https://github.com/mmikk/MikkTSpace/issues/5) and in the documentation
 //! of [`quick_sort_edges`].
+//!
+//! # Copyright
+//!
+//! > Copyright (C) 2011 by Morten S. Mikkelsen
+//! >
+//! > This software is provided 'as-is', without any express or implied
+//! > warranty.  In no event will the authors be held liable for any damages
+//! > arising from the use of this software.
+//! >
+//! > Permission is granted to anyone to use this software for any purpose,
+//! > including commercial applications, and to alter it and redistribute it
+//! > freely, subject to the following restrictions:
+//! >
+//! > 1. The origin of this software must not be misrepresented; you must not
+//! >    claim that you wrote the original software. If you use this software
+//! >    in a product, an acknowledgment in the product documentation would be
+//! >    appreciated but is not required.
+//! > 2. Altered source versions must be plainly marked as such, and must not be
+//! >    misrepresented as being the original software.
+//! > 3. This notice may not be removed or altered from any source distribution.
 
 use super::Edge;
 
@@ -26,13 +46,13 @@ pub(super) fn quick_sort_edges(edges: &mut [Edge]) {
     // Unfortunately, because it is an unstable sort _and_ the subsequent sorts
     // are wrong, we cannot use [T]::sort_by_key even for this first step.
     quick_sort_by_key_with_seed(edges, |e| e.i0, INTERNAL_RND_SORT_SEED);
+    #[cfg(mikktspace_rs_more_assertions)]
     debug_assert!(edges.is_sorted_by_key(|e| e.i0));
 
     // The last chunk is incorrectly sorted in the C implementation.
     let last_chunk_len = edges
         .chunk_by(|a, b| a.i0 == b.i0)
-        .rev()
-        .next()
+        .next_back()
         .map(<[_]>::len)
         .unwrap_or(edges.len());
 
@@ -56,6 +76,7 @@ pub(super) fn quick_sort_edges(edges: &mut [Edge]) {
         // Each `chunk` within `bad` will be correctly sorted.
         // But this is unhelpful, as chunks themselves will be in an unsorted
         // order.
+        #[cfg(mikktspace_rs_more_assertions)]
         debug_assert!(chunk.is_sorted());
     }
 }
@@ -100,22 +121,23 @@ fn quick_sort_by_key_with_seed<T, K: Ord>(sort_buffer: &mut [T], key: fn(&T) -> 
     debug_assert!(b < a);
 
     let (lesser, rest) = sort_buffer.split_at_mut(b + 1);
-    let (sorted, greater) = rest.split_at_mut(a - lesser.len());
+    let (_sorted, greater) = rest.split_at_mut(a - lesser.len());
 
     // everything in lesser should be less than or equal to sorted, and likewise
     // for sorted and greater.
     #[cfg(debug_assertions)]
-    if let (Some(x), Some(y)) = (sorted.first(), sorted.last()) {
+    if let (Some(x), Some(y)) = (_sorted.first(), _sorted.last()) {
         debug_assert!(lesser.iter().all(|t| key(t) <= key(x)));
         debug_assert!(greater.iter().all(|t| key(t) >= key(y)));
     } else {
-        debug_assert!(sorted.is_empty());
+        debug_assert!(_sorted.is_empty());
         debug_assert!(lesser.iter().all(|t| key(t) <= pivot));
         debug_assert!(greater.iter().all(|t| key(t) >= pivot));
     }
 
     quick_sort_by_key_with_seed(lesser, key, seed);
-    debug_assert!(sorted.is_sorted_by_key(key));
+    #[cfg(mikktspace_rs_more_assertions)]
+    debug_assert!(_sorted.is_sorted_by_key(key));
     quick_sort_by_key_with_seed(greater, key, seed);
 }
 

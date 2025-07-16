@@ -1,22 +1,22 @@
-/*!
- *  Copyright (C) 2011 by Morten S. Mikkelsen
- *
- *  This software is provided 'as-is', without any express or implied
- *  warranty.  In no event will the authors be held liable for any damages
- *  arising from the use of this software.
- *
- *  Permission is granted to anyone to use this software for any purpose,
- *  including commercial applications, and to alter it and redistribute it
- *  freely, subject to the following restrictions:
- *
- *  1. The origin of this software must not be misrepresented; you must not
- *     claim that you wrote the original software. If you use this software
- *     in a product, an acknowledgment in the product documentation would be
- *     appreciated but is not required.
- *  2. Altered source versions must be plainly marked as such, and must not be
- *     misrepresented as being the original software.
- *  3. This notice may not be removed or altered from any source distribution.
- */
+//! # Copyright
+//!
+//! > Copyright (C) 2011 by Morten S. Mikkelsen
+//! >
+//! > This software is provided 'as-is', without any express or implied
+//! > warranty.  In no event will the authors be held liable for any damages
+//! > arising from the use of this software.
+//! >
+//! > Permission is granted to anyone to use this software for any purpose,
+//! > including commercial applications, and to alter it and redistribute it
+//! > freely, subject to the following restrictions:
+//! >
+//! > 1. The origin of this software must not be misrepresented; you must not
+//! >    claim that you wrote the original software. If you use this software
+//! >    in a product, an acknowledgment in the product documentation would be
+//! >    appreciated but is not required.
+//! > 2. Altered source versions must be plainly marked as such, and must not be
+//! >    misrepresented as being the original software.
+//! > 3. This notice may not be removed or altered from any source distribution.
 
 mod face_vertex;
 #[cfg_attr(
@@ -24,6 +24,7 @@ mod face_vertex;
     path = "mikktspace/quick_sort_legacy.rs"
 )]
 mod quick_sort;
+mod raw_tangent_space;
 #[cfg_attr(
     not(feature = "corrected-vertex-welding"),
     path = "mikktspace/weld_vertices_legacy.rs"
@@ -32,17 +33,19 @@ mod weld_vertices;
 
 use alloc::{vec, vec::Vec};
 
-use self::{face_vertex::FaceVertex, quick_sort::quick_sort_edges, weld_vertices::weld_vertices};
-use crate::{math::*, MikkTSpaceInterface};
+use self::{
+    face_vertex::FaceVertex, quick_sort::quick_sort_edges, raw_tangent_space::RawTangentSpace,
+    weld_vertices::weld_vertices,
+};
+use crate::{GenerateTangentSpaceError, MikkTSpaceInterface, math::*};
 
-pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
+pub(crate) fn generate_tangent_space_and_write<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &mut I,
-    angular_threshold: f32,
+    linear_threshold: f32,
 ) -> Result<(), GenerateTangentSpaceError> {
-    let threshold_cos = O::cos(deg_to_rad(angular_threshold) as f64) as f32;
     let faces_total = context.get_num_faces();
 
-    let tangent_spaces = get_tangent_spaces(&*context, threshold_cos, faces_total)?;
+    let tangent_spaces = generate_tangent_space(&*context, linear_threshold, faces_total)?;
 
     let mut tangent_spaces_iter = tangent_spaces.iter();
     for f in 0..faces_total {
@@ -53,18 +56,15 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
             // All healthy triangles on the other hand are built to always be either or.
             // set data
             for v in 0..vertices {
-                let tangent_space = tangent_spaces_iter.next().unwrap().unwrap_or(TangentSpace {
-                    value: RawTangentSpace {
-                        s: [1., 0., 0.].into(),
-                        s_magnitude: 1.0,
-                        t: [0., 1., 0.].into(),
-                        t_magnitude: 1.0,
-                    },
-                    orientation_preserving: false,
-                    is_averaged: false,
-                });
+                // Under certain circumstances a tangent space may not be calculated
+                // for a particular vertex on a face.
+                // For consistency with the C implementation, we provide the default.
+                let tangent_space = tangent_spaces_iter
+                    .next()
+                    .unwrap()
+                    .map(crate::TangentSpace::from);
 
-                context.set_tangent_space(tangent_space.into(), f, v);
+                context.set_tangent_space(tangent_space, f, v);
             }
         }
     }
@@ -74,11 +74,11 @@ pub(crate) fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
 
 /// Generate [`TangentSpace`] values for the provided [geometry](MikkTSpaceInterface).
 ///
-/// This is separated from [`generate_tangent_space`] to highlight this step does
-/// not require mutable access to the provided [context](MikkTSpaceInterface).
-fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
+/// This is separated from [`generate_tangent_space_and_write`] to highlight this
+/// step does not require mutable access to the provided [context](MikkTSpaceInterface).
+fn generate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
-    threshold_cos: f32,
+    linear_threshold: f32,
     faces_total: usize,
 ) -> Result<Vec<Option<TangentSpace<O>>>, GenerateTangentSpaceError> {
     // This set of operations can be done on-line.
@@ -110,85 +110,12 @@ fn get_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     let tangent_spaces = generate_tangent_spaces(
         triangles_good,
         &*triangles_degenerate,
-        &*triangle_vertex_list,
-        threshold_cos,
+        &triangle_vertex_list,
+        linear_threshold,
         context,
     );
 
     Ok(tangent_spaces)
-}
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub(crate) enum GenerateTangentSpaceError {}
-
-impl core::fmt::Display for GenerateTangentSpaceError {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        unreachable!()
-    }
-}
-
-impl core::error::Error for GenerateTangentSpaceError {}
-
-struct RawTangentSpace<O: Ops> {
-    /// Normalized first order face derivative.
-    s: Vec3<O>,
-    /// Normalized first order face derivative.
-    t: Vec3<O>,
-    /// Original magnitude of [`s`](RawTangentSpace::s).
-    s_magnitude: f32,
-    /// Original magnitude of [`t`](RawTangentSpace::t).
-    t_magnitude: f32,
-}
-
-impl<O: Ops> PartialEq for RawTangentSpace<O> {
-    fn eq(&self, other: &Self) -> bool {
-        self.s == other.s
-            && self.t == other.t
-            && self.s_magnitude == other.s_magnitude
-            && self.t_magnitude == other.t_magnitude
-    }
-}
-
-impl<O: Ops> Copy for RawTangentSpace<O> {}
-
-impl<O: Ops> Clone for RawTangentSpace<O> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<O: Ops> RawTangentSpace<O> {
-    const ZERO: Self = Self {
-        s: Vec3::ZERO,
-        t: Vec3::ZERO,
-        s_magnitude: 0f32,
-        t_magnitude: 0f32,
-    };
-}
-
-impl<O: Ops> RawTangentSpace<O> {
-    fn mean(self, rhs: Self) -> Self {
-        // this if is important. Due to floating point precision
-        // averaging when ts0==ts1 will cause a slight difference
-        // which results in tangent space splits later on
-        if self == rhs {
-            self
-        } else {
-            // Note that the magnitudes here may not be the value you're expecting.
-            // If `lhs.s` and `rhs.t` are `a` and `-a` (for some arbitrary vector `a`),
-            // the expected mean would be `0`.
-            // However, this method will instead return `a` (as `(a + a) / 2 == a`).
-            //
-            // TODO: Determine if `s_magnitude` and `t_magnitude` are being calculated incorrectly.
-            //       This matches the C implementation, but may be incorrect.
-            RawTangentSpace {
-                s_magnitude: 0.5f32 * (self.s_magnitude + rhs.s_magnitude),
-                t_magnitude: 0.5f32 * (self.t_magnitude + rhs.t_magnitude),
-                s: (self.s + rhs.s).normalized_or_zero(),
-                t: (self.t + rhs.t).normalized_or_zero(),
-            }
-        }
-    }
 }
 
 struct TangentSpace<O: Ops> {
@@ -284,6 +211,7 @@ fn generate_triangle_info_list<I: MikkTSpaceInterface<O>, O: Ops>(
     context: &I,
     faces_total: usize,
 ) -> Vec<TriangleInfo<O>> {
+    #[expect(clippy::map_flatten, reason = "provides clarity")]
     (0..faces_total)
         // Only support triangles and quads
         .filter_map(|f| match context.get_num_vertices_of_face(f) {
@@ -627,23 +555,23 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
     triangle_info_list: &mut [TriangleInfo<O>],
     triangles_degenerate: &[TriangleInfo<O>],
     triangle_vertex_list: &[FaceVertex],
-    threshold_cos: f32,
+    linear_threshold: f32,
     context: &I,
 ) -> Vec<Option<TangentSpace<O>>> {
     // Get the total number of tangent space values to be computed
     let tangent_spaces_total = triangle_info_list
         .last()
         .into_iter()
-        .chain(triangles_degenerate.last().into_iter())
+        .chain(triangles_degenerate.last())
         .max_by_key(|info| info.tangent_spaces_offset)
         .map(|info| {
             info.tangent_spaces_offset + context.get_num_vertices_of_face(info.original_face_index)
         })
         .unwrap_or(0);
 
-    build_neighbors(triangle_info_list, &*triangle_vertex_list);
+    build_neighbors(triangle_info_list, triangle_vertex_list);
 
-    let groups = build_4_rule_groups(triangle_info_list, &*triangle_vertex_list);
+    let groups = build_4_rule_groups(triangle_info_list, triangle_vertex_list);
 
     let triangle_info_list = &*triangle_info_list;
 
@@ -693,7 +621,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
                         let s_cos = s_a.dot(s_b);
                         let t_cos = t_a.dot(t_b);
 
-                        s_cos > threshold_cos && t_cos > threshold_cos
+                        s_cos > linear_threshold && t_cos > linear_threshold
                     };
 
                     let any = a.group_with_any || b.group_with_any;
@@ -735,7 +663,7 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
             if let Some(tangent_space) = tangent_space {
                 debug_assert!(!tangent_space.is_averaged);
                 *tangent_space = TangentSpace {
-                    value: tangent_space.value.mean(sub_group_tangent_spaces[l]),
+                    value: tangent_space.value.combine(sub_group_tangent_spaces[l]),
                     is_averaged: true,
                     orientation_preserving: group.orientation_preserving,
                 };
@@ -754,14 +682,14 @@ fn generate_tangent_spaces<I: MikkTSpaceInterface<O>, O: Ops>(
 
     generate_tangent_spaces_for_degenerate_triangles(
         &mut tangent_spaces,
-        &*triangle_info_list,
-        &*triangles_degenerate,
-        &*triangle_vertex_list,
+        triangle_info_list,
+        triangles_degenerate,
+        triangle_vertex_list,
     );
 
     generate_tangent_spaces_for_partially_degenerate_quads(
         &mut tangent_spaces,
-        &*triangle_info_list,
+        triangle_info_list,
         context,
     );
 
@@ -798,7 +726,7 @@ fn evaluate_tangent_space<I: MikkTSpaceInterface<O>, O: Ops>(
                 // weight contribution by the angle
                 // between the two edge vectors
                 let cos = v[0].dot(v[1]).clamp(-1f32, 1f32);
-                let angle = O::acos(cos as f64) as f32;
+                let angle = O::acos(cos);
 
                 let t = [info.tangent.s, info.tangent.t]
                     .map(|t| t - (n.dot(t) * n))

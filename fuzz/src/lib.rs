@@ -247,10 +247,11 @@ impl mikktspace_rs::MikkTSpaceInterface for Geometry {
 
     fn set_tangent_space(
         &mut self,
-        tangent_space: mikktspace_rs::TangentSpace,
+        tangent_space: Option<mikktspace_rs::TangentSpace>,
         face: usize,
         vert: usize,
     ) {
+        let tangent_space = tangent_space.unwrap_or_default();
         self.vertices[self.faces[face][vert]].tangent = tangent_space.tangent();
     }
 }

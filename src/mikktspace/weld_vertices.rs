@@ -9,11 +9,11 @@
 use alloc::collections::BTreeMap;
 
 use crate::{
-    mikktspace::{
-        get_normal_from_index, get_position_from_index, get_texture_coordinate_from_index,
-        FaceVertex,
-    },
     MikkTSpaceInterface, Ops,
+    mikktspace::{
+        FaceVertex, get_normal_from_index, get_position_from_index,
+        get_texture_coordinate_from_index,
+    },
 };
 
 /// De-duplicate [`FaceVertex`]'s by comparing the position, normal, and texture

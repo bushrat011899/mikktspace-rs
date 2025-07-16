@@ -36,3 +36,10 @@ path = "src/many_faces.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "many_faces_threshold"
+path = "src/many_faces_threshold.rs"
+test = false
+doc = false
+bench = false

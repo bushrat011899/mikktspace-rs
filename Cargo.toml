@@ -2,9 +2,23 @@
 name = "mikktspace-rs"
 version = "0.1.0"
 edition = "2018"
+authors = [
+  "Morten S. Mikkelsen <mmikk@users.noreply.github.com>",
+  "Benjamin Wasty <benny.wasty@gmail.com>",
+  "David Harvey-Macaulay <alteous@outlook.com>",
+  "Layl Bongers <LaylBongers@users.noreply.github.com>",
+  "Atlas Dostal <email@atlasdostal.com>",
+  "Zac Harrold <zac@harrold.com.au>",
+]
+description = "Safe rust implementation of Mikkelsen tangent space algorithm"
+license = "Zlib AND (MIT OR Apache-2.0)"
+keywords = ["3D", "graphics", "algorithm", "tangent"]
+rust-version = "1.81.0"
+
 exclude = ["/data", "/reference", "/fuzz"]
 
 [dependencies]
+# This space is intentionally left blank
 
 [features]
 default = ["std"]
@@ -27,3 +41,8 @@ corrected-vertex-welding = []
 [dev-dependencies]
 mikktspace-sys = "0.1.1"
 wavefront_obj = "11.0.0"
+libm = "0.2.15"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = ['cfg(mikktspace_rs_more_assertions)']

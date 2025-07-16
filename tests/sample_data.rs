@@ -2,7 +2,7 @@ extern crate alloc;
 
 use alloc::collections::BTreeMap;
 
-use wavefront_obj::obj::{parse, ObjSet, Primitive};
+use wavefront_obj::obj::{ObjSet, Primitive, parse};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct TangentSpace {
@@ -120,10 +120,11 @@ impl mikktspace_rs::MikkTSpaceInterface for WavefrontObject<'_> {
 
     fn set_tangent_space(
         &mut self,
-        tangent_space: mikktspace_rs::TangentSpace,
+        tangent_space: Option<mikktspace_rs::TangentSpace>,
         face: usize,
         vert: usize,
     ) {
+        let tangent_space = tangent_space.unwrap_or_default();
         self.result.insert(
             (face, vert),
             TangentSpace {
@@ -193,7 +194,7 @@ macro_rules! generate_tests {
                 let reference_succeeded = mikktspace_sys::gen_tang_space_default(&mut reference_object);
 
                 let mut object = WavefrontObject { object, result: BTreeMap::new() };
-                let succeeded = mikktspace_rs::gen_tang_space_default(&mut object);
+                let succeeded = mikktspace_rs::generate_tangent_space(&mut object).is_ok();
 
                 assert_eq!(reference_succeeded, succeeded);
                 assert_eq!(reference_object.result, object.result);

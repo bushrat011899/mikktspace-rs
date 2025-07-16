@@ -1,22 +1,22 @@
-/*!
- *  Copyright (C) 2011 by Morten S. Mikkelsen
- *
- *  This software is provided 'as-is', without any express or implied
- *  warranty.  In no event will the authors be held liable for any damages
- *  arising from the use of this software.
- *
- *  Permission is granted to anyone to use this software for any purpose,
- *  including commercial applications, and to alter it and redistribute it
- *  freely, subject to the following restrictions:
- *
- *  1. The origin of this software must not be misrepresented; you must not
- *     claim that you wrote the original software. If you use this software
- *     in a product, an acknowledgment in the product documentation would be
- *     appreciated but is not required.
- *  2. Altered source versions must be plainly marked as such, and must not be
- *     misrepresented as being the original software.
- *  3. This notice may not be removed or altered from any source distribution.
- */
+//! # Copyright
+//!
+//! > Copyright (C) 2011 by Morten S. Mikkelsen
+//! >
+//! > This software is provided 'as-is', without any express or implied
+//! > warranty.  In no event will the authors be held liable for any damages
+//! > arising from the use of this software.
+//! >
+//! > Permission is granted to anyone to use this software for any purpose,
+//! > including commercial applications, and to alter it and redistribute it
+//! > freely, subject to the following restrictions:
+//! >
+//! > 1. The origin of this software must not be misrepresented; you must not
+//! >    claim that you wrote the original software. If you use this software
+//! >    in a product, an acknowledgment in the product documentation would be
+//! >    appreciated but is not required.
+//! > 2. Altered source versions must be plainly marked as such, and must not be
+//! >    misrepresented as being the original software.
+//! > 3. This notice may not be removed or altered from any source distribution.
 
 use core::{
     marker::PhantomData,
@@ -30,17 +30,14 @@ pub trait Ops {
     /// Provides a [`sqrt`] implementation for [`f32`].
     ///
     /// [`sqrt`]: https://doc.rust-lang.org/stable/std/primitive.f32.html#method.sqrt
-    fn sqrtf(x: f32) -> f32;
+    // TODO: Provide default implementation if/when `core_float_math` is stable.
+    //       See https://github.com/rust-lang/rust/issues/137578
+    fn sqrt(x: f32) -> f32;
 
-    /// Provides a [`cos`] implementation for [`f64`].
+    /// Provides a [`acos`] implementation for [`f32`].
     ///
-    /// [`cos`]: https://doc.rust-lang.org/stable/std/primitive.f64.html#method.cos
-    fn cos(x: f64) -> f64;
-
-    /// Provides a [`acos`] implementation for [`f64`].
-    ///
-    /// [`acos`]: https://doc.rust-lang.org/stable/std/primitive.f64.html#method.acos
-    fn acos(x: f64) -> f64;
+    /// [`acos`]: https://doc.rust-lang.org/stable/std/primitive.f32.html#method.acos
+    fn acos(x: f32) -> f32;
 }
 
 pub(crate) struct Vec3<O: Ops> {
@@ -90,7 +87,7 @@ impl<O: Ops> Vec3<O> {
     pub(crate) fn normalize_or_zero(&mut self) {
         // might change this to an epsilon based test
         if not_zero(self.x) || not_zero(self.y) || not_zero(self.z) {
-            *self = (1f32 / self.length()) * *self
+            *self = *self * self.length().recip();
         }
     }
 
@@ -104,7 +101,7 @@ impl<O: Ops> Vec3<O> {
     }
 
     pub(crate) fn length(self) -> f32 {
-        O::sqrtf(self.length_squared())
+        O::sqrt(self.length_squared())
     }
 }
 
@@ -199,18 +196,10 @@ impl<O: Ops> Neg for Vec3<O> {
 }
 
 pub(crate) fn fabsf(x: f32) -> f32 {
-    if x.is_sign_negative() {
-        -x
-    } else {
-        x
-    }
+    if x.is_sign_negative() { -x } else { x }
 }
 
 pub(crate) fn not_zero(x: f32) -> bool {
     // could possibly use FLT_EPSILON instead
     fabsf(x) > f32::MIN_POSITIVE
-}
-
-pub(crate) fn deg_to_rad(x: f32) -> f32 {
-    x * core::f32::consts::PI / 180.0f32
 }
